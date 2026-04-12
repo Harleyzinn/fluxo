@@ -1,6 +1,6 @@
 <div align="center">
   <img src="https://img.shields.io/badge/Status-Online-success?style=for-the-badge&logo=electron" alt="Status">
-  <img src="https://img.shields.io/badge/Version-3.2.4-blue?style=for-the-badge&logo=npm" alt="Version">
+  <img src="https://img.shields.io/badge/Version-3.4.0-blue?style=for-the-badge&logo=npm" alt="Version">
   <img src="https://img.shields.io/badge/License-ISC-purple?style=for-the-badge" alt="License">
 </div>
 
