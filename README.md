@@ -4,7 +4,7 @@ Fluxo Music e um player desktop para Windows feito em Electron, com foco em musi
 
 O objetivo do projeto e ser um player com identidade propria: a interface muda com os temas, o Modo Festa acompanha a estetica ativa, o equalizador tem perfis de uso real e a sessao compartilhada permite ouvir junto sem transformar tudo em painel confuso.
 
-> Versao atual do projeto: **3.9.29**
+> Versao atual do projeto: **3.9.30**
 
 ## Baixar e instalar
 
@@ -20,7 +20,7 @@ O jeito correto para usuario final e baixar o instalador pronto pela aba **Relea
    `Fluxo-Music-Setup-x.x.x.exe`
 
    Exemplo da versao atual:
-   `Fluxo-Music-Setup-3.9.29.exe`
+   `Fluxo-Music-Setup-3.9.30.exe`
 
 4. Execute o arquivo baixado.
 
@@ -47,13 +47,12 @@ Fluxo-Music-Setup-x.x.x.exe.blockmap
 latest.yml
 ```
 
-## Novidades da 3.9.29
+## Novidades da 3.9.30
 
-- Player ganhou cache real de resolucao de stream no renderer: prefetch agora esquenta e reaproveita a URL/proxy no play.
-- Busca, preview de playlist, tocar agora, tocar a seguir e proximas faixas aquecem streams em segundo plano.
-- O `yt-dlp` faz warmup no boot e a Central Fluxo mostra versao/tempo desse aquecimento.
-- Falhas do media element invalidam cache, renovam o stream uma vez e mostram o botao **POR QUE FALHOU?**.
-- Biblioteca ganhou backup completo e restauracao por JSON unico com playlists, favoritos, historico, inbox, perfil visual e EQ.
+- Controles de reproducao tiveram codigo legado inalcancavel removido para reduzir conflito entre permissao de sessao e comandos locais.
+- Auto-Mix agora aquece o stream da proxima faixa assim que ela entra na fila.
+- Falha geral da busca virou uma tela amigavel com **Tentar de novo** e atalho para diagnostico de rede.
+- Mantido o cache/prefetch/warmup do player para iniciar faixas com menos chamadas repetidas ao `yt-dlp`.
 
 ## Principais recursos
 

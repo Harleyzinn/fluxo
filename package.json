@@ -1,0 +1,65 @@
+{
+  "name": "fluxo-music",
+  "version": "3.9.30",
+  "description": "Fluxo Music - Player",
+  "main": "main.js",
+  "author": "Adrian",
+  "license": "ISC",
+  "homepage": "https://github.com/Harleyzinn/fluxo",
+  "discordClientId": "1487787955186565250",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win --x64"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "discord-rpc": "^4.0.1",
+    "electron-updater": "^6.1.1",
+    "express": "^4.19.2",
+    "hls.js": "^1.6.16",
+    "yt-dlp-exec": "^1.0.2",
+    "yt-search": "^2.10.4"
+  },
+  "devDependencies": {
+    "electron": "^30.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.devpotato.fluxomusic",
+    "productName": "Fluxo Music",
+    "artifactName": "Fluxo-Music-Setup-${version}.${ext}",
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!backups{,/**}",
+      "!dist{,/**}",
+      "!fluxo-mobile{,/**}",
+      "!*.log",
+      "!npm-debug.log",
+      "!firebase-debug.log",
+      "!node_modules/.cache{,/**}"
+    ],
+    "extraResources": [
+      {
+        "from": "node_modules/yt-dlp-exec/bin/yt-dlp.exe",
+        "to": "yt-dlp-bin/yt-dlp.exe"
+      }
+    ],
+    "win": {
+      "icon": "icon.ico",
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "include": "build/installer.nsh"
+    },
+    "publish": {
+      "provider": "generic",
+      "url": "https://github.com/Harleyzinn/fluxo/releases/latest/download/"
+    }
+  }
+}

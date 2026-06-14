@@ -1,0 +1,16 @@
+node_modules/
+dist/
+backups/
+*.log
+*.tmp
+*.bak
+.env
+.env.*
+
+fluxo-mobile/node_modules/
+fluxo-mobile/
+fluxo-mobile/android/.gradle/
+fluxo-mobile/android/**/.gradle/
+fluxo-mobile/android/**/build/
+fluxo-mobile/android/app/build/
+fluxo-mobile/android/build/

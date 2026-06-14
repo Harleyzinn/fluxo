@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fluxo - Cyber Deck</title>
+    <link rel="icon" href="icon.ico">
+    
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&family=Fira+Code:wght@400;700&family=Orbitron:wght@400;700&family=Outfit:wght@400;700&family=Press+Start+2P&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=VT323&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
+    <script src="node_modules/hls.js/dist/hls.min.js"></script>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="dropOverlay">
+        <i class="ph ph-download-simple" style="font-size: 4rem; margin-bottom: 20px;"></i>
+        SOLTE O ARQUIVO AQUI PARA ADICIONAR À FILA
+    </div>
+
+    <div id="requestModal">
+        <div class="modal-content">
+            <h3 style="color: var(--neon-cyan); margin-bottom: 15px; display: flex; align-items: center; gap: 10px;"><i class="ph ph-hand-pointing"></i> FAZER PEDIDO</h3>
+            <div id="reqModalTrackInfo" style="color: var(--text-main); font-size: 0.9rem; margin-bottom: 15px; padding: 10px; background: rgba(0,0,0,0.3); border: var(--border-tech);"></div>
+            <textarea id="reqModalMsg" class="inline-input" style="width: 100%; height: 80px; resize: none; margin-bottom: 15px;" placeholder="Mensagem para o Anfitrião (Ex: Toca essa por favor!)..."></textarea>
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button class="btn-action" onclick="document.getElementById('requestModal').style.display = 'none';">CANCELAR</button>
+                <button class="btn-confirm" id="btnSendRequest">ENVIAR PEDIDO</button>
+            </div>
+        </div>
+    </div>
+    <div id="globalSearchOverlay" class="global-search-overlay" aria-hidden="true">
+        <div class="global-search-panel">
+            <div class="global-search-head">
+                <i class="ph ph-magnifying-glass"></i>
+                <input type="text" id="globalSearchInput" class="global-search-input" placeholder="Busca rapida no Fluxo ou YouTube...">
+                <button class="btn-action" id="btnCloseGlobalSearch" title="Fechar"><i class="ph ph-x"></i></button>
+            </div>
+            <div id="globalSearchResults" class="global-search-results"></div>
+        </div>
+    </div>
+<div id="confirmModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(5px); z-index: 999999; align-items: center; justify-content: center;">
+        <div class="modal-content" style="background: var(--bg-panel); border: var(--border-tech); padding: 30px; border-radius: var(--item-radius); max-width: 450px; text-align: center; box-shadow: 0 0 40px rgba(0,0,0,0.9);">
+            <i class="ph ph-warning-octagon" style="font-size: 4rem; color: var(--neon-pink); margin-bottom: 15px;"></i>
+            <h3 style="color: var(--neon-cyan); margin-bottom: 15px; font-family: inherit; letter-spacing: 2px;">ATENÇÃO SISTEMA</h3>
+            <p id="confirmModalMsg" style="color: var(--text-main); font-size: 1.1rem; margin-bottom: 25px;">Deseja ejetar todos os dados?</p>
+            <div style="display: flex; gap: 15px; justify-content: center;">
+                <button class="btn-abort" id="btnConfirmCancel" style="flex: 1; padding: 12px; font-weight: bold;">CANCELAR</button>
+                <button class="btn-confirm" id="btnConfirmOk" style="flex: 1; padding: 12px; font-weight: bold; background: var(--neon-pink); border-color: var(--neon-pink); color: var(--bg-base);">EJETAR</button>
+            </div>
+        </div>
+    </div>
+    <div id="customTitleBar">
+        <div id="titleBarTitle"><span>//</span> FLUXO_ MUSIC</div>
+        <div class="window-controls">
+            <button class="btn-win-control" id="titleBarMin" title="Minimizar"><i class="ph ph-minus"></i></button>
+            <button class="btn-win-control btn-win-close" id="titleBarClose" title="Fechar"><i class="ph ph-x"></i></button>
+        </div>
+    </div>
+
+    <div class="app-layout">
+        <aside class="sidebar">
+            <div class="brand"><span>//</span> FLUXO_</div>
+            
+            <nav class="sidebar-menu" id="mainMenu">
+                <button id="btnQueueView" class="sidebar-btn active"><i class="ph ph-list-dashes"></i> Fila Atual</button>
+                <button id="btnDonations" class="sidebar-btn sidebar-donate"><i class="ph ph-hand-heart"></i> Apoiar Fluxo</button>
+                <button id="btnMultiplayer" class="sidebar-btn"><i class="ph ph-users-three"></i> Sessão Compart. <span id="mpBadge" style="display:none; width: 8px; height: 8px; background: var(--neon-pink); border-radius: 50%; margin-left: 5px;"></span></button>
+                <button id="btnRadio" class="sidebar-btn"><i class="ph ph-radio"></i> Rádios Ao Vivo</button>
+                <button id="btnLibrary" class="sidebar-btn"><i class="ph ph-books"></i> Biblioteca</button>
+                <button id="btnInbox" class="sidebar-btn"><i class="ph ph-tray"></i> Inbox</button>
+                <button id="btnFavorites" class="sidebar-btn"><i class="ph ph-heart"></i> Favoritas</button>
+                <button id="btnHistory" class="sidebar-btn"><i class="ph ph-clock-counter-clockwise"></i> Histórico Recente</button>
+                <button id="btnLyrics" class="sidebar-btn"><i class="ph ph-text-aa"></i> Letra da Música</button>
+                <button id="btnEQ" class="sidebar-btn"><i class="ph ph-sliders"></i> Equalizador</button>
+                <button id="btnTimer" class="sidebar-btn"><i class="ph ph-timer"></i> Sleep Timer</button>
+                <button id="btnFluxoLab" class="sidebar-btn"><i class="ph ph-toolbox"></i> Central Fluxo</button>
+                <button id="btnThemes" class="sidebar-btn"><i class="ph ph-palette"></i> Temas & UI</button>
+                <button id="btnHotkeys" class="sidebar-btn"><i class="ph ph-keyboard"></i> Atalhos (Hotkeys)</button>
+                <button id="btnChangelog" class="sidebar-btn"><i class="ph ph-scroll"></i> Changelog</button>
+            </nav>
+
+        <div class="sidebar-bottom" style="display: flex; flex-direction: column; gap: 10px;">
+                <button id="btnPartyMode" class="btn-confirm" style="width: 100%; justify-content: center; padding: 12px; font-weight: bold; color: var(--neon-cyan); border-color: var(--neon-cyan);">
+                    <i class="ph ph-sparkle"></i> MODO FESTA
+                </button>
+                <button id="btnMiniPlayer" class="btn-action" style="width: 100%; justify-content: center; padding: 12px; color: var(--neon-pink); border-color: var(--neon-pink); font-weight: bold;">
+                    <i class="ph ph-picture-in-picture"></i> MINI PLAYER
+                </button>
+            </div>
+        </aside>
+
+        <div class="content-wrapper">
+            <header class="header">
+                <div class="search-box">
+                    <input type="text" id="searchInput" class="search-input" placeholder=">> Busca, link YouTube/SoundCloud, playlist, mix ou arrastar .mp3 e ENTER...">
+                    <button type="button" id="btnSearch" class="btn-search" title="Buscar"><i class="ph ph-magnifying-glass"></i></button>
+                </div>
+            </header>
+
+            <main class="main-container">
+                <div class="results-area">
+         <div class="panel-header">
+                        <span id="panelTitle">TERMINAL DE RESULTADOS</span>
+                        
+                        <div style="display: flex; gap: 15px; align-items: center;">
+                            <span id="queueCounter" style="color: var(--neon-pink)"></span>
+                            <button id="btnClearQueue" class="btn-abort" title="Limpar Fila Atual" style="display: none; padding: 5px 15px; font-size: 0.8rem; height: fit-content;">
+                                <i class="ph ph-trash"></i> LIMPAR FILA
+                            </button>
+                        </div>
+                    </div>
+                    <ul class="results-list" id="resultsList">
+                        <li style="padding: 40px; color: var(--text-muted); text-align: center;">
+                            <i class="ph ph-terminal" style="font-size: 3rem; margin-bottom: 15px; display: block;"></i>
+                            Aguardando entrada de dados pelo terminal superior.<br>Você também pode arrastar arquivos de áudio direto para cá.
+                        </li>
+                    </ul>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <div id="updateModal" style="display: none; position: absolute; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(10px); z-index: 999999; flex-direction: column; align-items: center; justify-content: center; color: var(--neon-cyan);">
+        <i class="ph ph-rocket-launch" style="font-size: 5rem; margin-bottom: 20px; animation: pulseGlow 2s infinite;"></i>
+        <h2 style="letter-spacing: 3px; margin-bottom: 10px; text-transform: uppercase;">SISTEMA OS: ATUALIZAÇÃO</h2>
+        <div id="updateStatus" style="font-family: monospace; margin-bottom: 20px; color: var(--text-main);">Procurando dados...</div>
+        <div style="width: 400px; height: 10px; background: rgba(255,255,255,0.1); border-radius: 10px; border: var(--border-tech); overflow: hidden;">
+            <div id="updateProgressFill" style="width: 0%; height: 100%; background: var(--neon-pink); transition: width 0.2s;"></div>
+        </div>
+    </div>
+<div id="videoContainer"></div>
+
+    <footer class="player-deck">
+        <div class="now-playing">
+            <i class="ph ph-terminal-window np-pipboy-icon"></i>
+            <div class="np-cover" id="cover" style="background-image: url('');"><i class="ph ph-disc" id="coverIcon"></i></div>
+            <div class="np-info">
+                <span class="np-title" id="title">SISTEMA INICIADO</span>
+                <span class="np-artist" id="artist">Aguardando comando</span>
+                <div class="visualizer" id="visualizer">
+                    <div class="vis-bar"></div><div class="vis-bar"></div><div class="vis-bar"></div>
+                    <div class="vis-bar"></div><div class="vis-bar"></div><div class="vis-bar"></div>
+                    <div class="vis-bar"></div><div class="vis-bar"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="deck-controls">
+            <div class="hardware-buttons" id="deckHardwareButtons">
+                <div class="deck-tool-group deck-tools-left">
+                    <button class="btn" id="shuffleBtn" title="Aleatório"><i class="ph ph-shuffle"></i></button>
+                    <button class="btn" id="loopBtn" title="Repetição"><i class="ph ph-repeat"></i></button>
+                    <button class="btn" id="autoMixBtn" title="Auto-Mix (Rádio Infinito)"><i class="ph ph-infinity"></i></button>
+                    <button class="btn" id="crossfadeBtn" title="Transição Suave (Crossfade)"><i class="ph ph-intersect"></i></button>
+                    <button class="btn" id="btnSpeedFx" title="Velocidade, Reverb e DSP"><i class="ph ph-gauge"></i></button>
+                </div>
+                <div class="deck-media-center">
+                    <button class="btn" id="prevBtn" title="Anterior"><i class="ph ph-skip-back"></i></button>
+                    <button class="btn btn-play" id="playPauseBtn" title="Play/Pause"><i class="ph ph-play-circle"></i></button>
+                    <button class="btn" id="nextBtn" title="Próximo"><i class="ph ph-skip-forward"></i></button>
+                </div>
+                <div class="deck-tool-group deck-tools-right">
+                    <button class="btn" id="btnToggleVideo" title="Ligar/Desligar Vídeo"><i class="ph ph-video-camera"></i></button>
+                    <button class="btn" id="btnPiP" title="Modo Flutuante"><i class="ph ph-copy"></i></button>
+                    <button class="btn" id="btnFullscreen" title="Tela Cheia"><i class="ph ph-corners-out"></i></button>
+                </div>
+            </div>
+            <div class="timeline">
+                <span class="time" id="currentTime">0:00</span>
+                <div class="progress-bar" id="progressBar">
+                    <canvas id="timelineWaveform" class="timeline-waveform"></canvas>
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <span class="time" id="durationTime">0:00</span>
+            </div>
+        </div>
+
+        <div class="volume-container">
+            <i class="ph ph-speaker-high" id="volIcon" title="Mutar/Desmutar"></i>
+            <input type="range" id="volumeSlider" class="vol-slider" min="0" max="1" step="0.01" value="1">
+        </div>
+
+      <div class="mini-controls">
+            <button class="btn" id="btnPinMini" title="Desafixar do Topo" style="color: var(--neon-cyan); font-size: 1.3rem;"><i class="ph ph-push-pin"></i></button>
+            <button class="btn" id="btnExitMini" title="Maximizar" style="color: var(--neon-pink); font-size: 1.3rem;"><i class="ph ph-arrows-out"></i></button>
+            <button class="btn" id="btnExitParty" title="Sair do Modo Festa" style="display: none; color: var(--neon-pink); font-size: 2.5rem;"><i class="ph ph-x-square"></i></button>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
