@@ -10,8 +10,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // AS FUNÇÕES DE ÁUDIO QUE ESTAVAM FALTANDO!
     // =========================================================
     searchAudio: (query) => ipcRenderer.invoke('search-audio', query),
-    getStreamUrl: (id, quality) => ipcRenderer.invoke('get-stream-url', id, quality),
-    resolveTrackStream: (track, quality) => ipcRenderer.invoke('resolve-track-stream', track, quality),
+    getStreamUrl: (id, quality, options) => ipcRenderer.invoke('get-stream-url', id, quality, options),
+    resolveTrackStream: (track, quality, options) => ipcRenderer.invoke('resolve-track-stream', track, quality, options),
     downloadAudio: (id, title, collectionTitle) => ipcRenderer.invoke('download-audio', id, title, collectionTitle),
     getSpotifyInfo: (url) => ipcRenderer.invoke('get-spotify-info', url),
     updateDiscordPresence: (track, state) => ipcRenderer.send('discord-presence-update', track, state),
@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     openPluginsFolder: () => ipcRenderer.invoke('plugins-open-folder'),
     openExternalUrl: (url) => ipcRenderer.invoke('external-url-open', url),
     runNetworkDiagnostics: () => ipcRenderer.invoke('network-diagnostics-run'),
+    clearStreamCache: () => ipcRenderer.invoke('stream-cache-clear'),
     diagnoseMedia: (track, quality) => ipcRenderer.invoke('diagnose-media', track, quality),
     openNowPlayingWidget: (mode) => ipcRenderer.invoke('now-playing-widget-open', mode),
     updateNowPlayingWidget: (payload) => ipcRenderer.send('now-playing-widget-update', payload),

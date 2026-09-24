@@ -88,8 +88,12 @@ function normalizeTrack(track) {
 }
 
 function normalizeSearchResult(result) {
-    const tracks = Array.isArray(result) ? result : (Array.isArray(result?.tracks) ? result.tracks : []);
-    return { tracks: tracks.map(normalizeTrack).filter(track => track && getTrackStreamId(track)) };
+    const data = Array.isArray(result) ? { tracks: result } : (result || {});
+    const tracks = Array.isArray(data.tracks) ? data.tracks : [];
+    return {
+        ...data,
+        tracks: tracks.map(normalizeTrack).filter(track => track && getTrackStreamId(track))
+    };
 }
 
 async function searchAudioTracks(query) {
@@ -103,6 +107,7 @@ const streamPrefetchKeys = new Set();
 const streamResolutionCache = new Map();
 const streamResolutionInflight = new Map();
 let currentStreamRetryKey = '';
+let playbackLoadGeneration = 0;
 
 function getResolvedStreamCacheKey(track, quality = 'audio') {
     const normalized = normalizeTrack(track);
@@ -153,12 +158,12 @@ async function resolveTrackStreamCached(track, quality = 'audio', options = {}) 
         return { ...cached.resolved, fromCache: true };
     }
 
-    if (streamResolutionInflight.has(key)) return streamResolutionInflight.get(key);
+    if (streamResolutionInflight.has(key) && (!options.forceRefresh || streamResolutionInflight.get(key).forceRefresh)) return streamResolutionInflight.get(key);
 
     const promise = (async () => {
         const rawResolved = window.electronAPI.resolveTrackStream
-            ? await window.electronAPI.resolveTrackStream(normalized, quality)
-            : { url: await window.electronAPI.getStreamUrl(trackId, quality), quality, track: normalized };
+            ? await window.electronAPI.resolveTrackStream(normalized, quality, { forceRefresh: Boolean(options.forceRefresh) })
+            : { url: await window.electronAPI.getStreamUrl(trackId, quality, { forceRefresh: Boolean(options.forceRefresh) }), quality, track: normalized };
         const url = typeof rawResolved === 'string' ? rawResolved : rawResolved?.url;
         if (!url) throw new Error('Stream indisponivel.');
         const resolved = {
@@ -170,14 +175,15 @@ async function resolveTrackStreamCached(track, quality = 'audio', options = {}) 
             source: rawResolved?.source || 'direct',
             warmedAt: Date.now()
         };
-        return rememberResolvedStream(key, resolved);
+        return streamResolutionInflight.get(key) === promise ? rememberResolvedStream(key, resolved) : resolved;
     })();
+    promise.forceRefresh = Boolean(options.forceRefresh);
 
     streamResolutionInflight.set(key, promise);
     try {
         return await promise;
     } finally {
-        streamResolutionInflight.delete(key);
+        if (streamResolutionInflight.get(key) === promise) streamResolutionInflight.delete(key);
     }
 }
 
@@ -993,6 +999,7 @@ function canControl(action = 'all') {
 const menuButtons = document.querySelectorAll('.sidebar-btn');
 
 function handleTabSwitch(clickedBtn) {
+    cancelActiveSearch(false);
     // 1. Controle Visual (Remove o brilho dos outros botões e acende o clicado)
     menuButtons.forEach(btn => btn.classList.remove('active'));
     clickedBtn.classList.add('active');
@@ -1049,10 +1056,39 @@ document.getElementById('btnDonations')?.addEventListener('click', renderDonatio
 
 const FLUXO_CHANGELOG = [
     {
+        version: '3.9.32',
+        date: '24/09/2026',
+        title: 'Reproducao recuperada e busca mais confiavel',
+        badge: 'Atual',
+        items: [
+            'Extrator de midia atualizado e Deno incluido no instalador, sem exigir Node.js no computador do usuario.',
+            'Proxy entrega audio e video em blocos com Range limitado, preservando avanco e retrocesso.',
+            'Video usa o manifesto HLS quando o YouTube entrega audio e imagem separados, mantendo ambos sincronizados.',
+            'Renovacao de stream limpa o cache correto; requisicoes antigas nao substituem a musica selecionada.',
+            'Faixas indisponiveis nao sao mais trocadas silenciosamente por outra gravacao.',
+            'Busca cancelavel, respostas antigas descartadas e disponibilidade de YouTube e SoundCloud separada.',
+            'Diagnostico testa buscas reais e entrega de midia, com limpeza de cache sem apagar a biblioteca.',
+            'Discord aguarda antes de reconectar quando esta fechado, evitando tentativas excessivas.',
+            'Instalador inclui somente arquivos do app e dependencias; mapas, backups e arquivos privados ficam de fora.'
+        ]
+    },
+    {
+        version: '3.9.31',
+        date: '14/06/2026',
+        title: 'Playlists seletivas e radio mais esperto',
+        badge: 'Anterior',
+        items: [
+            'Playlists do YouTube agora abrem em uma tela de importacao seletiva com marcar tudo, limpar, inverter, importar selecionadas, importar tudo e salvar selecionadas.',
+            'Removido o limite artificial de 200 musicas nas playlists do YouTube.',
+            'Infinite Radio passou a lembrar artistas recentes, penalizar repeticao e evitar compilacoes, podcasts, tutoriais, loops e lives longas.',
+            'Busca preserva metadados de colecao no renderer para detectar melhor playlists, mixes e fontes importadas.'
+        ]
+    },
+    {
         version: '3.9.30',
         date: '14/06/2026',
         title: 'Polimento do player',
-        badge: 'Atual',
+        badge: 'Anterior',
         items: [
             'Controles de reproducao tiveram codigo legado inalcancavel removido para reduzir conflito entre permissao de sessao e comandos locais.',
             'Auto-Mix agora aquece o stream da proxima faixa assim que ela entra na fila.',
@@ -1608,14 +1644,14 @@ function renderDonationsPanel() {
 
 function renderChangelog() {
     panelTitle.innerText = 'CHANGELOG DO FLUXO';
-    queueCounter.innerText = 'v3.9.30';
+    queueCounter.innerText = 'v3.9.32';
     resultsList.innerHTML = `
         <li class="changelog-root">
             <section class="changelog-hero">
                 <div class="changelog-hero-icon"><i class="ph ph-scroll"></i></div>
                 <div>
                     <span class="changelog-kicker">Historico de mudancas</span>
-                    <h2>Fluxo Music 3.9.30</h2>
+                    <h2>Fluxo Music 3.9.32</h2>
                     <p>Resumo das mudancas recentes do player, interface, updater, Discord RPC, busca, temas e recursos principais.</p>
                 </div>
                 <button class="btn-confirm changelog-copy" id="btnCopyChangelog"><i class="ph ph-copy"></i> COPIAR</button>
@@ -2317,7 +2353,7 @@ async function resolvePlayableStreamForTrack(track, preferredMode = 'audio', opt
         try {
             const resolved = await resolveTrackStreamCached(normalized, mode, { forceRefresh: Boolean(options.forceRefresh) });
             const url = resolved?.url;
-            if (url) return { url, mode: resolved?.quality || mode, track: normalized, target: resolved?.target || trackId, source: resolved?.source || 'direct' };
+            if (url) return { url, mode: resolved?.quality || mode, track: normalized, target: resolved?.target || trackId, source: resolved?.source || 'direct', fromCache: Boolean(resolved?.fromCache) };
             throw new Error('Stream indisponivel.');
         } catch (error) {
             lastError = error;
@@ -2614,20 +2650,28 @@ function getTrackFingerprint(track) {
     return `${artist}|${title}`.replace(/^\|+|\|+$/g, '');
 }
 
+function getAutoMixArtistKey(track) {
+    const normalized = normalizeTrack(track);
+    const artist = normalizeLookupText(sanitizeMetadata(normalized?.artist || normalized?.author || ''));
+    return /^(desconhecido|unknown|youtube|soundcloud|importado do spotify)$/.test(artist) ? '' : artist;
+}
+
 function rememberAutoMixTrack(track) {
     const fingerprint = getTrackFingerprint(track);
     if (!fingerprint) return;
+    const normalized = normalizeTrack(track);
 
     autoMixMemory = [
-        { fingerprint, id: normalizeTrack(track)?.id || '', playedAt: Date.now() },
-        ...autoMixMemory.filter(item => item.fingerprint !== fingerprint && item.id !== normalizeTrack(track)?.id)
+        { fingerprint, id: normalized?.id || '', artistKey: getAutoMixArtistKey(normalized), playedAt: Date.now() },
+        ...autoMixMemory.filter(item => item.fingerprint !== fingerprint && item.id !== normalized?.id)
     ].slice(0, 140);
     localStorage.setItem('fluxo_automix_memory', JSON.stringify(autoMixMemory));
 }
 
 function isLikelyBadAutoMixCandidate(track) {
     const text = normalizeLookupText(`${track?.title || ''} ${track?.artist || track?.author || ''}`);
-    return /\b(playlist|mix|full album|album completo|reaction|review|tutorial|karaoke|instrumental|extended|compilation|coletanea|top 10|ranking|type beat|cover)\b/.test(text)
+    return /\b(playlist|mix|full album|album completo|reaction|review|tutorial|karaoke|instrumental|extended|compilation|coletanea|top 10|ranking|type beat|cover|podcast|episode|episodio|aula|how to|remix compilation|tiktok compilation|shorts)\b/.test(text)
+        || /\b(live set|dj set|set completo|ao vivo completo|loop)\b/.test(text)
         || /\b(1|2|3|4|8|10)\s*(hour|hours|hora|horas)\b/.test(text);
 }
 
@@ -2665,9 +2709,13 @@ function getAutoMixStyle(track) {
     const text = normalizeLookupText(`${track?.title || ''} ${track?.artist || track?.author || ''}`);
     const buckets = [
         { id: 'anime', pattern: /\b(anime|opening|ending|ost|jpop|j rock|jrock|vocaloid)\b/ },
+        { id: 'game', pattern: /\b(game|gaming|ost|undertale|persona|minecraft|zelda|hollow knight|terraria|sonic|final fantasy)\b/ },
         { id: 'phonk', pattern: /\b(phonk|drift|bruxaria|mandela)\b/ },
         { id: 'lofi', pattern: /\b(lofi|lo fi|chill|study|beats|jazzhop)\b/ },
         { id: 'rap', pattern: /\b(rap|trap|hip hop|hiphop|drill|plug|boombap)\b/ },
+        { id: 'br', pattern: /\b(funk|mtg|automotivo|mandela|sertanejo|pagode|bossa|forro|pisadinha|trap br|rap nacional)\b/ },
+        { id: 'pop', pattern: /\b(pop|dance pop|kpop|k pop|rnb|r&b|indie pop)\b/ },
+        { id: 'indie', pattern: /\b(indie|bedroom pop|shoegaze|dreampop|dream pop|alt rock|alternative)\b/ },
         { id: 'rock', pattern: /\b(rock|metal|punk|emo|hardcore|grunge)\b/ },
         { id: 'electronic', pattern: /\b(electronic|edm|house|techno|dubstep|synthwave|trance)\b/ },
         { id: 'funk', pattern: /\b(funk|mtg|automotivo|beat fino)\b/ },
@@ -2718,6 +2766,7 @@ function getAutoMixRelation(candidateTrack, currentTrack, seedTrack) {
             score = Math.max(score, 22 + totalOverlap * 6);
         }
         if (sameStyle) {
+            hasRelation = true;
             score = Math.max(score, 18);
         }
     });
@@ -2727,6 +2776,20 @@ function getAutoMixRelation(candidateTrack, currentTrack, seedTrack) {
 
 function getSeenTrackSets() {
     const tracks = [...queue, ...playHistory].map(normalizeTrack).filter(Boolean);
+    const recentTracks = [
+        ...queue.slice(Math.max(0, queue.length - 12)),
+        ...playHistory.slice(0, 28)
+    ].map(normalizeTrack).filter(Boolean);
+    const artistCounts = new Map();
+    recentTracks.forEach(track => {
+        const artistKey = getAutoMixArtistKey(track);
+        if (artistKey) artistCounts.set(artistKey, (artistCounts.get(artistKey) || 0) + 1);
+    });
+    autoMixMemory.slice(0, 28).forEach(item => {
+        const artistKey = item.artistKey || '';
+        if (artistKey) artistCounts.set(artistKey, (artistCounts.get(artistKey) || 0) + 1);
+    });
+
     return {
         ids: new Set([
             ...tracks.map(track => track.id).filter(Boolean),
@@ -2735,7 +2798,8 @@ function getSeenTrackSets() {
         fingerprints: new Set([
             ...tracks.map(getTrackFingerprint).filter(Boolean),
             ...autoMixMemory.map(item => item.fingerprint).filter(Boolean)
-        ])
+        ]),
+        artistCounts
     };
 }
 
@@ -2753,16 +2817,19 @@ function scoreAutoMixCandidate(track, currentTrack, seen, seedTrack = currentTra
     let score = 70 + relation.score;
     const title = normalizeLookupText(normalized.title);
     const currentTitle = normalizeLookupText(currentTrack?.title);
-    const artist = normalizeLookupText(normalized.artist);
-    const currentArtist = normalizeLookupText(currentTrack?.artist);
+    const artistKey = getAutoMixArtistKey(normalized);
+    const currentArtistKey = getAutoMixArtistKey(currentTrack);
+    const recentArtistCount = artistKey ? (seen.artistCounts.get(artistKey) || 0) : 0;
     const duration = parseDurationSeconds(normalized.duration);
 
     if (title && currentTitle && (title.includes(currentTitle) || currentTitle.includes(title))) score -= 75;
-    if (artist && currentArtist && artist === currentArtist) score += 10;
+    if (artistKey && currentArtistKey && artistKey === currentArtistKey) score += recentArtistCount >= 2 ? -10 : 12;
+    if (artistKey && artistKey !== currentArtistKey && recentArtistCount >= 2) score -= 22 + recentArtistCount * 4;
     if (duration && duration < 85) return -9999;
     if (duration && duration > 660) return -9999;
     if (duration && duration > 480) score -= 25;
-    if (/\b(official audio|official video|visualizer)\b/i.test(normalized.title)) score += 10;
+    if (/\b(official audio|official video|visualizer|topic)\b/i.test(normalized.title)) score += 10;
+    if (/\b(remix|speed up|sped up|slowed|nightcore)\b/i.test(normalized.title) && getAutoMixStyle(normalized) !== getAutoMixStyle(currentTrack)) score -= 18;
     if (normalized.thumbnail) score += 4;
 
     return score >= 76 ? score : -9999;
@@ -2785,15 +2852,16 @@ function buildAutoMixQueries(currentTrack, seedTrack = autoMixSeedTrack) {
         if (clean && !queries.includes(clean)) queries.push(clean);
     };
 
-    addQuery(base && `${base} similar songs official audio`);
-    addQuery(artist && `${artist} official audio`);
-    addQuery(artist && `${artist} top songs audio`);
-    addQuery(artist && title && `${artist} ${title} radio audio`);
-    addQuery(seedBase && seedBase !== base && `${seedBase} similar songs audio`);
-    addQuery(seedArtist && seedArtist !== artist && `${seedArtist} ${artist || 'similar'} songs audio`);
+    addQuery(base && `${base} official audio`);
+    addQuery(artist && title && `${artist} songs like ${title} official audio`);
+    addQuery(artist && `${artist} official audio topic`);
+    addQuery(artist && `${artist} music official audio`);
+    addQuery(seedBase && seedBase !== base && `${seedBase} official audio`);
+    addQuery(seedArtist && seedArtist !== artist && `${seedArtist} ${artist || 'similar'} official audio`);
 
     const style = getAutoMixStyle(current);
-    addQuery(style && artist && `${artist} ${style} audio`);
+    addQuery(style && artist && `${artist} ${style} official audio`);
+    addQuery(style && !artist && `${style} music official audio`);
 
     return queries.slice(0, 7);
 }
@@ -2896,6 +2964,7 @@ async function startRadioFromTrack(track) {
     if (firstSuggestion) {
         queue.push(firstSuggestion);
         originalQueue.push(firstSuggestion);
+        prefetchStream(firstSuggestion, isVideoMode ? 'video' : 'audio');
         publishRoomState();
     }
 
@@ -3950,13 +4019,24 @@ window.rejectMusic = (rid) => trackMultiplayerPromise(
 // MOTOR DE BUSCA (AGORA COM SPOTIFY, DOWNLOAD E PROTEÇÃO)
 // ========================================================
 let isSearchRunning = false;
+let searchGeneration = 0;
+
+function cancelActiveSearch(showMessage = true) {
+    if (!isSearchRunning) return;
+    searchGeneration++;
+    isSearchRunning = false;
+    setSearchBusy(false);
+    if (showMessage) resultsList.innerHTML = '<li class="search-status" role="status">Busca cancelada.</li>';
+}
 
 function setSearchBusy(isBusy) {
     if (!btnSearch) return;
-    btnSearch.disabled = isBusy;
+    btnSearch.disabled = false;
+    btnSearch.title = isBusy ? 'Cancelar busca' : 'Buscar';
+    btnSearch.setAttribute('aria-label', btnSearch.title);
     btnSearch.classList.toggle('is-loading', isBusy);
     btnSearch.innerHTML = isBusy
-        ? '<i class="ph ph-spinner-gap ph-spin"></i>'
+        ? '<i class="ph ph-x"></i>'
         : '<i class="ph ph-magnifying-glass"></i>';
 }
 
@@ -4003,13 +4083,144 @@ function getSearchUrlKind(value) {
     return { type: '', isCollection: false };
 }
 
+function getUniquePlaylistTitle(baseTitle) {
+    const base = String(baseTitle || 'Playlist importada').replace(/\s+/g, ' ').trim().slice(0, 90) || 'Playlist importada';
+    const existing = new Set(savedPlaylists.map(playlist => normalizeLookupText(playlist.title)));
+    if (!existing.has(normalizeLookupText(base))) return base;
+
+    let index = 2;
+    while (existing.has(normalizeLookupText(`${base} (${index})`))) index += 1;
+    return `${base} (${index})`;
+}
+
+function renderYouTubePlaylistImportSelector(collection) {
+    const tracks = (collection?.tracks || []).map(normalizeTrack).filter(Boolean);
+    const title = collection?.title || 'Playlist do YouTube';
+    panelTitle.innerText = 'IMPORTAR PLAYLIST DO YOUTUBE';
+    queueCounter.innerText = `${tracks.length} faixas`;
+
+    if (!tracks.length) {
+        resultsList.innerHTML = '<li style="padding: 28px; text-align: center; color: var(--neon-pink);">Nenhuma musica importavel foi encontrada nesta playlist.</li>';
+        return;
+    }
+
+    warmTrackStreams(tracks, 'audio', Math.min(5, tracks.length));
+
+    resultsList.innerHTML = `
+        <li class="yt-import-root">
+            <section class="yt-import-head">
+                <div class="yt-import-titlebox">
+                    <span class="changelog-kicker">YouTube playlist</span>
+                    <h2>${escapeHtml(title)}</h2>
+                    <p>Escolha exatamente o que entra no Fluxo. Playlists grandes agora podem vir completas, sem corte artificial em 200 faixas.</p>
+                </div>
+                <div class="yt-import-meter">
+                    <strong id="ytImportSelectedCount">${tracks.length}</strong>
+                    <span>/ ${tracks.length} selecionadas</span>
+                </div>
+            </section>
+            <section class="yt-import-actions">
+                <button class="btn-action" id="btnYtSelectAll"><i class="ph ph-check-square"></i> TODAS</button>
+                <button class="btn-action" id="btnYtSelectNone"><i class="ph ph-square"></i> NENHUMA</button>
+                <button class="btn-action" id="btnYtInvertSelection"><i class="ph ph-arrows-clockwise"></i> INVERTER</button>
+                <button class="btn-confirm" id="btnYtImportSelected"><i class="ph ph-list-plus"></i> IMPORTAR SELECIONADAS</button>
+                <button class="btn-confirm" id="btnYtImportAll"><i class="ph ph-stack-plus"></i> IMPORTAR TUDO</button>
+                <button class="btn-action" id="btnYtSaveSelected"><i class="ph ph-floppy-disk"></i> SALVAR SELECIONADAS</button>
+            </section>
+            <section class="yt-import-list" id="ytImportTrackList">
+                ${tracks.map((track, index) => `
+                    <label class="yt-import-row">
+                        <input type="checkbox" class="yt-import-check" data-index="${index}" checked>
+                        <img src="${escapeHtml(track.thumbnail || '')}" alt="">
+                        <span class="yt-import-index">${index + 1}</span>
+                        <span class="yt-import-info">
+                            <strong>${escapeHtml(track.title)}</strong>
+                            <small>${escapeHtml(track.artist || 'YouTube')}${track.duration ? ` - ${escapeHtml(track.duration)}` : ''}</small>
+                        </span>
+                    </label>
+                `).join('')}
+            </section>
+        </li>
+    `;
+
+    const getChecks = () => Array.from(document.querySelectorAll('.yt-import-check'));
+    const getSelectedTracks = () => getChecks()
+        .filter(check => check.checked)
+        .map(check => tracks[Number(check.dataset.index)])
+        .map(normalizeTrack)
+        .filter(Boolean);
+
+    const syncSelectionUi = () => {
+        const selectedCount = getChecks().filter(check => check.checked).length;
+        const countEl = document.getElementById('ytImportSelectedCount');
+        if (countEl) countEl.innerText = String(selectedCount);
+        document.getElementById('btnYtImportSelected').disabled = selectedCount === 0;
+        document.getElementById('btnYtSaveSelected').disabled = selectedCount === 0;
+    };
+
+    const openImportedPlaylist = (selectedTracks, importedTitle = title) => {
+        if (!selectedTracks.length) {
+            alert('Selecione pelo menos uma musica para importar.');
+            return;
+        }
+        renderPlaylistPreview({
+            title: importedTitle,
+            cover: selectedTracks[0]?.thumbnail || '',
+            locked: false,
+            tracks: selectedTracks
+        });
+    };
+
+    const saveSelectedPlaylist = () => {
+        const selectedTracks = getSelectedTracks();
+        if (!selectedTracks.length) {
+            alert('Selecione pelo menos uma musica para salvar.');
+            return;
+        }
+        const playlistTitle = getUniquePlaylistTitle(title);
+        savedPlaylists.push({
+            title: playlistTitle,
+            cover: selectedTracks[0]?.thumbnail || '',
+            locked: false,
+            tracks: selectedTracks
+        });
+        savePlaylists();
+        updateAchievementProgress('playlistSaved');
+        const button = document.getElementById('btnYtSaveSelected');
+        if (button) {
+            button.innerHTML = `<i class="ph ph-check"></i> SALVA COMO ${escapeHtml(playlistTitle).slice(0, 32)}`;
+            setTimeout(() => {
+                button.innerHTML = '<i class="ph ph-floppy-disk"></i> SALVAR SELECIONADAS';
+            }, 1800);
+        }
+    };
+
+    getChecks().forEach(check => check.addEventListener('change', syncSelectionUi));
+    document.getElementById('btnYtSelectAll').onclick = () => {
+        getChecks().forEach(check => { check.checked = true; });
+        syncSelectionUi();
+    };
+    document.getElementById('btnYtSelectNone').onclick = () => {
+        getChecks().forEach(check => { check.checked = false; });
+        syncSelectionUi();
+    };
+    document.getElementById('btnYtInvertSelection').onclick = () => {
+        getChecks().forEach(check => { check.checked = !check.checked; });
+        syncSelectionUi();
+    };
+    document.getElementById('btnYtImportSelected').onclick = () => openImportedPlaylist(getSelectedTracks(), `${title} - selecionadas`);
+    document.getElementById('btnYtImportAll').onclick = () => openImportedPlaylist(tracks, title);
+    document.getElementById('btnYtSaveSelected').onclick = saveSelectedPlaylist;
+    syncSelectionUi();
+}
+
 async function executeSearch() {
     const rawQuery = searchInput ? searchInput.value.trim() : '';
     if (!rawQuery) {
         if (searchInput) searchInput.focus();
         return;
     }
-    if (isSearchRunning) return;
+    const requestId = ++searchGeneration;
 
     if (!window.electronAPI?.searchAudio) {
         resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: var(--neon-pink);">A busca precisa ser executada dentro do Fluxo Music.</li>';
@@ -4029,6 +4240,7 @@ async function executeSearch() {
 
             try {
                 const spData = await window.electronAPI.getSpotifyInfo(query);
+                if (requestId !== searchGeneration) return;
 
                 if (spData && spData.searchQueries && spData.searchQueries.length > 0) {
                     if (spData.searchQueries.length > 1) {
@@ -4050,6 +4262,7 @@ async function executeSearch() {
                     return;
                 }
             } catch (err) {
+                if (requestId !== searchGeneration) return;
                 console.error("Erro no Spotify:", err);
                 resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: var(--neon-pink);">Erro de conexão com a API do Spotify.</li>';
                 return;
@@ -4066,6 +4279,7 @@ async function executeSearch() {
         // BUSCA PADRÃO (YOUTUBE / TERMOS)
         try {
             const data = await searchAudioTracks(query);
+            if (requestId !== searchGeneration) return;
             resultsList.innerHTML = '';
             
             // Graças ao interceptador no topo, 'data' sempre terá .tracks
@@ -4078,6 +4292,14 @@ async function executeSearch() {
 
             if (data?.isCollection && faixas.length > 1) {
                 warmTrackStreams(faixas, 'audio', 3);
+                if (urlKind.type === 'youtube') {
+                    renderYouTubePlaylistImportSelector({
+                        title: data.title || 'Playlist do YouTube',
+                        source: data.source || 'YouTube',
+                        tracks: faixas
+                    });
+                    return;
+                }
                 renderPlaylistPreview({
                     title: data.title || (data.source ? `${data.source} importado` : 'Playlist importada'),
                     tracks: faixas
@@ -4086,6 +4308,14 @@ async function executeSearch() {
             }
 
             warmTrackStreams(faixas, 'audio', 3);
+
+            if (data.providers?.length) {
+                const status = document.createElement('li');
+                status.className = 'search-status';
+                status.setAttribute('role', 'status');
+                status.innerHTML = data.providers.map(provider => `<span class="${provider.ok ? '' : 'search-provider-error'}"><i class="ph ${provider.ok ? 'ph-check-circle' : 'ph-warning-circle'}"></i> ${escapeHtml(provider.name)}: ${provider.ok ? `${provider.count} resultados` : 'indisponivel'}</span>`).join('');
+                resultsList.appendChild(status);
+            }
 
             faixas.forEach(t => {
                 const li = document.createElement('li'); li.className = 'result-item';
@@ -4301,6 +4531,7 @@ async function executeSearch() {
                 resultsList.appendChild(li);
             });
     } catch (err) {
+        if (requestId !== searchGeneration) return;
         console.error("Erro fatal na busca principal:", err);
         resultsList.innerHTML = `
             <li class="lab-card solo-panel">
@@ -4318,8 +4549,10 @@ async function executeSearch() {
         document.getElementById('btnSearchNetworkDiag')?.addEventListener('click', renderNetworkDiagnosticsPanel);
     }
     } finally {
-        isSearchRunning = false;
-        setSearchBusy(false);
+        if (requestId === searchGeneration) {
+            isSearchRunning = false;
+            setSearchBusy(false);
+        }
     }
 }
 
@@ -4335,7 +4568,8 @@ if (searchInput) {
 if (btnSearch) {
     btnSearch.addEventListener('click', (e) => {
         e.preventDefault();
-        executeSearch();
+        if (isSearchRunning) cancelActiveSearch();
+        else executeSearch();
     });
 }
 
@@ -4544,6 +4778,10 @@ async function transitionToTrack(index, smooth = isCrossfade) {
 
 async function loadAndPlayTrack(index, options = {}) {
     if(!queue[index]) return;
+    const generation = ++playbackLoadGeneration;
+    const selectedTrack = queue[index];
+    const isCurrentLoad = () => generation === playbackLoadGeneration && queue[index] === selectedTrack;
+    currentStreamRetryKey = '';
     clearMediaFailureAction();
     if (previewPlayer && !previewPlayer.paused) { previewPlayer.pause(); document.querySelectorAll('.btn-preview').forEach(b => b.classList.replace('ph-pause-circle', 'ph-play-circle')); }
     initEQ(); 
@@ -4554,11 +4792,13 @@ async function loadAndPlayTrack(index, options = {}) {
         titleEl.innerText = 'CONVERTENDO NO YOUTUBE...';
         try {
             t = await resolveGhostTrack(t);
+            if (!isCurrentLoad()) return;
             queue[index] = t;
             if (originalQueue[index]) originalQueue[index] = t;
         } catch {
+            if (!isCurrentLoad()) return;
             titleEl.innerText = 'FALHA NA CONVERSAO';
-            setTimeout(() => document.getElementById('nextBtn').click(), 2000);
+            setTimeout(() => { if (generation === playbackLoadGeneration) document.getElementById('nextBtn').click(); }, 2000);
             return;
         }
     } else {
@@ -4590,6 +4830,7 @@ async function loadAndPlayTrack(index, options = {}) {
     let resolvedStream = null;
     try {
         resolvedStream = await resolvePlayableStreamForTrack(t, playbackMode);
+        if (generation !== playbackLoadGeneration || getTrackKey(queue[currentIndex]) !== getTrackKey(t)) return;
         url = resolvedStream.url;
         artistEl.innerText = resolvedStream?.fromCache ? 'Abrindo stream quente...' : 'Abrindo stream...';
 
@@ -4600,6 +4841,7 @@ async function loadAndPlayTrack(index, options = {}) {
             }
         }
     } catch (error) {
+        if (generation !== playbackLoadGeneration) return;
         const reason = classifyMediaError(error, 'Nao foi possivel gerar stream para essa faixa.');
         recordMediaIssue(t, reason, playbackMode, error);
         titleEl.innerText = "ERRO DE STREAM";
@@ -4641,12 +4883,16 @@ async function loadAndPlayTrack(index, options = {}) {
     updateDiscordNowPlaying('playing');
     try {
         await audioPlayer.play();
+        if (generation !== playbackLoadGeneration) return;
         artistEl.innerText = t.artist;
         clearMediaFailureAction();
         currentStreamRetryKey = '';
         if (options.fadeIn) await fadeMainVolume(targetVolume, getSmartFadeDuration(t));
     } catch (e) {
-        console.log(e);
+        if (generation !== playbackLoadGeneration || e.name === 'AbortError') return;
+        const reason = classifyMediaError(e, 'Nao foi possivel iniciar a reproducao.');
+        artistEl.innerText = reason;
+        showMediaFailureAction(t, reason, playbackMode);
     }
 }
 // ========================================================
@@ -4794,18 +5040,20 @@ async function retryCurrentStreamAfterMediaError(track, mode = 'audio', reason =
     const retryKey = `${getTrackKey(normalized)}::${mode}`;
     if (currentStreamRetryKey === retryKey) return;
     currentStreamRetryKey = retryKey;
+    const generation = playbackLoadGeneration;
 
     const resumeAt = Number.isFinite(audioPlayer.currentTime) ? audioPlayer.currentTime : 0;
-    const shouldResume = !audioPlayer.paused;
+    const shouldResume = !audioPlayer.paused || Boolean(audioPlayer.error);
     artistEl.innerText = 'Renovando stream...';
     invalidateResolvedStream(normalized, mode);
     if (mode !== 'audio') invalidateResolvedStream(normalized, 'audio');
 
     try {
         const resolvedStream = await resolvePlayableStreamForTrack(normalized, mode, { forceRefresh: true });
-        if (!resolvedStream?.url || getTrackKey(normalized) !== getTrackKey(queue[currentIndex])) return;
+        if (generation !== playbackLoadGeneration || !resolvedStream?.url || getTrackKey(normalized) !== getTrackKey(queue[currentIndex])) return;
         setMediaElementSource(audioPlayer, resolvedStream.url, 'main');
         await waitForMediaMetadata(audioPlayer).catch(() => {});
+        if (generation !== playbackLoadGeneration) return;
         if (resumeAt > 1 && Number.isFinite(audioPlayer.duration) && audioPlayer.duration > resumeAt + 1) {
             audioPlayer.currentTime = resumeAt;
         }
@@ -4813,14 +5061,11 @@ async function retryCurrentStreamAfterMediaError(track, mode = 'audio', reason =
         clearMediaFailureAction();
         if (shouldResume) await audioPlayer.play().catch(error => console.log('Retry de stream nao retomou:', error));
     } catch (error) {
+        if (generation !== playbackLoadGeneration) return;
         const friendly = classifyMediaError(error, reason || 'Falha ao renovar stream.');
         artistEl.innerText = friendly;
         recordMediaIssue(normalized, friendly, mode, error);
         showMediaFailureAction(normalized, friendly, mode);
-    } finally {
-        setTimeout(() => {
-            if (currentStreamRetryKey === retryKey) currentStreamRetryKey = '';
-        }, 12000);
     }
 }
 
@@ -5173,6 +5418,12 @@ async function refreshDiagnosticsPanel() {
 
 function getReleaseAssistantText() {
     const selected = [
+        'Fluxo Music 3.9.32 recupera a reproducao com extrator atualizado, runtime incluido, proxy por blocos e protecao contra streams vencidos e trocas de faixa fora de ordem.',
+        'Busca cancelavel e diagnostico real dos servicos, sem apagar suas playlists ao limpar o cache.',
+        'Importacao seletiva para playlists do YouTube com marcar tudo, limpar, inverter, importar selecionadas, importar tudo e salvar selecionadas.',
+        'Playlists do YouTube deixaram de ter limite artificial de 200 musicas e agora usam yt-dlp completo antes do fallback parcial.',
+        'Infinite Radio ficou mais esperto: lembra artistas recentes, penaliza repeticao e evita compilacoes, podcasts, tutoriais, loops e lives longas.',
+        'A busca preserva metadados de colecao no renderer para detectar melhor playlists, mixes e fontes importadas.',
         'Fluxo Music 3.9.30 remove codigo legado inalcancavel dos controles de reproducao e reduz conflito entre permissao de sessao e comandos locais.',
         'Auto-Mix agora aquece o stream da proxima faixa assim que ela entra na fila.',
         'Falha geral da busca virou uma tela amigavel com TENTAR DE NOVO e atalho para diagnostico de rede.',
@@ -5258,7 +5509,7 @@ function getReleaseAssistantText() {
         'Tocar a seguir, playlist por duracao, modo foco, modo DJ experimental e transicao por BPM estimado.',
         'Discord RPC revisado com teste manual e estado de conexao.'
     ];
-    return `Fluxo Music 3.9.30\n\nNovidades:\n${selected.map(item => `- ${item}`).join('\n')}\n\nChangelog base:\n${flattenChangelogText()}`;
+    return `Fluxo Music 3.9.32\n\nNovidades:\n${selected.map(item => `- ${item}`).join('\n')}\n\nChangelog base:\n${flattenChangelogText()}`;
 }
 
 function renderPlaylistTrashPanel() {
@@ -5915,31 +6166,53 @@ function renderListeningInsightsPanel() {
 }
 
 async function renderNetworkDiagnosticsPanel() {
+    document.getElementById('btnClearQueue').style.display = 'none';
     panelTitle.innerText = "DIAGNOSTICO DE REDE";
-    queueCounter.innerText = "yt-dlp, RPC, bridge";
-    resultsList.innerHTML = '<li class="lab-card solo-panel"><i class="ph ph-spinner-gap ph-spin"></i> Testando conexoes...</li>';
-    const diag = await window.electronAPI?.runNetworkDiagnostics?.();
+    queueCounter.innerText = "Servicos e reproducao";
+    const loading = document.createElement('li');
+    loading.className = 'search-status';
+    loading.innerHTML = '<i class="ph ph-spinner-gap ph-spin"></i> Testando buscas e conexoes...';
+    resultsList.replaceChildren(loading);
+    let diag;
+    try { diag = await window.electronAPI?.runNetworkDiagnostics?.(); }
+    catch { diag = { checks: [{ label: 'Conexao com o player', ok: false, error: 'Nao foi possivel concluir o teste' }] }; }
+    if (!loading.isConnected) return;
     resultsList.innerHTML = `
-        <li class="lab-card solo-panel">
-            <div class="lab-card-head"><i class="ph ph-pulse"></i><h3>Saude do Fluxo</h3></div>
+        <li class="service-health">
+            <header class="service-health-header"><div><h3>Saude do Fluxo</h3><p class="lab-status">${diag?.checks?.every(check => check.ok) ? 'Servicos respondendo' : 'Ha servicos que precisam de atencao'}</p></div>
+                <button class="btn-action" id="btnRunNetworkAgain" title="Testar novamente"><i class="ph ph-arrow-clockwise"></i></button>
+            </header>
+            <div class="service-health-grid">
+                ${(diag?.checks || []).map(check => `<article class="service-health-item ${check.ok ? 'is-ok' : 'is-error'}"><i class="ph ${check.ok ? 'ph-check-circle' : 'ph-warning-circle'}"></i><div><h4>${escapeHtml(check.label || (check.url?.includes('firebaseio.com') ? 'Sessao compartilhada' : 'Spotify'))}</h4><span>${check.ok ? `${check.ms} ms` : escapeHtml(check.error || 'Indisponivel')}</span></div></article>`).join('')}
+            </div>
             <div class="diagnostics-box">
-                <div class="diag-line"><span>Online</span><strong>${diag?.online ? 'sim' : 'nao'}</strong></div>
                 <div class="diag-line"><span>Cache de streams</span><strong>${diag?.streamCacheSize ?? 0}</strong></div>
                 <div class="diag-line"><span>yt-dlp</span><strong>${diag?.ytDlpExists ? 'ok' : 'nao encontrado'}</strong></div>
+                <div class="diag-line"><span>Runtime de midia</span><strong>${diag?.jsRuntimeExists ? 'Incluido no app' : 'Nao encontrado: reinstale a versao atual'}</strong></div>
                 <div class="diag-line"><span>Warmup yt-dlp</span><strong>${diag?.ytDlpWarmup?.done ? (diag.ytDlpWarmup.ok ? `${escapeHtml(diag.ytDlpWarmup.version || 'ok')} / ${diag.ytDlpWarmup.elapsedMs}ms` : 'falhou') : 'aquecendo'}</strong></div>
                 <div class="diag-line"><span>Stream Deck bridge</span><strong>${escapeHtml(diag?.controlServer?.url || 'offline')}</strong></div>
-                ${(diag?.checks || []).map(check => `
-                    <div class="diag-line"><span>${escapeHtml(check.url.replace(/^https?:\/\//, ''))}</span><strong>${check.ok ? `${check.ms}ms` : escapeHtml(check.error || 'falhou')}</strong></div>
-                `).join('')}
             </div>
             <div class="lab-actions">
                 <button class="btn-action" id="btnBackLabFromNetwork"><i class="ph ph-arrow-left"></i> VOLTAR</button>
-                <button class="btn-confirm" id="btnRunNetworkAgain"><i class="ph ph-arrow-clockwise"></i> TESTAR DE NOVO</button>
+                <button class="btn-action" id="btnClearStreamCache"><i class="ph ph-broom"></i> LIMPAR CACHE DE STREAMS</button>
+                <button class="btn-confirm" id="btnTestCurrentMedia"><i class="ph ph-play-circle"></i> TESTAR FAIXA</button>
             </div>
         </li>
     `;
     document.getElementById('btnBackLabFromNetwork').onclick = renderFluxoLab;
     document.getElementById('btnRunNetworkAgain').onclick = renderNetworkDiagnosticsPanel;
+    document.getElementById('btnTestCurrentMedia').onclick = renderMediaDiagnosticsPanel;
+    document.getElementById('btnClearStreamCache').onclick = async event => {
+        const button = event.currentTarget;
+        button.disabled = true;
+        try {
+            await window.electronAPI.clearStreamCache();
+            streamResolutionCache.clear();
+            streamResolutionInflight.clear();
+            button.innerHTML = '<i class="ph ph-check"></i> CACHE LIMPO';
+        } catch { button.innerText = 'Nao foi possivel limpar'; }
+        finally { button.disabled = false; }
+    };
 }
 
 function executePluginAction(action = {}) {

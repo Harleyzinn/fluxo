@@ -34,9 +34,20 @@ function resolveYtDlpPath() {
 }
 
 const ytDlpPath = resolveYtDlpPath();
+const jsRuntimePath = isPackaged
+    ? path.join(process.resourcesPath, 'yt-dlp-bin', 'deno.exe')
+    : path.join(__dirname, 'vendor', 'deno', 'deno.exe');
 
 // Importa e vincula o yt-dlp ao caminho correto
-const ytDlp = require('yt-dlp-exec').create(ytDlpPath);
+const ytDlpBinary = require('yt-dlp-exec').create(ytDlpPath);
+const ytDlp = (target, flags = {}, options = {}) => ytDlpBinary(target, {
+    ignoreConfig: true,
+    jsRuntimes: `deno:${jsRuntimePath}`,
+    socketTimeout: 10,
+    retries: 1,
+    extractorRetries: 1,
+    ...flags
+}, { windowsHide: true, ...options });
 
 function warmupYtDlp() {
     const startedAt = Date.now();
@@ -77,6 +88,7 @@ let normalBounds;
 const STREAM_CACHE_TTL_MS = 45 * 60 * 1000;
 const STREAM_PROXY_TTL_MS = 50 * 60 * 1000;
 const SOUNDCLOUD_CLIENT_ID_TTL_MS = 6 * 60 * 60 * 1000;
+const STREAM_CHUNK_BYTES = 1024 * 1024;
 const streamUrlCache = new Map();
 const streamUrlInflight = new Map();
 const streamProxyEntries = new Map();
@@ -89,11 +101,25 @@ let ytDlpWarmupStatus = {
 };
 let soundCloudClientId = '';
 let soundCloudClientIdExpiresAt = 0;
+let soundCloudClientIdRequest = null;
+
+function withDeadline(promise, timeoutMs, label) {
+    let timer;
+    return Promise.race([
+        promise,
+        new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`${label}: timeout`)), timeoutMs); })
+    ]).finally(() => clearTimeout(timer));
+}
+
+function fetchMedia(url, options = {}, timeoutMs = 8000) {
+    return fetch(url, { ...options, signal: options.signal || AbortSignal.timeout(timeoutMs) });
+}
 let discordClient = null;
 let discordLoginPromise = null;
 let discordReady = false;
 let lastDiscordPresenceRequest = null;
 let discordRetryTimer = null;
+let nextDiscordConnectAt = 0;
 const discordClientId = packageConfig.discordClientId || '1487787955186565250';
 const FLUXO_RPC_URL = packageConfig.homepage || 'https://github.com/Harleyzinn/fluxo';
 let floatingWidgetWindow = null;
@@ -657,11 +683,17 @@ async function getSoundCloudClientId(forceRefresh = false) {
     if (!forceRefresh && soundCloudClientId && Date.now() < soundCloudClientIdExpiresAt) {
         return soundCloudClientId;
     }
+    if (soundCloudClientIdRequest) return soundCloudClientIdRequest;
+    soundCloudClientIdRequest = discoverSoundCloudClientId();
+    try { return await soundCloudClientIdRequest; }
+    finally { soundCloudClientIdRequest = null; }
+}
 
+async function discoverSoundCloudClientId() {
     const fallbackClientId = 'IRnK0myxxLJdwXXjybXQo71mXyDGpaM6';
 
     try {
-        const html = await (await fetch('https://soundcloud.com/', {
+        const html = await (await fetchMedia('https://soundcloud.com/', {
             headers: { 'User-Agent': 'Mozilla/5.0' }
         })).text();
         const scripts = [...html.matchAll(/<script[^>]+src=["']([^"']+\.js)["']/gi)]
@@ -671,7 +703,7 @@ async function getSoundCloudClientId(forceRefresh = false) {
 
         for (const src of scripts.slice(0, 12)) {
             const scriptUrl = src.startsWith('//') ? `https:${src}` : src;
-            const js = await (await fetch(scriptUrl, {
+            const js = await (await fetchMedia(scriptUrl, {
                 headers: { 'User-Agent': 'Mozilla/5.0' }
             })).text();
             const match = js.match(/client_id\s*[:=]\s*["']([a-zA-Z0-9_-]{20,})["']/)
@@ -700,7 +732,7 @@ async function fetchSoundCloudApi(pathname, params = {}, retry = true) {
         if (value !== undefined && value !== null && value !== '') url.searchParams.set(key, value);
     });
 
-    const response = await fetch(url.toString(), {
+    const response = await fetchMedia(url.toString(), {
         headers: {
             'Accept': 'application/json',
             'User-Agent': 'Mozilla/5.0'
@@ -708,12 +740,14 @@ async function fetchSoundCloudApi(pathname, params = {}, retry = true) {
     });
 
     if ((response.status === 401 || response.status === 403) && retry) {
+        await response.body?.cancel();
         soundCloudClientId = '';
         soundCloudClientIdExpiresAt = 0;
         return fetchSoundCloudApi(pathname, params, false);
     }
 
     if (!response.ok) {
+        await response.body?.cancel();
         throw new Error(`SoundCloud API HTTP ${response.status}`);
     }
 
@@ -738,7 +772,7 @@ async function searchSoundCloudTracks(query, limit = 6) {
 
 async function getSoundCloudTranscodingUrl(transcoding) {
     const clientId = await getSoundCloudClientId();
-    const response = await fetch(`${transcoding.url}?client_id=${clientId}`, {
+    const response = await fetchMedia(`${transcoding.url}?client_id=${clientId}`, {
         headers: {
             'Accept': 'application/json',
             'User-Agent': 'Mozilla/5.0'
@@ -754,7 +788,7 @@ async function isPlayableHlsUrl(url) {
     if (!/\.m3u8/i.test(String(url || ''))) return true;
 
     try {
-        const response = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+        const response = await fetchMedia(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
         if (!response.ok) return false;
         const manifest = await response.text();
         return !/METHOD=SAMPLE-AES|KEYFORMAT=/i.test(manifest);
@@ -809,7 +843,7 @@ function mapYtSearchVideo(video) {
 }
 
 async function searchYouTubeWithYtSearch(query, limit = 10) {
-    const results = await ytSearch(query);
+    const results = await withDeadline(ytSearch(query), 8000, 'YouTube');
     return (results?.videos || [])
         .slice(0, limit)
         .map(mapYtSearchVideo)
@@ -852,7 +886,7 @@ async function extractYouTubeMetadataWithYtSearch(input) {
             if (tracks.length > 0) {
                 return {
                     title: playlist?.title || 'Playlist do YouTube',
-                    tracks: tracks.slice(0, 200),
+                    tracks,
                     source: 'YouTube',
                     isCollection: true
                 };
@@ -963,9 +997,10 @@ function isYouTubeCollectionTarget(input) {
 async function extractYouTubeTracks(input) {
     const target = normalizeYouTubeTarget(input);
     const isCollection = isYouTubeCollectionTarget(target);
+    let metadataOnly = null;
     try {
-        const metadataOnly = await extractYouTubeMetadataWithYtSearch(target);
-        if (metadataOnly?.tracks?.length) return metadataOnly;
+        metadataOnly = await extractYouTubeMetadataWithYtSearch(target);
+        if (!isCollection && metadataOnly?.tracks?.length) return metadataOnly;
     } catch (metadataError) {
         console.log('yt-search por ID/lista falhou, tentando yt-dlp:', metadataError.message);
     }
@@ -974,12 +1009,11 @@ async function extractYouTubeTracks(input) {
         dumpSingleJson: true,
         noWarnings: true,
         ignoreErrors: true,
-        extractorArgs: 'youtube:player_client=tv,web'
+        socketTimeout: 10
     };
 
     if (isCollection) {
         options.flatPlaylist = true;
-        options.playlistEnd = 200;
     } else {
         options.noPlaylist = true;
     }
@@ -989,6 +1023,7 @@ async function extractYouTubeTracks(input) {
         output = await ytDlp(target, options);
     } catch (error) {
         console.log('yt-dlp falhou ao importar YouTube:', error.message);
+        if (metadataOnly?.tracks?.length) return metadataOnly;
         return {
             title: isCollection ? 'Playlist do YouTube' : 'YouTube',
             tracks: [],
@@ -1006,7 +1041,7 @@ async function extractYouTubeTracks(input) {
         .filter(track => track && (track.url || track.id));
 
     return {
-        title: output?.title || (isCollection ? 'Playlist do YouTube' : 'YouTube'),
+        title: output?.title || metadataOnly?.title || (isCollection ? 'Playlist do YouTube' : 'YouTube'),
         tracks,
         source: 'YouTube',
         isCollection: isCollection || tracks.length > 1
@@ -1019,8 +1054,8 @@ async function searchWithYtDlp(query, limit = 10) {
         noWarnings: true,
         flatPlaylist: true,
         ignoreErrors: true,
-        extractorArgs: 'youtube:player_client=tv,web'
-    });
+        socketTimeout: 10
+    }, { timeout: 15000 });
 
     const entries = Array.isArray(output?.entries) ? output.entries.filter(Boolean) : [output].filter(Boolean);
     return entries.map(mapYtDlpInfo).filter(track => track && track.id);
@@ -1071,6 +1106,13 @@ function pickPlayableUrl(output, wantsVideo, maxHeight = null) {
     if (output.url && (!wantsVideo || hasPlayableVideo)) return output.url;
 
     const formats = Array.isArray(output.formats) ? output.formats : [];
+    if (wantsVideo) {
+        // Modern YouTube serves separate HLS audio/video renditions. Hand the
+        // master playlist to Hls.js so it selects and synchronizes both.
+        const hlsVideo = formats.find(format => format.manifest_url && /^m3u8/.test(format.protocol || '')
+            && format.vcodec && format.vcodec !== 'none' && (!maxHeight || format.height <= maxHeight));
+        if (hlsVideo) return hlsVideo.manifest_url;
+    }
     const playable = formats
         .filter(format => {
             if (!format.url) return false;
@@ -1091,10 +1133,8 @@ function pickPlayableUrl(output, wantsVideo, maxHeight = null) {
 
 function getExtractorAttempts() {
     return [
-        { extractorArgs: 'youtube:player_client=android_vr,web' },
-        { extractorArgs: 'youtube:player_client=android,web' },
-        { extractorArgs: 'youtube:player_client=tv,web' },
-        { extractorArgs: 'youtube:player_client=ios,web' }
+        {},
+        { extractorArgs: 'youtube:player_client=web_safari' }
     ];
 }
 
@@ -1105,7 +1145,7 @@ function getStreamCacheKey(target, quality) {
 function readCachedStreamUrl(key) {
     const cached = streamUrlCache.get(key);
     if (!cached) return null;
-    if (Date.now() - cached.createdAt > STREAM_CACHE_TTL_MS) {
+    if (Date.now() >= cached.expiresAt) {
         streamUrlCache.delete(key);
         return null;
     }
@@ -1113,7 +1153,26 @@ function readCachedStreamUrl(key) {
 }
 
 function writeCachedStreamUrl(key, url) {
-    if (url) streamUrlCache.set(key, { url, createdAt: Date.now() });
+    if (!url) return;
+    let expiresAt = Date.now() + STREAM_CACHE_TTL_MS;
+    try {
+        const expires = Number(new URL(url).searchParams.get('expire')) * 1000;
+        if (expires > 0) expiresAt = Math.min(expiresAt, expires - 60000);
+    } catch { /* Non-HTTP sources have no signed expiry. */ }
+    if (streamUrlCache.size >= 200) streamUrlCache.delete(streamUrlCache.keys().next().value);
+    streamUrlCache.set(key, { url, createdAt: Date.now(), expiresAt });
+}
+
+function getUpstreamRange(url, range) {
+    const host = new URL(url).hostname;
+    if (!/(^|\.)googlevideo\.com$/i.test(host)) return range;
+    // Googlevideo rejects open-ended ranges on some clients. Chromium requests
+    // the next partial response as needed, including after a seek.
+    const match = /^bytes=(\d+)-(\d*)$/.exec(range || 'bytes=0-');
+    if (!match) return range;
+    const start = Number(match[1]);
+    const end = match[2] ? Math.min(Number(match[2]), start + STREAM_CHUNK_BYTES - 1) : start + STREAM_CHUNK_BYTES - 1;
+    return `bytes=${start}-${end}`;
 }
 
 function shouldProxyStreamUrl(url) {
@@ -1183,19 +1242,25 @@ async function handleStreamProxyRequest(req, res) {
         'User-Agent': 'Mozilla/5.0',
         'Accept': req.headers.accept || '*/*'
     };
-    if (req.headers.range) upstreamHeaders.Range = req.headers.range;
+    const range = getUpstreamRange(entry.url, req.headers.range);
+    if (range) upstreamHeaders.Range = range;
+    entry.createdAt = Date.now();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    res.once('close', () => controller.abort());
 
     try {
         const upstream = await fetch(entry.url, {
             method: req.method === 'HEAD' ? 'HEAD' : 'GET',
             redirect: 'follow',
-            headers: upstreamHeaders
+            headers: upstreamHeaders,
+            signal: controller.signal
         });
+        clearTimeout(timer);
 
         res.status(upstream.status);
         const passthroughHeaders = [
             'accept-ranges',
-            'content-encoding',
             'content-length',
             'content-range',
             'content-type',
@@ -1208,11 +1273,13 @@ async function handleStreamProxyRequest(req, res) {
         res.setHeader('Cache-Control', 'private, max-age=240');
 
         if (req.method === 'HEAD') {
+            await upstream.body?.cancel();
             res.end();
             return;
         }
 
         if (!upstream.ok && upstream.status !== 206) {
+            streamUrlCache.delete(getStreamCacheKey(normalizeYouTubeTarget(entry.target), entry.quality));
             const body = await upstream.text().catch(() => '');
             res.send(body || `Falha no upstream do stream (${upstream.status}).`);
             return;
@@ -1224,17 +1291,21 @@ async function handleStreamProxyRequest(req, res) {
         }
 
         Readable.fromWeb(upstream.body).on('error', error => {
+            if (res.destroyed || controller.signal.aborted) return;
             console.log('Fluxo stream proxy falhou:', error.message);
             if (!res.headersSent) res.status(502);
             res.end();
         }).pipe(res);
     } catch (error) {
+        if (res.destroyed) return;
         console.log('Fluxo stream proxy upstream falhou:', error.message);
         if (!res.headersSent) {
             res.status(502).send('Falha ao abrir stream no proxy local.');
         } else {
             res.end();
         }
+    } finally {
+        clearTimeout(timer);
     }
 }
 
@@ -1246,6 +1317,7 @@ function extractFirstUrl(output) {
 }
 
 async function getStreamUrlFast(target, quality, format) {
+    let lastError = null;
     for (const attempt of getExtractorAttempts()) {
         try {
             const output = await ytDlp(target, {
@@ -1253,16 +1325,21 @@ async function getStreamUrlFast(target, quality, format) {
                 noWarnings: true,
                 noPlaylist: true,
                 format,
+                socketTimeout: 8,
+                retries: 1,
+                extractorRetries: 1,
                 ...attempt
-            });
+            }, { timeout: 15000, windowsHide: true });
 
             const streamUrl = extractFirstUrl(output);
             if (streamUrl) return streamUrl;
         } catch (error) {
+            lastError = error;
             console.log(`Extração rápida falhou (${quality}):`, error.message);
         }
     }
 
+    if (lastError) throw new Error(getFriendlyMediaError(lastError));
     return null;
 }
 
@@ -1273,9 +1350,12 @@ async function getStreamUrlWithMetadata(target, quality, format, wantsVideo, max
                 dumpSingleJson: true,
                 noWarnings: true,
                 noPlaylist: true,
-                format,
+                ...(wantsVideo ? {} : { format }),
+                socketTimeout: 8,
+                retries: 1,
+                extractorRetries: 1,
                 ...attempt
-            });
+            }, { timeout: 15000, windowsHide: true });
 
             const streamUrl = pickPlayableUrl(output, wantsVideo, maxHeight);
             if (streamUrl) return streamUrl;
@@ -1356,6 +1436,7 @@ async function buildSearchStreamCandidates(searchText, limit = 8) {
         console.log('Candidatos via yt-search falharam:', error.message);
     }
 
+    if (candidates.length) return candidates.slice(0, limit);
     try {
         const ytDlpTracks = await searchWithYtDlp(clean, limit);
         ytDlpTracks.forEach(track => addUniqueStreamCandidate(candidates, track.url || track.videoId || track.id, 'yt-dlp-search'));
@@ -1366,54 +1447,53 @@ async function buildSearchStreamCandidates(searchText, limit = 8) {
     return candidates;
 }
 
-async function getDirectStreamUrl(target, quality = 'audio') {
+async function getDirectStreamUrl(target, quality = 'audio', options = {}) {
     if (!target) return null;
 
     const normalizedTarget = normalizeYouTubeTarget(target);
     if (!normalizedTarget) return null;
 
-    if (isDirectSoundCloudTarget(normalizedTarget)) {
-        const soundCloudCacheKey = getStreamCacheKey(await resolveSoundCloudUrl(normalizedTarget), 'soundcloud');
-        const cachedSoundCloudUrl = readCachedStreamUrl(soundCloudCacheKey);
-        if (cachedSoundCloudUrl) return cachedSoundCloudUrl;
-
-        const soundCloudUrl = await getSoundCloudStreamUrl(normalizedTarget);
-        if (soundCloudUrl) {
-            writeCachedStreamUrl(soundCloudCacheKey, soundCloudUrl);
-            return soundCloudUrl;
-        }
-    }
-
     const wantsVideo = quality !== 'audio';
     const format = getFormatForQuality(quality);
     const maxHeight = getMaxHeightForQuality(quality);
     const cacheKey = getStreamCacheKey(normalizedTarget, quality);
+    if (options.forceRefresh) streamUrlCache.delete(cacheKey);
     const cachedUrl = readCachedStreamUrl(cacheKey);
     if (cachedUrl) return cachedUrl;
 
-    if (streamUrlInflight.has(cacheKey)) {
+    if (streamUrlInflight.has(cacheKey) && (!options.forceRefresh || streamUrlInflight.get(cacheKey).forceRefresh)) {
         return streamUrlInflight.get(cacheKey);
     }
 
     const inflight = (async () => {
+        if (isDirectSoundCloudTarget(normalizedTarget)) {
+            try {
+                const url = await withDeadline(getSoundCloudStreamUrl(normalizedTarget), 12000, 'SoundCloud');
+                if (url) return url;
+            } catch (error) {
+                console.log('SoundCloud API indisponivel; tentando extrator:', error.message);
+            }
+        }
+        if (wantsVideo) return getStreamUrlWithMetadata(normalizedTarget, quality, format, true, maxHeight);
         const fastUrl = await getStreamUrlFast(normalizedTarget, quality, format);
         if (fastUrl) return fastUrl;
 
         return getStreamUrlWithMetadata(normalizedTarget, quality, format, wantsVideo, maxHeight);
     })();
+    inflight.forceRefresh = Boolean(options.forceRefresh);
 
     streamUrlInflight.set(cacheKey, inflight);
 
     try {
         const streamUrl = await inflight;
-        writeCachedStreamUrl(cacheKey, streamUrl);
+        if (streamUrlInflight.get(cacheKey) === inflight) writeCachedStreamUrl(cacheKey, streamUrl);
         return streamUrl;
     } finally {
-        streamUrlInflight.delete(cacheKey);
+        if (streamUrlInflight.get(cacheKey) === inflight) streamUrlInflight.delete(cacheKey);
     }
 }
 
-async function resolveTrackStreamUrl(payload, quality = 'audio') {
+async function resolveTrackStreamUrl(payload, quality = 'audio', options = {}) {
     const primaryTarget = typeof payload === 'string'
         ? normalizeYouTubeTarget(payload)
         : getTrackTargetFromPayload(payload);
@@ -1421,8 +1501,9 @@ async function resolveTrackStreamUrl(payload, quality = 'audio') {
 
     let directUrl = null;
     try {
-        directUrl = await getDirectStreamUrl(primaryTarget, quality);
+        directUrl = await getDirectStreamUrl(primaryTarget, quality, options);
     } catch (error) {
+        if (!/^ytsearch\d*:/i.test(primaryTarget)) throw new Error(getFriendlyMediaError(error));
         console.log('Stream direto falhou, tentando candidatos:', error.message);
     }
     if (directUrl) {
@@ -1435,10 +1516,12 @@ async function resolveTrackStreamUrl(payload, quality = 'audio') {
         };
     }
 
+    // A failed concrete URL must never silently play a different recording.
+    if (!/^ytsearch\d*:/i.test(primaryTarget)) return null;
     const searchText = getTrackSearchTextFromPayload(payload, primaryTarget);
     if (!searchText) return null;
 
-    const candidates = await buildSearchStreamCandidates(searchText, 8);
+    const candidates = await buildSearchStreamCandidates(searchText, 2);
     for (const candidate of candidates) {
         if (candidate.target.toLowerCase() === String(primaryTarget).toLowerCase()) continue;
         try {
@@ -1496,7 +1579,9 @@ function setupAutoUpdater() {
         console.log('Erro detalhado do Update:', err);
     });
 
-    setTimeout(() => autoUpdater.checkForUpdatesAndNotify(), 3000);
+    setTimeout(() => autoUpdater.checkForUpdatesAndNotify().catch(error => {
+        console.log('Verificacao de atualizacao indisponivel:', error.message);
+    }), 3000);
 }
 
 function getPluginsDir() {
@@ -1634,8 +1719,8 @@ ${['play-pause','next','prev','vol-up','vol-down','toggle-video','fullscreen','p
                 controlServerInfo = {
                     enabled: true,
                     host: '127.0.0.1',
-                    port: nextPort,
-                    url: `http://127.0.0.1:${nextPort}`,
+                    port: server.address().port,
+                    url: `http://127.0.0.1:${server.address().port}`,
                     lastError: ''
                 };
                 console.log(`Fluxo control server ativo em ${controlServerInfo.url}`);
@@ -1676,10 +1761,12 @@ async function timedFetch(url, timeoutMs = 6500) {
             redirect: 'follow',
             signal: controller.signal
         });
+        await response.body?.cancel();
         return {
             url,
-            ok: response.ok || response.status < 500,
+            ok: response.ok,
             status: response.status,
+            error: response.ok ? '' : `HTTP ${response.status}`,
             ms: Date.now() - startedAt
         };
     } catch (error) {
@@ -1749,12 +1836,13 @@ function scheduleDiscordPresenceRetry(delayMs = 7000) {
         if (!lastDiscordPresenceRequest) return;
         updateDiscordPresence(lastDiscordPresenceRequest.track, lastDiscordPresenceRequest.state)
             .catch(error => console.log('Discord RPC retry falhou:', error.message));
-    }, delayMs);
+    }, Math.max(delayMs, nextDiscordConnectAt - Date.now()));
 
     discordRetryTimer.unref?.();
 }
 
 async function ensureDiscordReady() {
+    if (!discordReady && Date.now() < nextDiscordConnectAt) return null;
     const client = getDiscordClient();
     if (!client) return null;
     if (discordReady || client.user) return client;
@@ -1763,16 +1851,20 @@ async function ensureDiscordReady() {
         setDiscordStatus({ state: 'connecting', lastError: '' });
         discordLoginPromise = client.login({ clientId: discordClientId })
             .then(() => {
+                if (client !== discordClient) return null;
+                nextDiscordConnectAt = 0;
                 discordReady = true;
                 setDiscordStatus({ state: 'connected', lastError: '' });
                 return client;
             })
             .catch(async (error) => {
+                if (client !== discordClient) return null;
+                nextDiscordConnectAt = Date.now() + 30000;
                 console.log('Discord RPC login falhou:', error.message);
                 await destroyDiscordClient('falha de login');
                 setDiscordStatus({
                     state: 'error',
-                    lastError: `${error.message}. Abra o Discord desktop e use RESET RPC antes de testar de novo.`
+                    lastError: `${error.message}. Abra o Discord desktop. O Fluxo tentara reconectar automaticamente.`
                 });
                 return null;
             });
@@ -2057,6 +2149,7 @@ async function clearDiscordPresence() {
 }
 
 async function resetDiscordPresenceClient() {
+    nextDiscordConnectAt = 0;
     lastDiscordPresenceRequest = null;
     if (discordRetryTimer) {
         clearTimeout(discordRetryTimer);
@@ -2080,7 +2173,7 @@ async function resetDiscordPresenceClient() {
         } catch (_) {}
 
         try {
-            client.destroy();
+            await client.destroy();
         } catch (error) {
             console.log('Discord RPC destroy falhou:', error.message);
         }
@@ -2187,7 +2280,7 @@ function createWindow() {
     });
 
     bindRoundedWindowShape(mainWindow);
-    mainWindow.loadFile('index.html');
+    mainWindow.loadFile(path.join(__dirname, 'index.html'));
 }
 
 app.whenReady().then(async () => {
@@ -2294,10 +2387,18 @@ ipcMain.handle('external-url-open', async (event, rawUrl) => {
 });
 
 ipcMain.handle('network-diagnostics-run', async () => {
+    async function checkSearch(label, action) {
+        const start = Date.now();
+        try {
+            const tracks = await withDeadline(action(), 8000, label);
+            return { label, ok: tracks.length > 0, ms: Date.now() - start, error: tracks.length ? '' : 'Sem resultados' };
+        } catch { return { label, ok: false, ms: Date.now() - start, error: 'Busca indisponivel ou lenta' }; }
+    }
     const checks = await Promise.all([
-        timedFetch('https://www.youtube.com/generate_204'),
+        checkSearch('Busca YouTube', () => searchYouTubeWithYtSearch('Kamaitachi Carnaval', 1)),
+        checkSearch('Busca SoundCloud', () => searchSoundCloudTracks('Tycho Awake', 1)),
         timedFetch('https://open.spotify.com'),
-        timedFetch('https://soundcloud.com')
+        timedFetch('https://fluxo-music-default-rtdb.firebaseio.com/rooms/ZZZZ/createdAt.json')
     ]);
 
     return {
@@ -2308,17 +2409,22 @@ ipcMain.handle('network-diagnostics-run', async () => {
         inflightStreams: streamUrlInflight.size,
         ytDlpPath,
         ytDlpExists: fs.existsSync(ytDlpPath),
+        jsRuntimeExists: fs.existsSync(jsRuntimePath),
         ytDlpWarmup: ytDlpWarmupStatus,
         controlServer: controlServerInfo,
         pluginsPath: getPluginsDir()
     };
 });
 
+ipcMain.handle('stream-cache-clear', () => {
+    streamUrlCache.clear();
+    streamUrlInflight.clear();
+    // Keep current proxy tokens alive so clearing cache does not stop playback.
+    return { success: true };
+});
+
 ipcMain.handle('diagnose-media', async (event, track, quality = 'audio') => {
     const target = getTrackTargetFromPayload(track);
-    const wantsVideo = quality !== 'audio';
-    const format = getFormatForQuality(quality);
-    const maxHeight = getMaxHeightForQuality(quality);
     const startedAt = Date.now();
     const result = {
         ok: false,
@@ -2343,33 +2449,19 @@ ipcMain.handle('diagnose-media', async (event, track, quality = 'audio') => {
     }
 
     try {
-        const info = await ytDlpWithExtractorFallback(target, {
-            dumpSingleJson: true,
-            noWarnings: true,
-            noPlaylist: true
-        }, 'metadata de midia');
-
         result.metadata = {
-            title: info?.title || track?.title || '',
-            extractor: info?.extractor_key || info?.extractor || '',
-            duration: info?.duration || 0,
-            liveStatus: info?.live_status || ''
+            title: track?.title || '',
+            extractor: track?.source || '',
+            duration: track?.duration || 0
         };
-        result.checks.push({ name: 'metadata', ok: true, detail: result.metadata.title });
-    } catch (error) {
-        result.reason = getFriendlyMediaError(error);
-        result.raw = String(error?.stderr || error?.message || error || '').slice(0, 1200);
-        result.checks.push({ name: 'metadata', ok: false, detail: result.reason });
-        result.elapsedMs = Date.now() - startedAt;
-        return result;
-    }
-
-    try {
-        const streamUrl = await getStreamUrlFast(target, quality, format)
-            || await getStreamUrlWithMetadata(target, quality, format, wantsVideo, maxHeight);
-        result.ok = Boolean(streamUrl);
-        result.reason = streamUrl ? 'Stream tocavel resolvido.' : 'yt-dlp leu a midia, mas nao encontrou formato tocavel para esse modo.';
-        result.checks.push({ name: 'stream', ok: Boolean(streamUrl), detail: result.reason });
+        const stream = await resolveTrackStreamUrl(track, quality, { forceRefresh: true });
+        if (!stream?.url) throw new Error('Nao foi possivel resolver esta faixa.');
+        const response = await fetchMedia(stream.url, { headers: { Range: 'bytes=0-2047' } }, 12000);
+        const type = response.headers.get('content-type') || '';
+        result.ok = response.ok && /audio|video|octet-stream|mpegurl/i.test(type);
+        await response.body?.cancel();
+        result.reason = result.ok ? `Servidor entregou midia: HTTP ${response.status} (${type}).` : `Servidor recusou a midia: HTTP ${response.status} (${type}).`;
+        result.checks.push({ name: 'Entrega de midia', ok: result.ok, detail: result.reason });
     } catch (error) {
         result.reason = getFriendlyMediaError(error);
         result.raw = String(error?.stderr || error?.message || error || '').slice(0, 1200);
@@ -2415,13 +2507,13 @@ ipcMain.on('toggle-mini-player', (event, isMini) => {
 // MOTOR DE EXTRAÇÃO VIA API DO YT-DLP (ALTA QUALIDADE + ANTI-BOT)
 // ========================================================
 
-ipcMain.handle('get-stream-url', async (event, url, quality = 'audio') => {
-    const resolved = await resolveTrackStreamUrl(url, quality);
+ipcMain.handle('get-stream-url', async (event, url, quality = 'audio', options = {}) => {
+    const resolved = await resolveTrackStreamUrl(url, quality, { forceRefresh: options?.forceRefresh === true });
     return resolved?.url || null;
 });
 
-ipcMain.handle('resolve-track-stream', async (event, track, quality = 'audio') => {
-    return resolveTrackStreamUrl(track, quality);
+ipcMain.handle('resolve-track-stream', async (event, track, quality = 'audio', options = {}) => {
+    return resolveTrackStreamUrl(track, quality, { forceRefresh: options?.forceRefresh === true });
 });
 
 // ========================================================
@@ -2480,14 +2572,19 @@ ipcMain.handle('search-audio', async (event, query) => {
         }
 
         let videos = [];
+        let providers = [];
 
         try {
             const [youtubeResult, soundCloudResult] = await Promise.allSettled([
-                searchYouTubeWithYtSearch(query, 8),
-                searchSoundCloudTracks(query, 5)
+                withDeadline(searchYouTubeWithYtSearch(query, 8), 8500, 'YouTube'),
+                withDeadline(searchSoundCloudTracks(query, 5), 4500, 'SoundCloud')
             ]);
             const youtubeTracks = youtubeResult.status === 'fulfilled' ? youtubeResult.value : [];
             const soundCloudTracks = soundCloudResult.status === 'fulfilled' ? soundCloudResult.value : [];
+            providers = [
+                { name: 'YouTube', ok: youtubeResult.status === 'fulfilled', count: youtubeTracks.length },
+                { name: 'SoundCloud', ok: soundCloudResult.status === 'fulfilled', count: soundCloudTracks.length }
+            ];
             if (youtubeResult.status === 'rejected') console.log('yt-search falhou:', youtubeResult.reason?.message || youtubeResult.reason);
             if (soundCloudResult.status === 'rejected') console.log('SoundCloud search falhou:', soundCloudResult.reason?.message || soundCloudResult.reason);
             videos = [...youtubeTracks, ...soundCloudTracks];
@@ -2498,13 +2595,17 @@ ipcMain.handle('search-audio', async (event, query) => {
         if (videos.length === 0) {
             try {
                 videos = await searchWithYtDlp(query);
+                if (videos.length) providers = providers.map(provider => provider.name === 'YouTube' ? { ...provider, ok: true, count: videos.length } : provider);
             } catch (fallbackError) {
                 console.log('yt-dlp search falhou:', fallbackError.message);
                 videos = [];
             }
         }
 
-        return { tracks: videos };
+        if (!videos.length && providers.length && providers.every(provider => !provider.ok)) {
+            throw new Error('Servicos de busca indisponiveis. Confira a conexao e tente novamente.');
+        }
+        return { tracks: videos, providers };
     } catch (error) {
         console.error('Erro interno na busca:', error);
         throw new Error('Falha ao buscar no YouTube.');

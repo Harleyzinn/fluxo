@@ -1,169 +1,95 @@
 # Fluxo Music
 
-Fluxo Music e um player desktop para Windows feito em Electron, com foco em musica, personalizacao visual, sessao compartilhada, Discord Rich Presence, temas mutantes e ferramentas de audio.
+Seu player, do seu jeito. Musica do YouTube e SoundCloud, dezenas de temas, ferramentas de audio e salas para ouvir junto, em um aplicativo para Windows.
 
-O objetivo do projeto e ser um player com identidade propria: a interface muda com os temas, o Modo Festa acompanha a estetica ativa, o equalizador tem perfis de uso real e a sessao compartilhada permite ouvir junto sem transformar tudo em painel confuso.
-
-> Versao atual do projeto: **3.9.30**
+**Versao 3.9.32** | [Baixar o Fluxo](https://github.com/Harleyzinn/fluxo/releases/latest) | [Todas as releases](https://github.com/Harleyzinn/fluxo/releases) | [Apoiar no LivePix](https://livepix.gg/devpotato)
 
 ## Baixar e instalar
 
-O jeito correto para usuario final e baixar o instalador pronto pela aba **Releases** do GitHub. Nao precisa clonar o repositorio, instalar Node.js ou abrir terminal.
+Nao precisa usar terminal, clonar o repositorio ou instalar Node.js.
 
-1. Abra a pagina de releases:
-   [github.com/Harleyzinn/fluxo/releases](https://github.com/Harleyzinn/fluxo/releases)
+1. Abra a aba [Releases](https://github.com/Harleyzinn/fluxo/releases) deste repositorio.
+2. Entre na versao mais recente marcada como **Latest**.
+3. Abra **Assets**, abaixo das notas da versao, e baixe **Fluxo-Music-Setup-3.9.32.exe**. Em versoes futuras, muda somente o numero no nome.
+4. Execute o instalador e aguarde a conclusao.
+5. Abra **Fluxo Music** pelo menu Iniciar ou pelo atalho na area de trabalho.
 
-2. Clique na release mais recente, ou use o link direto:
-   [Ultima release](https://github.com/Harleyzinn/fluxo/releases/latest)
+**Qual arquivo escolher?** O aplicativo vem no `.exe`. Nao baixe `Source code (zip)` ou `Source code (tar.gz)` para instalar. Os arquivos `.blockmap` e `latest.yml` sao usados pela atualizacao automatica.
 
-3. Em **Assets**, baixe o instalador:
-   `Fluxo-Music-Setup-x.x.x.exe`
+O aplicativo e destinado a **Windows 10/11 de 64 bits**. Se o Windows mostrar um alerta de editor desconhecido, confirme que o arquivo veio deste repositorio oficial antes de prosseguir. Nao e necessario desativar o antivirus.
 
-   Exemplo da versao atual:
-   `Fluxo-Music-Setup-3.9.30.exe`
+## Atualizar sem perder a biblioteca
 
-4. Execute o arquivo baixado.
+O Fluxo verifica atualizacoes publicadas no GitHub. Quando uma atualizacao estiver pronta, o aplicativo avisa e reinicia para concluir a instalacao.
 
-5. Se o Windows SmartScreen avisar que o app e desconhecido, clique em **Mais informacoes** e depois em **Executar assim mesmo**.
+Para atualizar manualmente, feche o Fluxo, baixe o novo `.exe` em [Releases](https://github.com/Harleyzinn/fluxo/releases/latest) e execute-o. Nao desinstale nem apague os dados do aplicativo. Voce tambem pode exportar um backup pela Biblioteca antes de atualizar.
 
-6. Depois da instalacao, abra o **Fluxo Music** pelo menu iniciar ou pelo atalho criado.
+## O que mudou na 3.9.32
 
-## Atualizacao
+- **Reproducao recuperada:** extrator atualizado e runtime de midia incluido no instalador. Nao depende de ferramentas instaladas separadamente no computador.
+- **Streams por blocos:** ajuste na entrega de audio e video para lidar com recusas HTTP 403 em pedidos abertos e preservar o avanco pela faixa.
+- **Video com audio sincronizado:** suporte ao manifesto HLS quando o YouTube entrega audio e imagem separados.
+- **Troca de musica consistente:** uma resolucao antiga nao pode substituir a faixa que voce acabou de escolher.
+- **Cache renovado de verdade:** links expirados sao descartados no player e no processo principal. Faixas indisponiveis nao viram outra musica silenciosamente.
+- **Busca cancelavel:** cancele uma pesquisa demorada ou envie outra. Resultados antigos nao invadem a tela atual.
+- **Status por servico:** YouTube e SoundCloud mostram sua disponibilidade separadamente. Uma falha nao precisa inutilizar a busca inteira.
+- **Diagnostico melhor:** testes das buscas e da entrega de midia, runtime incluido e limpeza de cache sem apagar a biblioteca.
+- **Discord mais tranquilo:** reconexao com intervalo quando o Discord esta fechado, sem disparar tentativas continuamente.
+- **Instalador mais restrito:** mapas locais, backups, testes e arquivos privados nao entram no aplicativo distribuido.
 
-O Fluxo usa o `latest.yml` publicado junto da release para verificar atualizacoes.
+As mudancas anteriores, incluindo importacao seletiva de playlists e melhorias do Infinite Radio, continuam disponiveis. O changelog completo fica no proprio app.
 
-Para atualizar manualmente:
+## Musica e biblioteca
 
-1. Abra [Releases](https://github.com/Harleyzinn/fluxo/releases).
-2. Baixe o instalador mais novo em **Assets**.
-3. Execute o `.exe`.
-4. Se o Fluxo ja estiver instalado, o instalador atualiza a versao existente.
+- Pesquise no **YouTube e SoundCloud** ou cole links de faixas, playlists, mixes e sets publicos.
+- Escolha quais musicas importar de uma playlist do YouTube ou importe todas. O Fluxo nao impoe um limite artificial de faixas; a disponibilidade depende do que a plataforma entregar.
+- Importe metadados de links do **Spotify** e procure as gravacoes para tocar. O Fluxo nao reproduz diretamente o catalogo protegido do Spotify.
+- Organize playlists, favoritos, historico e Inbox. Importe, exporte e faca backup da sua biblioteca.
+- Use **Infinite Radio**, reproducao aleatoria, repeticao e transicao suave.
+- Abra musicas locais e use o diagnostico de biblioteca para revisar problemas.
 
-Arquivos que precisam estar na release para o autoupdater funcionar:
+## Audio e personalizacao
 
-```text
-Fluxo-Music-Setup-x.x.x.exe
-Fluxo-Music-Setup-x.x.x.exe.blockmap
-latest.yml
-```
+O equalizador inclui presets, velocidade, reverb, compressor, ganho e pan, com perfis como **Normal**, **Slowed + Reverb** e **Nightcore**.
 
-## Novidades da 3.9.30
+Os temas mudam a identidade da interface, do equalizador, do Modo Festa e dos widgets. Entre eles: Soul Eater, Adolla, Minecraft, Tensura, Ophiuchus, Dark Brotherhood, Morioh-Cho, Orokin Cell e Fluxo Bug.
 
-- Controles de reproducao tiveram codigo legado inalcancavel removido para reduzir conflito entre permissao de sessao e comandos locais.
-- Auto-Mix agora aquece o stream da proxima faixa assim que ela entra na fila.
-- Falha geral da busca virou uma tela amigavel com **Tentar de novo** e atalho para diagnostico de rede.
-- Mantido o cache/prefetch/warmup do player para iniciar faixas com menos chamadas repetidas ao `yt-dlp`.
+Tambem fazem parte do Fluxo:
 
-## Principais recursos
+- **Modo Festa**, mini-player e controles de video.
+- **Discord Rich Presence**, com faixa, capa e tempo de reproducao quando aceitos pelo Discord.
+- **Widget e overlay OBS** baseados no tema ativo.
+- **Soundboard personalizavel**, com selecao de saida. Para enviar audio como microfone no Discord, e necessario um dispositivo de audio virtual configurado no Windows; o Fluxo nao instala um driver de microfone.
+- **Sleep Timer** e ferramentas de conversao e recorte de audio, conforme a disponibilidade do formato e das ferramentas de midia.
 
-- **Busca por YouTube e SoundCloud**: pesquisa normal, links diretos, playlists, mixes, sets e links curtos.
-- **Importacao do Spotify**: cole links de musica, album ou playlist; o Fluxo le os metadados e resolve as faixas para reproducao.
-- **Player com fallback de stream**: se um resultado estiver bloqueado, o Fluxo tenta audio, outra fonte tocavel ou mostra erro amigavel.
-- **Discord Rich Presence**: mostra no Discord o que esta tocando, com capa, tempo decorrido, tempo total e botao para ouvir no YouTube.
-- **Sessao compartilhada**: crie uma sala para ouvir junto com outras pessoas em tempo real.
-- **Fila da sessao**: convidados podem pedir musica, entrar direto na proxima se o host liberar, votar para subir faixas e salvar a fila.
-- **Votacao para pular**: a sala pode exigir 50% dos votos para avancar, com opcao do host ignorar o requisito.
-- **Infinite Radio**: recomenda musicas automaticamente quando a fila esta acabando.
-- **Equalizador robusto**: presets, DSP, velocidade, reverb, compressor, ganho, pan e perfis como Normal, Slowed + Reverb e Nightcore.
-- **Modo Festa**: tela imersiva que muda conforme o tema ativo.
-- **Mini-player**: modos compacto, horizontal e cinema, com controles essenciais.
-- **Biblioteca local**: playlists, favoritos, historico, inbox musical, importacao/exportacao JSON e diagnostico de biblioteca.
-- **Widget e overlay OBS**: janela de "tocando agora" com visual baseado no tema.
-- **Sleep Timer**: pausar em X minutos, parar depois da faixa atual, fechar o app e aplicar fade out.
-- **LivePix**: aba visivel para apoiar o projeto via `livepix.gg/devpotato`.
-- **Changelog dentro do app**: veja as mudancas recentes sem sair do Fluxo.
+## Ouvir junto
 
-## Sessao compartilhada
+Abra **Sessao Compartilhada**, crie uma sala e envie o codigo para seus amigos.
 
-A sessao compartilhada permite que um usuario seja o host e outras pessoas entrem como convidados por codigo de sala.
+O dono da sala escolhe quem pode controlar a reproducao, se os convidados precisam pedir musicas ou podem adiciona-las diretamente, e se o salto de faixa exige votos de pelo menos metade da sala. Tambem pode ativar Infinite Radio, compartilhar as configuracoes de audio e ligar o video da sessao.
 
-O host pode:
+Os participantes podem acompanhar os membros, pedidos e fila, reagir e salvar a fila ou as musicas tocadas em uma playlist. A sincronizacao depende da conexao de cada participante e da disponibilidade das faixas.
 
-- liberar ou bloquear play/pause;
-- liberar ou bloquear seek na barra de progresso;
-- liberar ou bloquear skip manual;
-- permitir que convidados coloquem a proxima musica direto;
-- silenciar pedidos moderados;
-- ativar fila prioritaria por voto;
-- fixar uma musica como prioridade;
-- ativar votacao para pular;
-- permitir que o host pule sem esperar votos;
-- ligar Infinite Radio da sala;
-- sincronizar video para todos;
-- aplicar o equalizador do host nos convidados.
+## Algo nao funcionou?
 
-Os convidados podem:
+**A musica nao inicia:** atualize o Fluxo e abra **Central Fluxo > Rede**. Confira os testes de busca e o runtime de midia. Limpar o cache de streams nao apaga playlists. Use o diagnostico da faixa para verificar a resposta do servidor.
 
-- entrar por codigo de sala;
-- enviar pedidos de musica;
-- colocar a proxima musica direto, se o host permitir;
-- votar para pular;
-- votar para subir musicas na fila;
-- reagir ao vivo;
-- ver membros, fila, historico tocado e ranking;
-- salvar fila, tocadas ou replay da sessao como playlist.
+**So uma faixa falha:** confira o link no navegador. Conteudos privados, removidos, com DRM, restricao de idade, login ou bloqueio regional podem nao estar disponiveis. Teste outro resultado explicitamente ou somente audio.
 
-## Temas e identidade visual
+**A busca demora:** cancele pelo botao ao lado da barra e tente novamente. O status dos resultados indica quando um dos provedores esta indisponivel.
 
-O Fluxo tem dezenas de temas que mudam mais do que a paleta. Cada tema pode alterar bordas, sombras, fundo, player, equalizador, modo festa, cards, widget, overlay e clima geral da interface.
+**O Discord nao mostra a musica:** mantenha o Discord Desktop aberto e o compartilhamento de atividade ativado. O Fluxo tenta reconectar automaticamente; o painel RPC tambem oferece reset. A exibicao final depende do Discord.
 
-Alguns destaques:
+**A sessao nao conecta:** verifique a internet e o teste de sessao compartilhada no diagnostico de rede. O servico depende do Firebase; reinstalar o Fluxo nao resolve uma indisponibilidade do servidor.
 
-- **Fluxo Bug**: satira interna sobre bugs do app, com visual de crash report controlado.
-- **Soul Eater**: visual torto, sombrio e cartunesco.
-- **Adolla**: identidade de chamas pretas e brancas.
-- **Dark Brotherhood**: atmosfera ritualistica escura.
-- **Fatal Error**: estetica de diagnostico e falha critica.
-- **Minecraft**: interface inspirada em blocos e inventario.
-- **Tensura**: UI mais fluida e arredondada.
-- **Ophiuchus**: neon cosmico e aura estelar.
-- **Morioh-Cho Radio**: pop-art, paineis fortes e cores absurdas.
-- **Orokin Cell**: marfim, ouro e luxo de ficcao cientifica.
+Para relatar um problema, abra uma [issue](https://github.com/Harleyzinn/fluxo/issues) com a versao do Fluxo, passos para reproduzir e mensagem de erro. Nao envie senhas, tokens, dados de pagamento ou sua biblioteca privada.
 
-## Apoiar o projeto
+## Apoie o Fluxo
 
-O Fluxo tem uma aba **Apoiar Fluxo** dentro do app.
+O Fluxo e mantido por um desenvolvedor independente. As doacoes ajudam a manter o projeto e suas atualizacoes.
 
-Link publico:
-[livepix.gg/devpotato](https://livepix.gg/devpotato)
+**[Doar pelo LivePix](https://livepix.gg/devpotato)** ou abra **Apoiar Fluxo** no aplicativo. O pagamento acontece na pagina publica do LivePix; nenhum segredo privado de pagamento precisa ser configurado no player.
 
-O app nao embute segredo privado de pagamento. Ele abre apenas a pagina publica do LivePix.
+---
 
-## Solucao de problemas
-
-### A musica aparece como erro de stream
-
-Alguns videos do YouTube podem ter DRM, restricao regional, login, idade ou remocao. A partir da 3.9.28, o Fluxo resolve a faixa no processo principal e entrega o audio/video ao renderer por proxy local com CORS. Isso evita o erro em que o Electron recusava URLs diretas do `googlevideo.com` e tambem preserva o equalizador.
-
-Se ainda falhar:
-
-- tente outro resultado da busca;
-- confira se o link abre no navegador;
-- teste somente audio se o modo video estiver ligado;
-- atualize para a release mais recente.
-
-### SoundCloud nao toca
-
-O SoundCloud pode bloquear faixas privadas, removidas ou sem stream publico. Links curtos e playlists publicas sao suportados, mas a disponibilidade final depende da propria faixa.
-
-### Discord RPC nao aparece
-
-Verifique:
-
-- Discord Desktop aberto;
-- atividade de jogos ativada no Discord;
-- Fluxo atualizado;
-- app id configurado no projeto;
-- tempo de alguns segundos para o Discord atualizar o status.
-
-### Sessao compartilhada nao conecta
-
-A sessao compartilhada depende do Firebase Realtime Database. Confira se as regras foram publicadas e se o projeto correto e `fluxo-music`.
-
-## Observacoes
-
-- Algumas fontes podem bloquear streams por DRM, regiao, login ou idade.
-- SoundCloud depende de disponibilidade publica da faixa.
-- Discord RPC exige o Discord Desktop aberto.
-- Sessao compartilhada depende das regras corretas no Firebase Realtime Database.
-- O projeto e focado em Windows desktop.
+Fluxo Music e um projeto independente, sem afiliacao com YouTube, SoundCloud, Spotify, Discord ou com as obras que inspiram seus temas. Servicos externos podem mudar suas regras e disponibilidade. Utilize conteudos que voce tem direito de acessar.
