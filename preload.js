@@ -42,5 +42,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     unregisterGlobalShortcuts: () => ipcRenderer.send('unregister-global-shortcuts'),
     onGlobalShortcutAction: (callback) => ipcRenderer.on('global-shortcut-action', callback),
     onUpdateMessage: (callback) => ipcRenderer.on('update-message', callback),
+    onUpdateError: (callback) => ipcRenderer.on('update-error', callback),
     onUpdateProgress: (callback) => ipcRenderer.on('update-progress', callback)
 });

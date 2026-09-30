@@ -14,6 +14,7 @@
     <script src="node_modules/hls.js/dist/hls.min.js"></script>
 
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="themes-collection.css">
 </head>
 <body>
 
@@ -97,7 +98,7 @@
         <div class="content-wrapper">
             <header class="header">
                 <div class="search-box">
-                    <input type="text" id="searchInput" class="search-input" placeholder=">> Busca, link YouTube/SoundCloud, playlist, mix ou arrastar .mp3 e ENTER...">
+                    <input type="text" id="searchInput" class="search-input" placeholder="Busque uma musica ou cole um link de faixa, playlist ou mix...">
                     <button type="button" id="btnSearch" class="btn-search" title="Buscar"><i class="ph ph-magnifying-glass"></i></button>
                 </div>
             </header>
@@ -117,7 +118,7 @@
                     <ul class="results-list" id="resultsList">
                         <li style="padding: 40px; color: var(--text-muted); text-align: center;">
                             <i class="ph ph-terminal" style="font-size: 3rem; margin-bottom: 15px; display: block;"></i>
-                            Aguardando entrada de dados pelo terminal superior.<br>Você também pode arrastar arquivos de áudio direto para cá.
+                            Sua fila esta vazia.
                         </li>
                     </ul>
                 </div>
@@ -129,9 +130,10 @@
         <i class="ph ph-rocket-launch" style="font-size: 5rem; margin-bottom: 20px; animation: pulseGlow 2s infinite;"></i>
         <h2 style="letter-spacing: 3px; margin-bottom: 10px; text-transform: uppercase;">SISTEMA OS: ATUALIZAÇÃO</h2>
         <div id="updateStatus" style="font-family: monospace; margin-bottom: 20px; color: var(--text-main);">Procurando dados...</div>
-        <div style="width: 400px; height: 10px; background: rgba(255,255,255,0.1); border-radius: 10px; border: var(--border-tech); overflow: hidden;">
+        <div style="width: min(400px, 80%); height: 10px; background: rgba(255,255,255,0.1); border-radius: 10px; border: var(--border-tech); overflow: hidden;">
             <div id="updateProgressFill" style="width: 0%; height: 100%; background: var(--neon-pink); transition: width 0.2s;"></div>
         </div>
+        <button id="btnDismissUpdate" class="btn-action" style="margin-top: 24px;">Continuar ouvindo</button>
     </div>
 <div id="videoContainer"></div>
 

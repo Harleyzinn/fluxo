@@ -1133,8 +1133,8 @@ function pickPlayableUrl(output, wantsVideo, maxHeight = null) {
 
 function getExtractorAttempts() {
     return [
-        {},
-        { extractorArgs: 'youtube:player_client=web_safari' }
+        { extractorArgs: 'youtube:skip=translated_subs' },
+        { extractorArgs: 'youtube:player_client=web_safari;skip=translated_subs' }
     ];
 }
 
@@ -1335,7 +1335,7 @@ async function getStreamUrlFast(target, quality, format) {
             if (streamUrl) return streamUrl;
         } catch (error) {
             lastError = error;
-            console.log(`Extração rápida falhou (${quality}):`, error.message);
+            console.log(`Extração rápida falhou (${quality}):`, getFriendlyMediaError(error));
         }
     }
 
@@ -1347,10 +1347,11 @@ async function getStreamUrlWithMetadata(target, quality, format, wantsVideo, max
     for (const attempt of getExtractorAttempts()) {
         try {
             const output = await ytDlp(target, {
-                dumpSingleJson: true,
+                print: '%(.{url,formats,requested_formats,vcodec,acodec})j',
+                skipDownload: true,
                 noWarnings: true,
                 noPlaylist: true,
-                ...(wantsVideo ? {} : { format }),
+                format: wantsVideo ? 'bestaudio/best' : format,
                 socketTimeout: 8,
                 retries: 1,
                 extractorRetries: 1,
@@ -1360,7 +1361,7 @@ async function getStreamUrlWithMetadata(target, quality, format, wantsVideo, max
             const streamUrl = pickPlayableUrl(output, wantsVideo, maxHeight);
             if (streamUrl) return streamUrl;
         } catch (error) {
-            console.log(`Falha ao obter stream (${quality}):`, error.message);
+            console.log(`Falha ao obter stream (${quality}):`, getFriendlyMediaError(error));
         }
     }
 
@@ -1577,6 +1578,7 @@ function setupAutoUpdater() {
 
     autoUpdater.on('error', (err) => {
         console.log('Erro detalhado do Update:', err);
+        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('update-error', 'Nao foi possivel concluir a atualizacao. Sua versao atual continua disponivel.');
     });
 
     setTimeout(() => autoUpdater.checkForUpdatesAndNotify().catch(error => {

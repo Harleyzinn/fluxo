@@ -27,6 +27,21 @@ test('split HLS video uses the master playlist, never a silent video rendition',
     assert.equal(run("pickPlayableUrl({formats:[{url:'https://example.com/video.mp4',vcodec:'avc1',acodec:'none'}]}, true)"), null);
 });
 
+test('video extraction requests only playback metadata and skips translated subtitles', async () => {
+    const { run } = loadMain();
+    run(`globalThis.metadataFlags = null;
+        ytDlpBinary.exec = async (_target, flags) => {
+            metadataFlags = flags;
+            return {stdout: JSON.stringify({formats: [{url:'https://example.com/video.m3u8',
+                manifest_url:'https://example.com/master.m3u8', protocol:'m3u8_native',vcodec:'avc1',acodec:'none',height:720}]})};
+        };`);
+    assert.equal(await run('getStreamUrlWithMetadata("test", "video", "best", true, 720)'), 'https://example.com/master.m3u8');
+    assert.equal(run('metadataFlags.skipDownload'), true);
+    assert.equal(run('metadataFlags.dumpSingleJson'), undefined);
+    assert.match(run('metadataFlags.print'), /formats/);
+    assert.match(run('metadataFlags.extractorArgs'), /skip=translated_subs/);
+});
+
 test('force refresh reaches the main-process cache and concurrent refreshes are shared', async () => {
     const { run, handlers } = loadMain();
     run("globalThis.calls = 0; getStreamUrlFast = async () => { calls++; await new Promise(r => setTimeout(r, 10)); return 'https://example.com/audio-' + calls; };");

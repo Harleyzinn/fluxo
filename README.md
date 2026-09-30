@@ -2,7 +2,7 @@
 
 Seu player, do seu jeito. Musica do YouTube e SoundCloud, dezenas de temas, ferramentas de audio e salas para ouvir junto, em um aplicativo para Windows.
 
-**Versao 3.9.32** | [Baixar o Fluxo](https://github.com/Harleyzinn/fluxo/releases/latest) | [Todas as releases](https://github.com/Harleyzinn/fluxo/releases) | [Apoiar no LivePix](https://livepix.gg/devpotato)
+**Versao 3.9.33** | [Baixar o Fluxo](https://github.com/Harleyzinn/fluxo/releases/latest) | [Todas as releases](https://github.com/Harleyzinn/fluxo/releases) | [Apoiar no LivePix](https://livepix.gg/devpotato)
 
 ## Baixar e instalar
 
@@ -10,7 +10,7 @@ Nao precisa usar terminal, clonar o repositorio ou instalar Node.js.
 
 1. Abra a aba [Releases](https://github.com/Harleyzinn/fluxo/releases) deste repositorio.
 2. Entre na versao mais recente marcada como **Latest**.
-3. Abra **Assets**, abaixo das notas da versao, e baixe **Fluxo-Music-Setup-3.9.32.exe**. Em versoes futuras, muda somente o numero no nome.
+3. Abra **Assets**, abaixo das notas da versao, e baixe o arquivo **Fluxo-Music-Setup-[versao].exe**, com o numero da release escolhida.
 4. Execute o instalador e aguarde a conclusao.
 5. Abra **Fluxo Music** pelo menu Iniciar ou pelo atalho na area de trabalho.
 
@@ -24,7 +24,21 @@ O Fluxo verifica atualizacoes publicadas no GitHub. Quando uma atualizacao estiv
 
 Para atualizar manualmente, feche o Fluxo, baixe o novo `.exe` em [Releases](https://github.com/Harleyzinn/fluxo/releases/latest) e execute-o. Nao desinstale nem apague os dados do aplicativo. Voce tambem pode exportar um backup pela Biblioteca antes de atualizar.
 
-## O que mudou na 3.9.32
+## Novidades da 3.9.33
+
+- **Oito novos temas:** Portal, Resident Evil, DOOM, Ace Attorney, Death Note, Dandadan, Art Deco e Bauhaus. Sao 58 opcoes no seletor.
+- **Layouts diferentes:** menu superior no Ace Attorney, inventario e menu a direita no Resident Evil, player lateral no Death Note e navegacao modular no Bauhaus. Cada novo tema inclui uma composicao para o Modo Festa e o equalizador.
+- **Video mais agil:** extracao mais enxuta, sem carregar milhares de metadados de legendas desnecessarios ao player.
+- **Fila e transicoes:** cancelar um carregamento, limpar a fila ou escolher outra faixa nao deixa uma operacao antiga tomar o controle do player.
+- **Radio:** recomendacoes atrasadas sao descartadas depois de trocar a faixa ou desativar o radio.
+- **Audio e video:** a troca de modo preserva a posicao e consegue restaurar um stream HLS se o novo modo falhar.
+- **Sessao compartilhada:** pausa recebida durante o carregamento e fim de faixa passam a respeitar o estado do anfitriao. Equalizador compartilhado considera tambem ganho e pan.
+- **Mini-player e menus:** ajustes de video, fixacao da janela, rolagem do equalizador e fechamento do aviso de atualizacao em caso de erro.
+- **Biblioteca mais resistente:** importacao de registros invalidos e nomes repetidos corrigida; backups parciais preservam as categorias que nao contem.
+
+Baixe esta versao pela aba Releases. O changelog completo tambem esta no aplicativo.
+
+## Base de reproducao da 3.9.32
 
 - **Reproducao recuperada:** extrator atualizado e runtime de midia incluido no instalador. Nao depende de ferramentas instaladas separadamente no computador.
 - **Streams por blocos:** ajuste na entrega de audio e video para lidar com recusas HTTP 403 em pedidos abertos e preservar o avanco pela faixa.
@@ -46,7 +60,7 @@ As mudancas anteriores, incluindo importacao seletiva de playlists e melhorias d
 - Importe metadados de links do **Spotify** e procure as gravacoes para tocar. O Fluxo nao reproduz diretamente o catalogo protegido do Spotify.
 - Organize playlists, favoritos, historico e Inbox. Importe, exporte e faca backup da sua biblioteca.
 - Use **Infinite Radio**, reproducao aleatoria, repeticao e transicao suave.
-- Abra musicas locais e use o diagnostico de biblioteca para revisar problemas.
+- Use o diagnostico de biblioteca para revisar problemas.
 
 ## Audio e personalizacao
 
@@ -59,8 +73,7 @@ Tambem fazem parte do Fluxo:
 - **Modo Festa**, mini-player e controles de video.
 - **Discord Rich Presence**, com faixa, capa e tempo de reproducao quando aceitos pelo Discord.
 - **Widget e overlay OBS** baseados no tema ativo.
-- **Soundboard personalizavel**, com selecao de saida. Para enviar audio como microfone no Discord, e necessario um dispositivo de audio virtual configurado no Windows; o Fluxo nao instala um driver de microfone.
-- **Sleep Timer** e ferramentas de conversao e recorte de audio, conforme a disponibilidade do formato e das ferramentas de midia.
+- **Sleep Timer** e ferramentas de conversao e recorte de audio. Conversao e recorte dependem de FFmpeg disponivel no computador; ele ainda nao acompanha o instalador.
 
 ## Ouvir junto
 

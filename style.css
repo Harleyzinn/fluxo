@@ -5571,6 +5571,7 @@ body.theme-adolla.party-mode .np-cover:not(.video-active) {
 }
 
 .eq-hero {
+    flex-wrap: wrap;
     margin-bottom: 18px;
     padding-bottom: 16px;
     border-bottom: var(--border-tech);
@@ -5588,8 +5589,8 @@ body.theme-adolla.party-mode .np-cover:not(.video-active) {
 .eq-hero h3 {
     margin: 4px 0 0;
     color: var(--text-main);
-    font-size: clamp(1.2rem, 2vw, 1.8rem);
-    letter-spacing: 1px;
+    font-size: 1.25rem;
+    letter-spacing: 0;
 }
 
 .eq-toggle {
@@ -5631,6 +5632,8 @@ body.theme-adolla.party-mode .np-cover:not(.video-active) {
 }
 
 .eq-field {
+    flex-wrap: wrap;
+    min-width: 0;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -5642,7 +5645,8 @@ body.theme-adolla.party-mode .np-cover:not(.video-active) {
 }
 
 .eq-field select {
-    min-width: 220px;
+    min-width: 0;
+    max-width: 100%;
 }
 
 .eq-fx-grid {
@@ -5653,6 +5657,7 @@ body.theme-adolla.party-mode .np-cover:not(.video-active) {
 }
 
 .eq-card {
+    min-width: 0;
     padding: 16px;
     border: 1px solid color-mix(in srgb, var(--neon-cyan), transparent 60%);
     border-radius: calc(var(--item-radius) + 8px);
@@ -5670,6 +5675,8 @@ body.theme-adolla.party-mode .np-cover:not(.video-active) {
 }
 
 .eq-card-head span {
+    min-width: 0;
+    overflow-wrap: anywhere;
     flex: 1;
     font-weight: 900;
     text-transform: uppercase;
@@ -8412,36 +8419,36 @@ body.theme-souleater { --legacy-a:#ffcf32; --legacy-b:#c5091c; --legacy-eq-bg:#1
 body.theme-adolla { --legacy-a:#ffffff; --legacy-b:#050505; --legacy-eq-bg:#050505; --legacy-eq-card:rgba(255,255,255,0.045); --legacy-party-bg:linear-gradient(180deg,#f4f4f4 0%, #111 22%, #020202 100%); --legacy-party-fx:radial-gradient(ellipse at 50% 92%, rgba(255,255,255,0.42), transparent 42%); --legacy-party-label:"BLACK IGNITION"; }
 body.theme-terraria { --legacy-a:#7bdb6b; --legacy-b:#8fd7ff; --legacy-eq-bg:#102010; --legacy-eq-card:rgba(123,219,107,0.055); --legacy-party-bg:linear-gradient(180deg,#24486e 0 38%, #31591f 38% 58%, #4b2e19 58%); --legacy-party-fx:repeating-linear-gradient(90deg, transparent 0 44px, rgba(123,219,107,0.13) 44px 48px); --legacy-party-label:"TERRARIA CAMPFIRE"; }
 
-body[class*="theme-"]:not(.theme-minecraft):not(.theme-darkbrotherhood):not(.theme-error):not(.theme-matrix):not(.theme-eldenring):not(.theme-persona5):not(.theme-hollowknight):not(.theme-zelda):not(.theme-onepiece):not(.theme-naruto):not(.theme-jujutsu):not(.theme-aot):not(.theme-evangelion):not(.theme-undertale) .eq-shell {
+body[class*="theme-"]:not(.collection-theme):not(.theme-minecraft):not(.theme-darkbrotherhood):not(.theme-error):not(.theme-matrix):not(.theme-eldenring):not(.theme-persona5):not(.theme-hollowknight):not(.theme-zelda):not(.theme-onepiece):not(.theme-naruto):not(.theme-jujutsu):not(.theme-aot):not(.theme-evangelion):not(.theme-undertale) .eq-shell {
     background: var(--legacy-eq-bg, var(--bg-panel)) !important;
     border: 1px solid var(--legacy-a, var(--neon-cyan)) !important;
     box-shadow: 0 18px 60px rgba(0,0,0,0.45), inset 0 0 38px color-mix(in srgb, var(--legacy-a, var(--neon-cyan)), transparent 88%) !important;
 }
 
-body[class*="theme-"]:not(.theme-minecraft):not(.theme-darkbrotherhood):not(.theme-error):not(.theme-matrix):not(.theme-eldenring):not(.theme-persona5):not(.theme-hollowknight):not(.theme-zelda):not(.theme-onepiece):not(.theme-naruto):not(.theme-jujutsu):not(.theme-aot):not(.theme-evangelion):not(.theme-undertale) .eq-card,
-body[class*="theme-"]:not(.theme-minecraft):not(.theme-darkbrotherhood):not(.theme-error):not(.theme-matrix):not(.theme-eldenring):not(.theme-persona5):not(.theme-hollowknight):not(.theme-zelda):not(.theme-onepiece):not(.theme-naruto):not(.theme-jujutsu):not(.theme-aot):not(.theme-evangelion):not(.theme-undertale) .eq-band {
+body[class*="theme-"]:not(.collection-theme):not(.theme-minecraft):not(.theme-darkbrotherhood):not(.theme-error):not(.theme-matrix):not(.theme-eldenring):not(.theme-persona5):not(.theme-hollowknight):not(.theme-zelda):not(.theme-onepiece):not(.theme-naruto):not(.theme-jujutsu):not(.theme-aot):not(.theme-evangelion):not(.theme-undertale) .eq-card,
+body[class*="theme-"]:not(.collection-theme):not(.theme-minecraft):not(.theme-darkbrotherhood):not(.theme-error):not(.theme-matrix):not(.theme-eldenring):not(.theme-persona5):not(.theme-hollowknight):not(.theme-zelda):not(.theme-onepiece):not(.theme-naruto):not(.theme-jujutsu):not(.theme-aot):not(.theme-evangelion):not(.theme-undertale) .eq-band {
     background: var(--legacy-eq-card, rgba(255,255,255,0.04)) !important;
     border: 1px solid color-mix(in srgb, var(--legacy-a, var(--neon-cyan)), transparent 45%) !important;
     box-shadow: inset 0 0 24px color-mix(in srgb, var(--legacy-b, var(--neon-pink)), transparent 90%) !important;
 }
 
-body[class*="theme-"]:not(.theme-minecraft):not(.theme-darkbrotherhood):not(.theme-error):not(.theme-matrix):not(.theme-eldenring):not(.theme-persona5):not(.theme-hollowknight):not(.theme-zelda):not(.theme-onepiece):not(.theme-naruto):not(.theme-jujutsu):not(.theme-aot):not(.theme-evangelion):not(.theme-undertale) .eq-slider,
-body[class*="theme-"]:not(.theme-minecraft):not(.theme-darkbrotherhood):not(.theme-error):not(.theme-matrix):not(.theme-eldenring):not(.theme-persona5):not(.theme-hollowknight):not(.theme-zelda):not(.theme-onepiece):not(.theme-naruto):not(.theme-jujutsu):not(.theme-aot):not(.theme-evangelion):not(.theme-undertale) .dsp-slider {
+body[class*="theme-"]:not(.collection-theme):not(.theme-minecraft):not(.theme-darkbrotherhood):not(.theme-error):not(.theme-matrix):not(.theme-eldenring):not(.theme-persona5):not(.theme-hollowknight):not(.theme-zelda):not(.theme-onepiece):not(.theme-naruto):not(.theme-jujutsu):not(.theme-aot):not(.theme-evangelion):not(.theme-undertale) .eq-slider,
+body[class*="theme-"]:not(.collection-theme):not(.theme-minecraft):not(.theme-darkbrotherhood):not(.theme-error):not(.theme-matrix):not(.theme-eldenring):not(.theme-persona5):not(.theme-hollowknight):not(.theme-zelda):not(.theme-onepiece):not(.theme-naruto):not(.theme-jujutsu):not(.theme-aot):not(.theme-evangelion):not(.theme-undertale) .dsp-slider {
     accent-color: var(--legacy-a, var(--neon-cyan)) !important;
 }
 
-body[class*="theme-"]:not(.theme-minecraft):not(.theme-darkbrotherhood):not(.theme-error):not(.theme-matrix):not(.theme-eldenring):not(.theme-persona5):not(.theme-hollowknight):not(.theme-zelda):not(.theme-onepiece):not(.theme-naruto):not(.theme-jujutsu):not(.theme-aot):not(.theme-evangelion):not(.theme-undertale) .dsp-profile-btn.active {
+body[class*="theme-"]:not(.collection-theme):not(.theme-minecraft):not(.theme-darkbrotherhood):not(.theme-error):not(.theme-matrix):not(.theme-eldenring):not(.theme-persona5):not(.theme-hollowknight):not(.theme-zelda):not(.theme-onepiece):not(.theme-naruto):not(.theme-jujutsu):not(.theme-aot):not(.theme-evangelion):not(.theme-undertale) .dsp-profile-btn.active {
     background: var(--legacy-a, var(--neon-cyan)) !important;
     color: var(--bg-base) !important;
     border-color: var(--legacy-a, var(--neon-cyan)) !important;
 }
 
-body[class*="theme-"]:not(.theme-minecraft):not(.theme-darkbrotherhood):not(.theme-error):not(.theme-matrix):not(.theme-eldenring):not(.theme-persona5):not(.theme-hollowknight):not(.theme-zelda):not(.theme-onepiece):not(.theme-naruto):not(.theme-jujutsu):not(.theme-aot):not(.theme-evangelion):not(.theme-undertale).party-mode .player-deck {
+body[class*="theme-"]:not(.collection-theme):not(.theme-minecraft):not(.theme-darkbrotherhood):not(.theme-error):not(.theme-matrix):not(.theme-eldenring):not(.theme-persona5):not(.theme-hollowknight):not(.theme-zelda):not(.theme-onepiece):not(.theme-naruto):not(.theme-jujutsu):not(.theme-aot):not(.theme-evangelion):not(.theme-undertale).party-mode .player-deck {
     background: var(--legacy-party-bg, var(--bg-panel)) !important;
     box-shadow: inset 0 0 170px rgba(0,0,0,0.58), inset 0 0 0 10px color-mix(in srgb, var(--legacy-a, var(--neon-cyan)), transparent 55%) !important;
 }
 
-body[class*="theme-"]:not(.theme-minecraft):not(.theme-darkbrotherhood):not(.theme-error):not(.theme-matrix):not(.theme-eldenring):not(.theme-persona5):not(.theme-hollowknight):not(.theme-zelda):not(.theme-onepiece):not(.theme-naruto):not(.theme-jujutsu):not(.theme-aot):not(.theme-evangelion):not(.theme-undertale).party-mode .player-deck::before {
+body[class*="theme-"]:not(.collection-theme):not(.theme-minecraft):not(.theme-darkbrotherhood):not(.theme-error):not(.theme-matrix):not(.theme-eldenring):not(.theme-persona5):not(.theme-hollowknight):not(.theme-zelda):not(.theme-onepiece):not(.theme-naruto):not(.theme-jujutsu):not(.theme-aot):not(.theme-evangelion):not(.theme-undertale).party-mode .player-deck::before {
     content: "" !important;
     position: absolute !important;
     inset: 0 !important;
@@ -8450,7 +8457,7 @@ body[class*="theme-"]:not(.theme-minecraft):not(.theme-darkbrotherhood):not(.the
     background-size: 42px 42px !important;
 }
 
-body[class*="theme-"]:not(.theme-minecraft):not(.theme-darkbrotherhood):not(.theme-error):not(.theme-matrix):not(.theme-eldenring):not(.theme-persona5):not(.theme-hollowknight):not(.theme-zelda):not(.theme-onepiece):not(.theme-naruto):not(.theme-jujutsu):not(.theme-aot):not(.theme-evangelion):not(.theme-undertale).party-mode .player-deck::after {
+body[class*="theme-"]:not(.collection-theme):not(.theme-minecraft):not(.theme-darkbrotherhood):not(.theme-error):not(.theme-matrix):not(.theme-eldenring):not(.theme-persona5):not(.theme-hollowknight):not(.theme-zelda):not(.theme-onepiece):not(.theme-naruto):not(.theme-jujutsu):not(.theme-aot):not(.theme-evangelion):not(.theme-undertale).party-mode .player-deck::after {
     content: var(--legacy-party-label, "FLUXO PARTY") !important;
     position: absolute !important;
     left: 28px !important;
@@ -8462,7 +8469,7 @@ body[class*="theme-"]:not(.theme-minecraft):not(.theme-darkbrotherhood):not(.the
     pointer-events: none !important;
 }
 
-body[class*="theme-"]:not(.theme-minecraft):not(.theme-darkbrotherhood):not(.theme-error):not(.theme-matrix):not(.theme-eldenring):not(.theme-persona5):not(.theme-hollowknight):not(.theme-zelda):not(.theme-onepiece):not(.theme-naruto):not(.theme-jujutsu):not(.theme-aot):not(.theme-evangelion):not(.theme-undertale).party-mode .np-cover:not(.video-active) {
+body[class*="theme-"]:not(.collection-theme):not(.theme-minecraft):not(.theme-darkbrotherhood):not(.theme-error):not(.theme-matrix):not(.theme-eldenring):not(.theme-persona5):not(.theme-hollowknight):not(.theme-zelda):not(.theme-onepiece):not(.theme-naruto):not(.theme-jujutsu):not(.theme-aot):not(.theme-evangelion):not(.theme-undertale).party-mode .np-cover:not(.video-active) {
     border-color: var(--legacy-a, var(--neon-cyan)) !important;
     box-shadow: 0 0 70px color-mix(in srgb, var(--legacy-a, var(--neon-cyan)), transparent 58%) !important;
 }
@@ -9043,11 +9050,11 @@ body.mini-mode.video-mode .mini-controls {
 }
 
 .eq-fx-grid {
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
 }
 
 .eq-card-wide {
-    grid-column: span 2;
+    grid-column: 1 / -1;
 }
 
 .eq-mini-grid {

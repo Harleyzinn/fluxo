@@ -101,10 +101,16 @@ async function main() {
         console.log(JSON.stringify({ test: 'second real track', title: await page.evaluate(() => titleEl.innerText) }));
 
         if (process.env.FLUXO_MEDIA_MODES === '1') {
-            await page.evaluate(async () => { setVideoUiState(true); await loadAndPlayTrack(0); });
+            await page.locator('#btnToggleVideo').click();
             await page.waitForFunction(() => audioPlayer.videoWidth > 0 && audioPlayer.currentTime > 2 && !audioPlayer.paused, null, { timeout: 45000 });
             assert.ok(await page.evaluate(() => (audioPlayer.webkitAudioDecodedByteCount || 0) > 0 || (mainHlsController?.audioTracks?.length || 0) > 0), 'Video must include audio');
             console.log(JSON.stringify({ test: 'video playback', result: await page.evaluate(() => ({ width: audioPlayer.videoWidth, height: audioPlayer.videoHeight, time: audioPlayer.currentTime })) }));
+            await page.locator('#btnFullscreen').click();
+            await page.waitForFunction(() => document.fullscreenElement?.id === 'mainVideoPlayer');
+            await page.evaluate(() => document.exitFullscreen());
+            await page.locator('#btnToggleVideo').click();
+            await page.waitForFunction(() => !isVideoMode && !btnToggleVideo.disabled && !audioPlayer.paused);
+            console.log(JSON.stringify({ test: 'video fullscreen and return to audio', time: await page.evaluate(() => audioPlayer.currentTime) }));
             await page.evaluate(async () => {
                 setVideoUiState(false);
                 const results = await searchAudioTracks('Tycho Awake');

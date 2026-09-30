@@ -11,7 +11,10 @@ const files = asar.listPackage(archive).map(file => file.replace(/\\/g, '/'));
 for (const forbidden of ['/MAPA_MENTAL_FLUXO.canvas', '/MAPA_MENTAL_OBSIDIAN_FLUXO.md', '/.obsidian', '/.env', '/backups', '/tests', '/tools', '/vendor', '/.git']) {
     assert.equal(files.some(file => file === forbidden || file.startsWith(`${forbidden}/`)), false, `Private/development file in package: ${forbidden}`);
 }
-for (const file of ['/main.js', '/preload.js', '/script.js', '/index.html', '/style.css']) assert.ok(files.includes(file), `Missing ${file}`);
+for (const file of ['/main.js', '/preload.js', '/script.js', '/index.html', '/style.css', '/themes-collection.css']) {
+    assert.ok(files.includes(file), `Missing ${file}`);
+    assert.deepEqual(asar.extractFile(archive, file.slice(1)), fs.readFileSync(path.join(root, file.slice(1))), `Stale packaged file: ${file}`);
+}
 const packedConfig = JSON.parse(asar.extractFile(archive, 'package.json').toString());
 assert.equal(packedConfig.version, version);
 assert.ok(fs.existsSync(path.join(root, 'dist/win-unpacked/resources/THIRD_PARTY_NOTICES.txt')));

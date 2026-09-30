@@ -70,7 +70,7 @@ function getStableYouTubeThumbnail(videoId) {
 }
 
 function normalizeTrack(track) {
-    if (!track) return null;
+    if (!track || typeof track !== 'object' || Array.isArray(track)) return null;
 
     const id = track.id || track.videoId || track.url || track.query || '';
     const videoId = track.videoId || getYouTubeVideoIdFromValue(id) || getYouTubeVideoIdFromValue(track.url);
@@ -93,6 +93,17 @@ function normalizeSearchResult(result) {
     return {
         ...data,
         tracks: tracks.map(normalizeTrack).filter(track => track && getTrackStreamId(track))
+    };
+}
+
+function normalizePlaylist(playlist) {
+    if (!playlist || typeof playlist !== 'object' || Array.isArray(playlist)) return null;
+    return {
+        ...playlist,
+        title: String(playlist.title || playlist.name || 'Playlist'),
+        cover: String(playlist.cover || ''),
+        locked: Boolean(playlist.locked),
+        tracks: (Array.isArray(playlist.tracks) ? playlist.tracks : []).map(normalizeTrack).filter(Boolean)
     };
 }
 
@@ -282,6 +293,9 @@ let isApplyingRemotePlayback = false;
 let lastAppliedSessionEqStamp = '';
 let lastAppliedSessionVideoMode = null;
 let skipVoteInProgress = false;
+let latestRemotePlaybackState = null;
+let remotePlaybackPendingGeneration = 0;
+let remotePlaybackGuardDepth = 0;
 
 let myUid = localStorage.getItem('fluxo_uid');
 if (!myUid) { 
@@ -536,7 +550,8 @@ function getCurrentPlaybackPatch(extra = {}) {
 function getSharedExpectedTime(data = {}) {
     let expectedTime = Number(data.time) || 0;
     if (data.state === 'playing' && data.updatedAt) {
-        expectedTime += Math.max(0, (Date.now() - Number(data.updatedAt)) / 1000);
+        const rate = clampNumber(data.eq?.playbackRate, 0.5, 2, 1);
+        expectedTime += Math.max(0, (Date.now() - Number(data.updatedAt)) / 1000) * rate;
     }
     return expectedTime;
 }
@@ -553,14 +568,16 @@ function canPublishPlaybackEvent() {
 }
 
 async function withRemotePlaybackGuard(action) {
+    remotePlaybackGuardDepth++;
     isApplyingRemotePlayback = true;
     ignoreSync = true;
     try {
         return await action();
     } finally {
         setTimeout(() => {
-            isApplyingRemotePlayback = false;
-            ignoreSync = false;
+            remotePlaybackGuardDepth = Math.max(0, remotePlaybackGuardDepth - 1);
+            isApplyingRemotePlayback = remotePlaybackGuardDepth > 0;
+            ignoreSync = isApplyingRemotePlayback;
         }, 350);
     }
 }
@@ -1009,8 +1026,8 @@ function handleTabSwitch(clickedBtn) {
     if (btnClearQueue) btnClearQueue.style.display = 'none';
 
     // 3. Pausa prévias de áudio que ficaram tocando esquecidas em outra aba
-    if (window.previewPlayer && !window.previewPlayer.paused) {
-        window.previewPlayer.pause();
+    if (!previewPlayer.paused) {
+        previewPlayer.pause();
         document.querySelectorAll('.btn-preview').forEach(b => b.classList.replace('ph-pause-circle', 'ph-play-circle'));
     }
 
@@ -1031,6 +1048,17 @@ menuButtons.forEach(btn => {
 // ========================================================
 // SISTEMA DE TEMAS
 // ========================================================
+const COLLECTION_THEMES = [
+    { id: 'portal', name: 'Portal / Aperture', desc: 'Centro de enriquecimento. Camara de testes 07.', icon: 'ph-aperture' },
+    { id: 'residentevil', name: 'Resident Evil / Save Room', desc: 'Raccoon City. Arquivo de sobrevivencia.', icon: 'ph-first-aid-kit' },
+    { id: 'doom', name: 'DOOM / UAC', desc: 'Mars City. Frequencia da UAC.', icon: 'ph-shield-chevron' },
+    { id: 'aceattorney', name: 'Ace Attorney / Court Record', desc: 'Tribunal distrital. Registro de evidencias.', icon: 'ph-gavel' },
+    { id: 'deathnote', name: 'Death Note / Case Files', desc: 'Investigacao Kira. Acesso restrito.', icon: 'ph-notebook' },
+    { id: 'dandadan', name: 'Dandadan / Occult FM', desc: 'Frequencia paranormal. Sintonize o inexplicavel.', icon: 'ph-broadcast' },
+    { id: 'artdeco', name: 'Art Deco / Grand Salon', desc: 'Salao 1925. Programacao da noite.', icon: 'ph-buildings' },
+    { id: 'bauhaus', name: 'Bauhaus / Form & Sound', desc: 'Dessau, 1926. Estudos de forma e ritmo.', icon: 'ph-shapes' }
+];
+
 function applyThemeClass(themeId) {
     [...document.body.classList]
         .filter(className => className.startsWith('theme-'))
@@ -1039,6 +1067,7 @@ function applyThemeClass(themeId) {
     if (themeId && themeId !== 'default') {
         document.body.classList.add(`theme-${themeId}`);
     }
+    document.body.classList.toggle('collection-theme', COLLECTION_THEMES.some(theme => theme.id === themeId));
 }
 
 const savedTheme = localStorage.getItem('fluxo_theme') || 'default';
@@ -1056,10 +1085,29 @@ document.getElementById('btnDonations')?.addEventListener('click', renderDonatio
 
 const FLUXO_CHANGELOG = [
     {
+        version: '3.9.33',
+        date: '30/09/2026',
+        title: 'Oito novas identidades e revisao do player',
+        badge: 'Atual',
+        items: [
+            'Novos temas: Portal, Resident Evil, DOOM, Ace Attorney, Death Note, Dandadan, Art Deco e Bauhaus.',
+            'Novos layouts incluem navegacao superior, menu a direita, player lateral e inventario em grade, com modos festa e equalizadores proprios.',
+            'Extracao de video evita metadados desnecessarios de legendas, reduzindo demora e falhas por excesso de dados.',
+            'Limpar a fila cancela carregamentos pendentes; a proxima musica adicionada volta a tocar normalmente.',
+            'Trocas antigas de audio/video e transicoes suaves nao podem substituir a faixa escolhida depois.',
+            'Radio descarta recomendacoes que chegaram depois da troca de faixa ou de ser desativado.',
+            'Falha ao alternar video restaura a origem HLS correta e preserva a posicao quando possivel.',
+            'Convidados respeitam a pausa recebida durante o carregamento e aguardam o anfitriao no fim da faixa.',
+            'Mini-player ajusta o video e o estado do botao de fixar; modo festa pode ser aberto por convidados.',
+            'Importacao ignora registros invalidos e diferencia nomes repetidos; restauracao valida os dados antes de alterar a biblioteca.',
+            'Equalizador deixa de criar rolagem horizontal em janelas estreitas; erros de atualizacao nao prendem mais a tela.'
+        ]
+    },
+    {
         version: '3.9.32',
         date: '24/09/2026',
         title: 'Reproducao recuperada e busca mais confiavel',
-        badge: 'Atual',
+        badge: 'Anterior',
         items: [
             'Extrator de midia atualizado e Deno incluido no instalador, sem exigir Node.js no computador do usuario.',
             'Proxy entrega audio e video em blocos com Range limitado, preservando avanco e retrocesso.',
@@ -1644,14 +1692,14 @@ function renderDonationsPanel() {
 
 function renderChangelog() {
     panelTitle.innerText = 'CHANGELOG DO FLUXO';
-    queueCounter.innerText = 'v3.9.32';
+    queueCounter.innerText = 'v3.9.33';
     resultsList.innerHTML = `
         <li class="changelog-root">
             <section class="changelog-hero">
                 <div class="changelog-hero-icon"><i class="ph ph-scroll"></i></div>
                 <div>
                     <span class="changelog-kicker">Historico de mudancas</span>
-                    <h2>Fluxo Music 3.9.32</h2>
+                    <h2>Fluxo Music 3.9.33</h2>
                     <p>Resumo das mudancas recentes do player, interface, updater, Discord RPC, busca, temas e recursos principais.</p>
                 </div>
                 <button class="btn-confirm changelog-copy" id="btnCopyChangelog"><i class="ph ph-copy"></i> COPIAR</button>
@@ -1776,7 +1824,8 @@ function renderThemes() {
         { id: 'aot', name: 'Attack on Titan', desc: 'Dossiê militar, muralhas, couro verde e relatórios táticos.' },
         { id: 'evangelion', name: 'Evangelion NERV', desc: 'HUD NERV angular, alertas MAGI e contraste verde-laranja.' },
         { id: 'undertale', name: 'Undertale Battle', desc: 'Caixa de batalha, coração vermelho, tipografia mono e preto puro.' },
-        { id: 'fluxobug', name: 'Fluxo Bug', desc: 'Sátira interna: painel de crash bonito, TODOs falsos, alertas tortos e caos controlado.' }
+        { id: 'fluxobug', name: 'Fluxo Bug', desc: 'Sátira interna: painel de crash bonito, TODOs falsos, alertas tortos e caos controlado.' },
+        ...COLLECTION_THEMES
     ];
 
     const normalizeThemeFilter = (value) => String(value || '')
@@ -1813,7 +1862,7 @@ function renderThemes() {
             const isActive = activeTheme === theme.id;
             li.innerHTML = `
                 <div class="result-thumb" style="background-color: var(--bg-panel); color: var(--neon-cyan); border: var(--border-tech); font-size: 1.5rem;">
-                    <i class="ph ${isActive ? 'ph-star' : 'ph-palette'}"></i>
+                    <i class="ph ${isActive ? 'ph-star' : (theme.icon || 'ph-palette')}"></i>
                 </div>
                 <div class="result-info" style="flex: 1;">
                     <span class="result-title" style="color: var(--neon-cyan);">${escapeHtml(theme.name)}</span>
@@ -1854,6 +1903,7 @@ const previewPlayer = new Audio();
 previewPlayer.preload = 'auto';
 let mainHlsController = null;
 let previewHlsController = null;
+let currentStreamChangeGeneration = 0;
 
 function isHlsStreamUrl(url) {
     return /\.m3u8(?:$|[?#])/i.test(String(url || ''));
@@ -1869,7 +1919,8 @@ function destroyHlsController(slot = 'main') {
 }
 
 function setMediaElementSource(mediaElement, url, slot = 'main') {
-    destroyHlsController(slot);
+    clearMediaElementSource(mediaElement, slot);
+    mediaElement.dataset.streamUrl = url;
 
     if (isHlsStreamUrl(url) && window.Hls?.isSupported?.()) {
         const hls = new Hls({
@@ -1881,9 +1932,11 @@ function setMediaElementSource(mediaElement, url, slot = 'main') {
         else mainHlsController = hls;
 
         hls.on(Hls.Events.ERROR, (_, data) => {
-            if (data?.fatal) {
+            if (data?.fatal && (slot === 'preview' ? previewHlsController : mainHlsController) === hls) {
                 console.log('Erro fatal HLS:', data);
+                mediaElement.dispatchEvent(new Event('fluxo-media-error'));
                 destroyHlsController(slot);
+                if (slot === 'main') audioPlayer.onerror();
             }
         });
         hls.loadSource(url);
@@ -1895,18 +1948,35 @@ function setMediaElementSource(mediaElement, url, slot = 'main') {
     mediaElement.load();
 }
 
+function clearMediaElementSource(mediaElement, slot = 'main') {
+    mediaElement.pause();
+    destroyHlsController(slot);
+    delete mediaElement.dataset.streamUrl;
+    mediaElement.removeAttribute('src');
+    mediaElement.load();
+}
+
+function stopMainPlayback() {
+    ++playbackLoadGeneration;
+    currentStreamRetryKey = '';
+    clearMediaFailureAction();
+    audioPlayer.dataset.id = '';
+    clearMediaElementSource(audioPlayer);
+    crossfadeTriggered = false;
+}
+
 let queue = [], originalQueue = [], currentIndex = 0, isShuffled = false, loopMode = 0; 
-let playHistory = JSON.parse(localStorage.getItem('fluxo_history')) || [];
+let playHistory = readStoredArray('fluxo_history').map(normalizeTrack).filter(Boolean);
 let isAutoMix = false;
 let autoMixSeedTrack = null;
 let isCrossfade = false;
 let crossfadeTriggered = false;
 let isSmoothTransitioning = false;
 let autoMixRequestInFlight = null;
-let savedPlaylists = JSON.parse(localStorage.getItem('fluxo_playlists')) || [];
-let playlistTrash = readStoredArray('fluxo_playlist_trash');
+let savedPlaylists = readStoredArray('fluxo_playlists').map(normalizePlaylist).filter(Boolean);
+let playlistTrash = readStoredArray('fluxo_playlist_trash').map(normalizePlaylist).filter(Boolean);
 let favoriteTracks = readStoredArray('fluxo_favorites').map(normalizeTrack).filter(Boolean);
-let queueTabs = readStoredArray('fluxo_queue_tabs');
+let queueTabs = readStoredArray('fluxo_queue_tabs').map(normalizePlaylist).filter(Boolean);
 let activeQueueTabId = localStorage.getItem('fluxo_active_queue_tab') || '';
 let isLibraryCompact = localStorage.getItem('fluxo_library_compact') === 'true';
 let isBpmTransitionEnabled = localStorage.getItem('fluxo_bpm_transition') === 'true';
@@ -1927,7 +1997,7 @@ let trackInbox = readStoredArray('fluxo_music_inbox').map(normalizeTrack).filter
 let trackAnalysis = readStoredObject('fluxo_track_analysis');
 let mediaIssues = readStoredArray('fluxo_media_issues');
 let automationRunMemory = {};
-let autoMixMemory = JSON.parse(localStorage.getItem('fluxo_automix_memory') || '[]');
+let autoMixMemory = readStoredArray('fluxo_automix_memory').filter(item => item && typeof item === 'object');
 let achievementState = readStoredObject('fluxo_achievements');
 let fluxoStats = {
     tracksPlayed: 0,
@@ -1937,12 +2007,6 @@ let fluxoStats = {
     sleepTimersUsed: 0,
     ...readStoredObject('fluxo_stats')
 };
-savedPlaylists = savedPlaylists.map(pl => ({
-    title: pl.title || pl.name || 'Playlist',
-    cover: pl.cover || '',
-    locked: Boolean(pl.locked),
-    tracks: (Array.isArray(pl.tracks) ? pl.tracks : []).map(normalizeTrack).filter(Boolean)
-}));
 
 const titleEl = document.getElementById('title'), artistEl = document.getElementById('artist'), coverEl = document.getElementById('cover');
 const progressFill = document.getElementById('progressFill'), playPauseBtn = document.getElementById('playPauseBtn');
@@ -2128,15 +2192,20 @@ function syncMiniVariantButtons() {
 function enterMiniPlayer(variant = miniPlayerVariant) {
     if (variant) setMiniPlayerVariant(variant);
     isMiniPlayerActive = true;
+    document.body.classList.remove('party-mode');
     document.body.classList.add('mini-mode');
-    setVideoModeEnabled(isVideoMode);
+    setVideoUiState(isVideoMode);
+    isPinned = true;
+    syncMiniPinButton();
     window.electronAPI?.toggleMiniPlayer?.(true);
 }
 
 function exitMiniPlayer() {
     isMiniPlayerActive = false;
     document.body.classList.remove('mini-mode');
-    setVideoModeEnabled(isVideoMode);
+    setVideoUiState(isVideoMode);
+    isPinned = false;
+    syncMiniPinButton();
     window.electronAPI?.toggleMiniPlayer?.(false);
 }
 
@@ -2470,7 +2539,7 @@ function enqueueTrack(track, mode = 'end') {
     }
 
     prefetchStream(normalized, isVideoMode ? 'video' : 'audio');
-    if (wasQueueEmpty && (!audioPlayer.src || !audioPlayer.dataset.id)) loadAndPlayTrack(0);
+    if (wasQueueEmpty) loadAndPlayTrack(0);
     else publishRoomState();
     return true;
 }
@@ -3001,7 +3070,7 @@ volumeSlider.addEventListener('input', (e) => {
 // SANITIZAÇÃO DE METADADOS E MÓDULO DE LETRAS
 // ========================================================
 function sanitizeMetadata(text) {
-    return text
+    return String(text || '')
         .replace(/\(.*?\)/g, '')
         .replace(/\[.*?\]/g, '')
         .replace(/official video/gi, '')
@@ -3019,10 +3088,6 @@ function sanitizeMetadata(text) {
 // ========================================================
 // SANITIZAÇÃO E MÓDULO DE LETRAS INTELIGENTE
 // ========================================================
-function sanitizeMetadata(text) {
-    return text.replace(/\(.*?\)/g, '').replace(/\[.*?\]/g, '').replace(/official video/gi, '').replace(/clipe oficial/gi, '').replace(/video oficial/gi, '').replace(/lyric video/gi, '').replace(/audio/gi, '').replace(/lyrics/gi, '').replace(/feat\..*/gi, '').replace(/ft\..*/gi, '').replace(/\|.*/g, '').trim();
-}
-
 document.getElementById('btnLyrics').addEventListener('click', () => { renderLyricsPanel(); });
 
 function normalizeLookupText(value) {
@@ -3628,7 +3693,9 @@ function disconnectFromRoom() {
         roomRef.child('queueVotes').off();
         roomRef.child('reactions').off();
     }
-    currentRoom = null; isHost = false; 
+    currentRoom = null; isHost = false;
+    latestRemotePlaybackState = null;
+    stopMainPlayback();
     document.getElementById('deckHardwareButtons').style.display = 'flex';
     document.getElementById('progressBar').style.pointerEvents = 'auto';
     audioPlayer.pause(); renderMultiplayerPanel();
@@ -3726,6 +3793,81 @@ function submitSessionDirectTrack(track) {
 // ========================================================
 // LISTENERS DO MULTIPLAYER
 // ========================================================
+async function applyRemoteSessionPlayback(data) {
+    if (isHost || !currentRoom) return;
+    latestRemotePlaybackState = data;
+    const room = currentRoom;
+    const track = normalizeTrack(data.track);
+    const mode = roomSettings.videoEnabled ? 'video' : 'audio';
+    const modeChanged = lastAppliedSessionVideoMode !== roomSettings.videoEnabled;
+    lastAppliedSessionVideoMode = roomSettings.videoEnabled;
+
+    if (!track) {
+        if (audioPlayer.dataset.id || audioPlayer.dataset.streamUrl) await withRemotePlaybackGuard(() => stopMainPlayback());
+        titleEl.innerText = 'SALA SEM FAIXA';
+        artistEl.innerText = 'Aguardando o anfitrião';
+        coverEl.style.backgroundImage = '';
+        coverIcon.style.display = 'block';
+        return;
+    }
+
+    const needsLoad = track.id !== audioPlayer.dataset.id || modeChanged || (!audioPlayer.dataset.streamUrl && !remotePlaybackPendingGeneration);
+    if (needsLoad) {
+        const generation = ++playbackLoadGeneration;
+        remotePlaybackPendingGeneration = generation;
+        const isCurrent = () => generation === playbackLoadGeneration && currentRoom === room && !isHost;
+        audioPlayer.dataset.id = track.id;
+        const index = findTrackIndexByIdentity(queue, track);
+        if (index >= 0) currentIndex = index;
+        else { queue = [track]; originalQueue = [...queue]; currentIndex = 0; }
+        previewPlayer.pause();
+        await withRemotePlaybackGuard(() => clearMediaElementSource(audioPlayer));
+        if (!isCurrent()) return;
+        titleEl.innerText = `SINCRO: ${track.title}`;
+        artistEl.innerText = track.artist;
+        coverEl.style.backgroundImage = track.thumbnail ? `url('${track.thumbnail}')` : '';
+        coverIcon.style.display = track.thumbnail ? 'none' : 'block';
+        setVideoUiState(mode !== 'audio');
+        try {
+            const resolved = await resolvePlayableStreamForTrack(track, mode);
+            if (!isCurrent()) return;
+            setMediaElementSource(audioPlayer, resolved.url);
+            audioPlayer.dataset.playbackMode = resolved.mode;
+            await waitForMediaMetadata(audioPlayer);
+            if (!isCurrent()) return;
+            setVideoUiState(resolved.mode !== 'audio');
+            titleEl.innerText = track.title;
+            currentStreamRetryKey = '';
+        } catch (error) {
+            if (!isCurrent()) return;
+            const reason = classifyMediaError(error, 'Nao foi possivel sincronizar a faixa.');
+            artistEl.innerText = reason;
+            showMediaFailureAction(track, reason, mode);
+            recordMediaIssue(track, reason, mode, error);
+            return;
+        } finally {
+            if (remotePlaybackPendingGeneration === generation) remotePlaybackPendingGeneration = 0;
+        }
+    } else if (remotePlaybackPendingGeneration === playbackLoadGeneration) return;
+
+    if (currentRoom !== room || isHost || audioPlayer.readyState < 1) return;
+    // A pause or seek received while resolving must win over the original snapshot.
+    const latest = latestRemotePlaybackState;
+    if (!latest?.track || latest.track.id !== audioPlayer.dataset.id) return;
+    await withRemotePlaybackGuard(async () => {
+        const expected = getSharedExpectedTime(latest);
+        const position = Number.isFinite(audioPlayer.duration) ? Math.min(expected, Math.max(0, audioPlayer.duration - 0.1)) : expected;
+        if (Math.abs(audioPlayer.currentTime - position) > 0.9) audioPlayer.currentTime = position;
+        if (latest.state === 'playing') {
+            initEQ();
+            if (audioCtx?.state === 'suspended') await audioCtx.resume();
+            if (currentRoom === room && latestRemotePlaybackState?.state === 'playing' && audioPlayer.paused) {
+                await audioPlayer.play().catch(error => console.warn('Falha ao retomar sessao:', error));
+            }
+        } else audioPlayer.pause();
+    });
+}
+
 function setupRoomListeners() {
     if (!db || !currentRoom) return;
     const roomRef = db.ref('rooms/' + currentRoom);
@@ -3861,26 +4003,18 @@ function setupRoomListeners() {
         }
         sessionPlayedTracks = Array.isArray(data.played) ? data.played.map(normalizeTrack).filter(Boolean) : sessionPlayedTracks;
         const sharedQueue = Array.isArray(data.queue) ? data.queue.map(normalizeTrack).filter(Boolean) : [];
-        if (sharedQueue.length) {
-            if (isHost) syncHostQueueFromSharedQueue(sharedQueue);
-            else {
-                queue = sharedQueue;
-                originalQueue = sharedQueue.slice();
-            }
+        if (isHost) {
+            if (sharedQueue.length) syncHostQueueFromSharedQueue(sharedQueue);
+        } else {
+            queue = sharedQueue;
+            originalQueue = sharedQueue.slice();
         }
         renderSharedQueue(sharedQueue, roomSettings.queueVisible);
         renderSessionQueueList(sharedQueue.length ? sharedQueue : queue, sessionPlayedTracks);
         renderSessionRanking();
 
         if (!isHost && data.eq) {
-            const eqStamp = JSON.stringify({
-                p: data.eq.eqPreset,
-                d: data.eq.dspProfile,
-                r: data.eq.playbackRate,
-                v: data.eq.reverbMix,
-                g: data.eq.eqGains,
-                c: data.eq.compressor
-            });
+            const eqStamp = JSON.stringify(data.eq);
             if (eqStamp !== lastAppliedSessionEqStamp) {
                 try {
                     applySharedPresetPayload({ ...data.eq, type: 'sound-preset' });
@@ -3891,94 +4025,7 @@ function setupRoomListeners() {
             }
         }
 
-        if (!isHost && lastAppliedSessionVideoMode !== roomSettings.videoEnabled) {
-            lastAppliedSessionVideoMode = roomSettings.videoEnabled;
-            setVideoUiState(Boolean(roomSettings.videoEnabled));
-            if (audioPlayer.src && sharedTrackIdMatches(data.track)) {
-                reloadCurrentPlaybackStream(roomSettings.videoEnabled ? 'video' : 'audio').catch(error => console.warn('Falha ao sincronizar modo video:', error));
-            }
-        }
-
-        if (!isHost && !data.track) {
-            withRemotePlaybackGuard(async () => {
-                audioPlayer.pause();
-                destroyHlsController('main');
-                audioPlayer.src = '';
-            });
-            audioPlayer.dataset.id = '';
-            titleEl.innerText = "SALA SEM FAIXA";
-            artistEl.innerText = "Aguardando o anfitrião";
-            coverEl.style.backgroundImage = '';
-            if (coverIcon) coverIcon.style.display = 'block';
-            return;
-        }
-
-        const sharedTrack = normalizeTrack(data.track);
-
-        if (!isHost && sharedTrack && sharedTrack.id !== audioPlayer.dataset.id) {
-            audioPlayer.dataset.id = sharedTrack.id; 
-            const queueIndex = findTrackIndexByIdentity(queue, sharedTrack);
-            if (queueIndex >= 0) currentIndex = queueIndex;
-            
-            if(previewPlayer && !previewPlayer.paused) previewPlayer.pause();
-            withRemotePlaybackGuard(async () => audioPlayer.pause());
-            destroyHlsController('main');
-            audioPlayer.src = ''; 
-            
-            titleEl.innerText = "SINCRO: " + sharedTrack.title; 
-            artistEl.innerText = sharedTrack.artist;
-            coverEl.style.backgroundImage = sharedTrack.thumbnail ? `url('${sharedTrack.thumbnail}')` : '';
-            
-            const sessionPlaybackMode = roomSettings.videoEnabled ? 'video' : 'audio';
-            setVideoUiState(Boolean(roomSettings.videoEnabled));
-            resolvePlayableStreamForTrack(sharedTrack, sessionPlaybackMode).then(async resolvedStream => {
-                if (audioPlayer.dataset.id === sharedTrack.id && resolvedStream?.url) {
-                    if (sessionPlaybackMode !== 'audio' && resolvedStream.mode === 'audio') {
-                        setVideoUiState(false);
-                    }
-                    setMediaElementSource(audioPlayer, resolvedStream.url, 'main');
-                    await waitForMediaMetadata(audioPlayer).catch(() => {});
-                    titleEl.innerText = sharedTrack.title; 
-                    const expectedTime = getSharedExpectedTime(data);
-                    if (data.state === 'playing') {
-                        if (Number.isFinite(audioPlayer.duration) && audioPlayer.duration > expectedTime + 0.5) {
-                            audioPlayer.currentTime = expectedTime;
-                        }
-                        if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-                        withRemotePlaybackGuard(() => audioPlayer.play().catch(e => console.log("Sincro Play Error:", e)));
-                    } else {
-                        audioPlayer.currentTime = Math.min(expectedTime, Math.max(0, (audioPlayer.duration || expectedTime + 1) - 0.5));
-                    }
-                }
-            }).catch(error => {
-                if (audioPlayer.dataset.id !== sharedTrack.id) return;
-                const reason = classifyMediaError(error, 'Nao foi possivel sincronizar o stream da sala.');
-                titleEl.innerText = 'ERRO DE STREAM DA SALA';
-                artistEl.innerText = reason;
-                recordMediaIssue(sharedTrack, reason, sessionPlaybackMode, error);
-            });
-            return; 
-        }
-
-        if (!isHost && !ignoreSync && sharedTrack && audioPlayer.dataset.id === sharedTrack.id && audioPlayer.src) {
-            ignoreSync = true;
-            
-            let expectedTime = getSharedExpectedTime(data);
-
-            const diff = Math.abs(audioPlayer.currentTime - expectedTime);
-            
-            if (data.state === 'playing') {
-                if (diff > 0.9) audioPlayer.currentTime = expectedTime;
-                if (audioPlayer.paused && audioPlayer.readyState >= 3) {
-                    if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-                    withRemotePlaybackGuard(() => audioPlayer.play().catch(e => console.log("Play sync error:", e)));
-                }
-            } else {
-                if (!audioPlayer.paused) withRemotePlaybackGuard(async () => audioPlayer.pause());
-                if (diff > 0.9) audioPlayer.currentTime = expectedTime;
-            }
-            setTimeout(() => ignoreSync = false, 500);
-        }
+        if (!isHost) applyRemoteSessionPlayback(data).catch(error => console.warn('Falha na sincronizacao:', error));
     }, error => handleMultiplayerFirebaseError(error, 'ler estado da sala'));
 }
 
@@ -4083,9 +4130,8 @@ function getSearchUrlKind(value) {
     return { type: '', isCollection: false };
 }
 
-function getUniquePlaylistTitle(baseTitle) {
+function getUniquePlaylistTitle(baseTitle, existing = new Set(savedPlaylists.map(playlist => normalizeLookupText(playlist.title)))) {
     const base = String(baseTitle || 'Playlist importada').replace(/\s+/g, ' ').trim().slice(0, 90) || 'Playlist importada';
-    const existing = new Set(savedPlaylists.map(playlist => normalizeLookupText(playlist.title)));
     if (!existing.has(normalizeLookupText(base))) return base;
 
     let index = 2;
@@ -4692,12 +4738,14 @@ function getTargetVolume() {
 }
 
 function fadeMainVolume(targetVolume, duration = 700) {
+    const generation = playbackLoadGeneration;
     return new Promise(resolve => {
         const startVolume = audioPlayer.volume;
         const target = clampNumber(targetVolume, 0, 1, getTargetVolume());
         const start = performance.now();
 
         function step(now) {
+            if (generation !== playbackLoadGeneration) { resolve(); return; }
             const progress = Math.min(1, (now - start) / duration);
             const eased = 1 - Math.pow(1 - progress, 3);
             audioPlayer.volume = startVolume + (target - startVolume) * eased;
@@ -4736,14 +4784,22 @@ function findTrackIndexByIdentity(tracks, targetTrack) {
 }
 
 async function ensureAutoMixNextTrack() {
-    if (!isAutoMix || currentIndex !== queue.length - 1) return false;
-    if (autoMixRequestInFlight) return autoMixRequestInFlight;
+    if (!isAutoMix || !queue[currentIndex] || currentIndex !== queue.length - 1 || (currentRoom && !isHost)) return false;
+    const generation = playbackLoadGeneration;
+    const room = currentRoom;
+    const currentTrack = normalizeTrack(queue[currentIndex]);
+    const trackKey = getTrackKey(currentTrack);
+    if (autoMixRequestInFlight?.generation === generation && autoMixRequestInFlight.room === room && autoMixRequestInFlight.trackKey === trackKey) {
+        return autoMixRequestInFlight.promise;
+    }
 
-    autoMixRequestInFlight = (async () => {
-        const currentTrack = normalizeTrack(queue[currentIndex]);
+    const request = { generation, room, trackKey, promise: null };
+    autoMixRequestInFlight = request;
+    request.promise = (async () => {
         if (!autoMixSeedTrack) autoMixSeedTrack = normalizeTrack(queue[0]) || currentTrack;
         const nextMixTrack = await getSmartAutoMixTrack(currentTrack, autoMixSeedTrack);
-        if (!nextMixTrack || currentIndex !== queue.length - 1) return false;
+        if (!nextMixTrack || !isAutoMix || autoMixRequestInFlight !== request || generation !== playbackLoadGeneration || room !== currentRoom ||
+            currentIndex !== queue.length - 1 || trackKey !== getTrackKey(queue[currentIndex]) || (currentRoom && !isHost)) return false;
 
         queue.push(nextMixTrack);
         originalQueue.push(nextMixTrack);
@@ -4754,22 +4810,26 @@ async function ensureAutoMixNextTrack() {
     })();
 
     try {
-        return await autoMixRequestInFlight;
+        return await request.promise;
     } finally {
-        autoMixRequestInFlight = null;
+        if (autoMixRequestInFlight === request) autoMixRequestInFlight = null;
     }
 }
 
 async function transitionToTrack(index, smooth = isCrossfade) {
     if (!queue[index] || isSmoothTransitioning) return;
     isSmoothTransitioning = true;
+    const generation = playbackLoadGeneration;
+    const targetTrack = queue[index];
     const fadeDuration = getSmartFadeDuration(queue[index]);
     try {
         if (smooth && !audioPlayer.paused) {
             const syncDelay = getBeatSyncDelay(queue[index]);
             if (syncDelay > 0) await new Promise(resolve => setTimeout(resolve, syncDelay));
+            if (generation !== playbackLoadGeneration) return;
             await fadeMainVolume(0, fadeDuration);
         }
+        if (generation !== playbackLoadGeneration || queue[index] !== targetTrack) return;
         await loadAndPlayTrack(index, { fadeIn: smooth });
     } finally {
         isSmoothTransitioning = false;
@@ -4794,7 +4854,8 @@ async function loadAndPlayTrack(index, options = {}) {
             t = await resolveGhostTrack(t);
             if (!isCurrentLoad()) return;
             queue[index] = t;
-            if (originalQueue[index]) originalQueue[index] = t;
+            const originalIndex = findTrackIndexByIdentity(originalQueue, selectedTrack);
+            if (originalIndex >= 0) originalQueue[originalIndex] = t;
         } catch {
             if (!isCurrentLoad()) return;
             titleEl.innerText = 'FALHA NA CONVERSAO';
@@ -4866,6 +4927,7 @@ async function loadAndPlayTrack(index, options = {}) {
     if (isQueueViewActive()) document.getElementById('btnQueueView').click();
     
     setMediaElementSource(audioPlayer, url, 'main');
+    audioPlayer.dataset.playbackMode = resolvedStream.mode;
     publishRoomState({ track: t, state: 'playing', time: 0, settings: normalizeRoomSettings(roomSettings) });
     applySavedDspSettings();
     if (isPodcastMode) setPodcastMode(true, false);
@@ -4901,7 +4963,11 @@ async function loadAndPlayTrack(index, options = {}) {
 playPauseBtn.onclick = () => {
     if(!canControl('playPause')) { alert("O Anfitriao bloqueou play/pause."); return; }
     noteManualPlaybackControl('playPause');
-    audioPlayer.paused ? audioPlayer.play() : audioPlayer.pause();
+    if (audioPlayer.paused) {
+        if (!audioPlayer.dataset.streamUrl || audioPlayer.error) {
+            if (queue[currentIndex]) loadAndPlayTrack(currentIndex);
+        } else audioPlayer.play().catch(error => console.warn('Falha ao retomar:', error));
+    } else audioPlayer.pause();
 };
 
 document.getElementById('nextBtn').onclick = () => {
@@ -4970,6 +5036,8 @@ document.getElementById('loopBtn').onclick = () => {
 };
 
 audioPlayer.onended = async () => {
+    if (currentRoom && !isHost) return;
+    const generation = playbackLoadGeneration;
     if (isSmoothTransitioning) return;
     if (sleepTimerState?.mode === 'afterTrack') {
         await finishSleepTimer();
@@ -4986,6 +5054,7 @@ audioPlayer.onended = async () => {
                 console.log('Auto-Mix falhou no fim da faixa:', error.message);
             }
         }
+        if (generation !== playbackLoadGeneration) return;
         if (currentIndex < queue.length - 1) {
             transitionToTrack(currentIndex + 1, false);
         } else if (loopMode === 1 && queue.length > 0) {
@@ -5018,6 +5087,9 @@ audioPlayer.onpause = () => {
 };
 
 audioPlayer.onerror = () => {
+    if (!audioPlayer.dataset.streamUrl || !audioPlayer.dataset.id) return;
+    if (currentStreamChangeGeneration === playbackLoadGeneration) return;
+    if (remotePlaybackPendingGeneration === playbackLoadGeneration) return;
     const track = queue[currentIndex] ? normalizeTrack(queue[currentIndex]) : null;
     const code = audioPlayer.error?.code || 0;
     const reasons = {
@@ -5052,14 +5124,17 @@ async function retryCurrentStreamAfterMediaError(track, mode = 'audio', reason =
         const resolvedStream = await resolvePlayableStreamForTrack(normalized, mode, { forceRefresh: true });
         if (generation !== playbackLoadGeneration || !resolvedStream?.url || getTrackKey(normalized) !== getTrackKey(queue[currentIndex])) return;
         setMediaElementSource(audioPlayer, resolvedStream.url, 'main');
-        await waitForMediaMetadata(audioPlayer).catch(() => {});
+        audioPlayer.dataset.playbackMode = resolvedStream.mode;
+        await waitForMediaMetadata(audioPlayer);
         if (generation !== playbackLoadGeneration) return;
+        if (mode !== 'audio' && resolvedStream.mode === 'audio') setVideoUiState(false);
         if (resumeAt > 1 && Number.isFinite(audioPlayer.duration) && audioPlayer.duration > resumeAt + 1) {
             audioPlayer.currentTime = resumeAt;
         }
         artistEl.innerText = normalized.artist;
         clearMediaFailureAction();
-        if (shouldResume) await audioPlayer.play().catch(error => console.log('Retry de stream nao retomou:', error));
+        if (currentRoom && !isHost && latestRemotePlaybackState) await applyRemoteSessionPlayback(latestRemotePlaybackState);
+        else if (shouldResume) await audioPlayer.play().catch(error => console.log('Retry de stream nao retomou:', error));
     } catch (error) {
         if (generation !== playbackLoadGeneration) return;
         const friendly = classifyMediaError(error, reason || 'Falha ao renovar stream.');
@@ -5116,7 +5191,10 @@ audioPlayer.ontimeupdate = () => {
 
         // Criamos uma função assíncrona isolada para que o rádio não atrase o Crossfade
         const handleTransition = async () => {
+            if (currentRoom && !isHost) return;
+            const generation = playbackLoadGeneration;
             await ensureAutoMixNextTrack();
+            if (generation !== playbackLoadGeneration) return;
             const nextIndex = currentIndex < queue.length - 1 ? currentIndex + 1 : (loopMode === 1 && queue.length > 0 ? 0 : -1);
             if (isCrossfade && nextIndex >= 0) {
                 await transitionToTrack(nextIndex, true);
@@ -5418,7 +5496,7 @@ async function refreshDiagnosticsPanel() {
 
 function getReleaseAssistantText() {
     const selected = [
-        'Fluxo Music 3.9.32 recupera a reproducao com extrator atualizado, runtime incluido, proxy por blocos e protecao contra streams vencidos e trocas de faixa fora de ordem.',
+        'Fluxo Music 3.9.33 traz oito temas com novos layouts, extracao de video mais enxuta e correcoes de fila, transicao, sincronizacao e biblioteca.',
         'Busca cancelavel e diagnostico real dos servicos, sem apagar suas playlists ao limpar o cache.',
         'Importacao seletiva para playlists do YouTube com marcar tudo, limpar, inverter, importar selecionadas, importar tudo e salvar selecionadas.',
         'Playlists do YouTube deixaram de ter limite artificial de 200 musicas e agora usam yt-dlp completo antes do fallback parcial.',
@@ -5509,7 +5587,7 @@ function getReleaseAssistantText() {
         'Tocar a seguir, playlist por duracao, modo foco, modo DJ experimental e transicao por BPM estimado.',
         'Discord RPC revisado com teste manual e estado de conexao.'
     ];
-    return `Fluxo Music 3.9.32\n\nNovidades:\n${selected.map(item => `- ${item}`).join('\n')}\n\nChangelog base:\n${flattenChangelogText()}`;
+    return `Fluxo Music 3.9.33\n\nNovidades:\n${selected.map(item => `- ${item}`).join('\n')}\n\nChangelog base:\n${flattenChangelogText()}`;
 }
 
 function renderPlaylistTrashPanel() {
@@ -7403,16 +7481,6 @@ document.getElementById('btnRadio').onclick = () => {
     });
 };
 
-function getUniquePlaylistTitle(title) {
-    const base = String(title || 'Playlist importada').trim() || 'Playlist importada';
-    const names = new Set(savedPlaylists.map(p => p.title));
-    if (!names.has(base)) return base;
-
-    let counter = 2;
-    while (names.has(`${base} (${counter})`)) counter++;
-    return `${base} (${counter})`;
-}
-
 function exportPlaylistsJson() {
     const payload = {
         app: 'Fluxo Music',
@@ -7430,16 +7498,15 @@ function exportPlaylistsJson() {
 
 async function importPlaylistsJson(file) {
     const parsed = JSON.parse(await file.text());
-    const playlists = Array.isArray(parsed) ? parsed : parsed.playlists;
+    const playlists = Array.isArray(parsed) ? parsed : parsed?.playlists;
     if (!Array.isArray(playlists)) throw new Error('Arquivo sem playlists.');
 
-    const imported = playlists
-        .map(pl => ({
-            title: getUniquePlaylistTitle(pl.title || pl.name),
-            cover: pl.cover || '',
-            locked: Boolean(pl.locked),
-            tracks: (Array.isArray(pl.tracks) ? pl.tracks : []).map(normalizeTrack).filter(Boolean)
-        }));
+    const existing = new Set(savedPlaylists.map(playlist => normalizeLookupText(playlist.title)));
+    const imported = playlists.map(normalizePlaylist).filter(Boolean).map(playlist => {
+        const title = getUniquePlaylistTitle(playlist.title, existing);
+        existing.add(normalizeLookupText(title));
+        return { ...playlist, title };
+    });
 
     if (!imported.length) throw new Error('Nenhuma playlist valida encontrada.');
 
@@ -7494,15 +7561,10 @@ function exportLibraryBackupJson() {
 
 function reloadLibraryStateFromStorage() {
     playHistory = readStoredArray('fluxo_history').map(normalizeTrack).filter(Boolean);
-    savedPlaylists = readStoredArray('fluxo_playlists').map(pl => ({
-        title: pl.title || pl.name || 'Playlist',
-        cover: pl.cover || '',
-        locked: Boolean(pl.locked),
-        tracks: (Array.isArray(pl.tracks) ? pl.tracks : []).map(normalizeTrack).filter(Boolean)
-    }));
-    playlistTrash = readStoredArray('fluxo_playlist_trash');
+    savedPlaylists = readStoredArray('fluxo_playlists').map(normalizePlaylist).filter(Boolean);
+    playlistTrash = readStoredArray('fluxo_playlist_trash').map(normalizePlaylist).filter(Boolean);
     favoriteTracks = readStoredArray('fluxo_favorites').map(normalizeTrack).filter(Boolean);
-    queueTabs = readStoredArray('fluxo_queue_tabs');
+    queueTabs = readStoredArray('fluxo_queue_tabs').map(normalizePlaylist).filter(Boolean);
     activeQueueTabId = localStorage.getItem('fluxo_active_queue_tab') || '';
     trackComments = readStoredObject('fluxo_track_comments');
     trackInbox = readStoredArray('fluxo_music_inbox').map(normalizeTrack).filter(Boolean);
@@ -7529,15 +7591,31 @@ async function restoreLibraryBackupJson(file) {
 
     const keys = Object.keys(snapshot).filter(key => FLUXO_LIBRARY_BACKUP_KEYS.includes(key));
     if (!keys.length) throw new Error('Backup sem dados restauraveis.');
+    const arrayKeys = new Set(['fluxo_playlists', 'fluxo_playlist_trash', 'fluxo_favorites', 'fluxo_history', 'fluxo_music_inbox', 'fluxo_media_issues', 'fluxo_queue_tabs', 'fluxo_eq_gains']);
+    const objectKeys = new Set(['fluxo_track_comments', 'fluxo_track_analysis', 'fluxo_achievements', 'fluxo_stats', 'fluxo_hotkeys']);
+    for (const key of keys) {
+        if (typeof snapshot[key] !== 'string') throw new Error(`Dado invalido no backup: ${key}`);
+        if (arrayKeys.has(key) || objectKeys.has(key)) {
+            const value = JSON.parse(snapshot[key]);
+            if (arrayKeys.has(key) ? !Array.isArray(value) : (!value || typeof value !== 'object' || Array.isArray(value))) {
+                throw new Error(`Formato invalido no backup: ${key}`);
+            }
+        }
+    }
     if (!confirm(`Restaurar ${keys.length} categorias do backup? Isso substitui biblioteca, historico, favoritos e perfil local.`)) {
         return { restored: 0, cancelled: true };
     }
 
-    FLUXO_LIBRARY_BACKUP_KEYS.forEach(key => localStorage.removeItem(key));
-    keys.forEach(key => {
-        if (typeof snapshot[key] === 'string') localStorage.setItem(key, snapshot[key]);
-    });
-    reloadLibraryStateFromStorage();
+    const previous = new Map(keys.map(key => [key, localStorage.getItem(key)]));
+    try {
+        keys.forEach(key => localStorage.setItem(key, snapshot[key]));
+        reloadLibraryStateFromStorage();
+    } catch (error) {
+        keys.forEach(key => localStorage.removeItem(key));
+        previous.forEach((value, key) => { if (value !== null) localStorage.setItem(key, value); });
+        reloadLibraryStateFromStorage();
+        throw error;
+    }
     return { restored: keys.length, cancelled: false };
 }
 
@@ -8115,11 +8193,16 @@ document.getElementById('btnExitMini').onclick = () => {
 };
 
 let isPinned = false;
+function syncMiniPinButton() {
+    const button = document.getElementById('btnPinMini');
+    button.innerHTML = isPinned ? '<i class="ph ph-push-pin-slash"></i>' : '<i class="ph ph-push-pin"></i>';
+    button.style.color = isPinned ? 'var(--neon-pink)' : 'var(--neon-cyan)';
+    button.title = isPinned ? 'Desafixar janela' : 'Manter acima das outras janelas';
+    button.setAttribute('aria-pressed', String(isPinned));
+}
 document.getElementById('btnPinMini').addEventListener('click', () => {
     isPinned = !isPinned;
-    const pinBtn = document.getElementById('btnPinMini');
-    pinBtn.innerHTML = isPinned ? '<i class="ph ph-push-pin-slash"></i>' : '<i class="ph ph-push-pin"></i>';
-    pinBtn.style.color = isPinned ? 'var(--neon-pink)' : 'var(--neon-cyan)';
+    syncMiniPinButton();
     window.electronAPI.toggleAlwaysOnTop(isPinned); 
 });
 
@@ -8170,8 +8253,15 @@ if (window.electronAPI && window.electronAPI.onUpdateMessage) {
     window.electronAPI.onUpdateProgress((event, percent) => {
         document.getElementById('updateProgressFill').style.width = percent + '%';
     });
+    window.electronAPI.onUpdateError?.((event, message) => {
+        document.getElementById('updateStatus').innerText = message;
+    });
 }
+document.getElementById('btnDismissUpdate').onclick = () => {
+    document.getElementById('updateModal').style.display = 'none';
+};
 document.getElementById('btnClearQueue').onclick = () => {
+    if (currentRoom && !isHost) return;
     if (queue.length === 0) return;
 
     // Acorda o Modal Personalizado em vez do alerta do Windows
@@ -8182,6 +8272,7 @@ document.getElementById('btnClearQueue').onclick = () => {
     // Se o usuário clicar em EJETAR:
     document.getElementById('btnConfirmOk').onclick = () => {
         modal.style.display = 'none'; // Esconde o modal
+        if (currentRoom && !isHost) return;
         
         // Esvazia as filas
         queue = [];
@@ -8189,8 +8280,7 @@ document.getElementById('btnClearQueue').onclick = () => {
         currentIndex = 0;
 
         // Para o player
-        audioPlayer.pause();
-        audioPlayer.src = "";
+        stopMainPlayback();
         if (window.electronAPI?.clearDiscordPresence) window.electronAPI.clearDiscordPresence();
         
         // Reseta o visual do Deck
@@ -8227,7 +8317,7 @@ const coverIconEl = document.getElementById('coverIcon'); // O ícone Ph-Disc de
 function restoreFloatingVideo() {
     floatingVideoContainer.appendChild(mainVideoPlayer);
     // Re-mostra o ícone/capa no deck inferior
-    if (coverIconEl) coverIconEl.style.display = 'block'; 
+    if (coverIconEl) coverIconEl.style.display = queue[currentIndex]?.thumbnail ? 'none' : 'block';
     npCover.classList.remove('video-active');
     mainVideoPlayer.classList.remove('fits-cover');
 }
@@ -8271,7 +8361,7 @@ document.getElementById('btnFullscreen').onclick = async () => {
 // MODO FESTA LÓGICA (SUBSTITUIÇÃO COMPLETA)
 // ========================================================
 document.getElementById('btnPartyMode').onclick = () => { 
-    if(!canControl()) { alert("Anfitrião bloqueou os controlos."); return; }
+    if (isMiniPlayerActive) exitMiniPlayer();
     document.body.classList.add('party-mode'); 
     
     // SE O MODO VÍDEO ESTIVER ATIVO, TROCA O VINIL PELO VÍDEO NO CENTRO
@@ -8336,6 +8426,7 @@ function setVideoUiState(enabled) {
             if (!floatingVideoContainer.contains(mainVideoPlayer)) floatingVideoContainer.appendChild(mainVideoPlayer);
             mainVideoPlayer.classList.remove('fits-cover');
         } else {
+            floatingVideoContainer.classList.remove('active');
             if (coverIconEl) coverIconEl.style.display = 'none';
             if (npCover) {
                 npCover.classList.add('video-active');
@@ -8345,80 +8436,84 @@ function setVideoUiState(enabled) {
         }
     } else {
         floatingVideoContainer.classList.remove('active');
-        if (document.body.classList.contains('party-mode')) {
-            restoreFloatingVideo();
-        }
+        restoreFloatingVideo();
     }
 }
 
 async function reloadCurrentPlaybackStream(mode = (isVideoMode ? 'video' : 'audio')) {
-    if (!queue || !queue[currentIndex]) return false;
-
+    if (!queue[currentIndex]) return true;
     const track = normalizeTrack(queue[currentIndex]);
-    const trackId = getTrackStreamId(track);
-    if (!trackId) return false;
-
-    const currentTime = Number.isFinite(audioPlayer.currentTime) ? audioPlayer.currentTime : 0;
-    const wasPaused = audioPlayer.paused;
-    const previousSrc = audioPlayer.src;
-
+    if (!getTrackStreamId(track)) return false;
+    const generation = ++playbackLoadGeneration;
+    const isCurrent = () => generation === playbackLoadGeneration && getTrackKey(queue[currentIndex]) === getTrackKey(track);
+    const previousSource = audioPlayer.dataset.streamUrl;
+    const previousMode = audioPlayer.dataset.playbackMode || 'audio';
+    let resumeAt = audioPlayer.currentTime || 0;
+    let wasPaused = audioPlayer.paused;
+    let sourceChanged = false;
+    currentStreamChangeGeneration = generation;
     try {
-        if (titleEl) titleEl.innerText = mode === 'video' ? 'CARREGANDO VIDEO...' : 'CARREGANDO AUDIO...';
+        artistEl.innerText = mode === 'video' ? 'Carregando video...' : 'Carregando audio...';
         const resolvedStream = await resolvePlayableStreamForTrack(track, mode);
-        const streamUrl = resolvedStream.url;
-
-        if (mode !== 'audio' && resolvedStream.mode === 'audio') {
-            setVideoUiState(false);
-            if (currentRoom && isHost && roomSettings.videoEnabled) {
-                roomSettings = normalizeRoomSettings({ ...roomSettings, videoEnabled: false });
-                publishRoomState({ settings: roomSettings });
-            }
-        }
-
-        audioPlayer.pause();
-        setMediaElementSource(audioPlayer, streamUrl, 'main');
+        if (!isCurrent()) return null;
+        resumeAt = audioPlayer.currentTime || 0;
+        wasPaused = audioPlayer.paused;
+        sourceChanged = true;
+        setMediaElementSource(audioPlayer, resolvedStream.url, 'main');
+        audioPlayer.dataset.playbackMode = resolvedStream.mode;
         await waitForMediaMetadata(audioPlayer);
-
-        if (Number.isFinite(audioPlayer.duration) && audioPlayer.duration > currentTime + 1) {
-            audioPlayer.currentTime = currentTime;
-        }
-
-        if (!wasPaused) {
-            await audioPlayer.play().catch(err => console.log('Erro ao retomar playback:', err));
-        }
-
-        if (titleEl) titleEl.innerText = track.title;
+        if (!isCurrent()) return null;
+        if (Number.isFinite(audioPlayer.duration)) audioPlayer.currentTime = Math.min(resumeAt, Math.max(0, audioPlayer.duration - 0.1));
+        if (!wasPaused) await audioPlayer.play();
+        if (!isCurrent()) return null;
+        setVideoUiState(resolvedStream.mode !== 'audio');
+        titleEl.innerText = track.title;
+        artistEl.innerText = track.artist;
+        clearMediaFailureAction();
         return true;
     } catch (err) {
-        console.error('Erro ao alternar audio/video:', err);
-        recordMediaIssue(track, classifyMediaError(err, mode === 'video' ? 'Falha ao carregar video dessa faixa.' : 'Falha ao carregar audio dessa faixa.'), mode, err);
-        if (previousSrc && audioPlayer.src !== previousSrc) {
-            audioPlayer.src = previousSrc;
-            audioPlayer.load();
-            if (!wasPaused) audioPlayer.play().catch(playErr => console.log('Erro ao restaurar playback:', playErr));
+        if (!isCurrent()) return null;
+        const reason = classifyMediaError(err, 'Nao foi possivel trocar o modo de reproducao.');
+        recordMediaIssue(track, reason, mode, err);
+        // HLS uses a temporary blob URL. Restore its manifest, never the revoked blob.
+        if (sourceChanged && previousSource) {
+            try {
+                setMediaElementSource(audioPlayer, previousSource, 'main');
+                audioPlayer.dataset.playbackMode = previousMode;
+                await waitForMediaMetadata(audioPlayer);
+                if (!isCurrent()) return null;
+                if (Number.isFinite(audioPlayer.duration)) audioPlayer.currentTime = Math.min(resumeAt, Math.max(0, audioPlayer.duration - 0.1));
+                if (!wasPaused) await audioPlayer.play();
+            } catch (restoreError) {
+                if (isCurrent()) showMediaFailureAction(track, reason, previousMode);
+            }
         }
-        if (titleEl) {
-            titleEl.innerText = mode === 'video' ? 'ERRO AO CARREGAR VIDEO' : 'ERRO AO CARREGAR AUDIO';
-            setTimeout(() => {
-                if (queue[currentIndex]) titleEl.innerText = normalizeTrack(queue[currentIndex]).title;
-            }, 1800);
-        }
+        if (!isCurrent()) return null;
+        setVideoUiState(previousMode !== 'audio');
+        titleEl.innerText = track.title;
+        artistEl.innerText = reason;
         return false;
+    } finally {
+        if (currentStreamChangeGeneration === generation) currentStreamChangeGeneration = 0;
     }
 }
 
 if (btnToggleVideo) {
     btnToggleVideo.onclick = async () => {
-        if(currentRoom && !isHost) return;
+        if ((currentRoom && !isHost) || btnToggleVideo.disabled) return;
         const previousVideoState = isVideoMode;
         const nextVideoState = !previousVideoState;
         setVideoUiState(nextVideoState);
-        const changed = await reloadCurrentPlaybackStream(nextVideoState ? 'video' : 'audio');
-        if (!changed) {
-            setVideoUiState(previousVideoState);
-        } else if (currentRoom && isHost) {
-            roomSettings = normalizeRoomSettings({ ...roomSettings, videoEnabled: Boolean(isVideoMode) });
-            publishRoomState({ settings: roomSettings });
+        btnToggleVideo.disabled = true;
+        try {
+            const changed = await reloadCurrentPlaybackStream(nextVideoState ? 'video' : 'audio');
+            if (changed === false) setVideoUiState(previousVideoState);
+            else if (changed === true && currentRoom && isHost) {
+                roomSettings = normalizeRoomSettings({ ...roomSettings, videoEnabled: Boolean(isVideoMode) });
+                publishRoomState({ settings: roomSettings });
+            }
+        } finally {
+            btnToggleVideo.disabled = false;
         }
         return;
 
@@ -8503,13 +8598,14 @@ if (btnPiP) {
 // ========================================================
 
 // Carrega os atalhos salvos ou define os padrões que você pediu
-let currentHotkeys = JSON.parse(localStorage.getItem('fluxo_hotkeys')) || {
+let currentHotkeys = {
     playPause: 'Space',
     volUp: 'Up',
     volDown: 'Down',
     nextTrack: 'Shift+Right',
     prevTrack: 'Shift+Left',
-    globalEnabled: false
+    globalEnabled: false,
+    ...readStoredObject('fluxo_hotkeys')
 };
 
 // Registra imediatamente ao abrir o app caso a opção global esteja ativa
@@ -8733,13 +8829,17 @@ document.getElementById('btnHotkeys').addEventListener('click', () => {
 // LÓGICA DO SELETOR DE QUALIDADE (BLINDADA CONTRA CRASHES)
 // ========================================================
 function waitForMediaMetadata(player, timeoutMs = 7000) {
-    return new Promise((resolve) => {
+    if (player.error) return Promise.reject(new Error(player.error.message || 'Erro de midia.'));
+    if (player.readyState >= 1) return Promise.resolve();
+    return new Promise((resolve, reject) => {
         let finished = false;
         let timer = null;
 
         const cleanup = () => {
             player.removeEventListener('loadedmetadata', finish);
             player.removeEventListener('canplay', finish);
+            player.removeEventListener('error', fail);
+            player.removeEventListener('fluxo-media-error', fail);
             clearTimeout(timer);
         };
 
@@ -8750,9 +8850,18 @@ function waitForMediaMetadata(player, timeoutMs = 7000) {
             resolve();
         };
 
+        const fail = () => {
+            if (finished) return;
+            finished = true;
+            cleanup();
+            reject(new Error(player.error?.message || 'O stream nao carregou a midia a tempo.'));
+        };
+
         player.addEventListener('loadedmetadata', finish, { once: true });
         player.addEventListener('canplay', finish, { once: true });
-        timer = setTimeout(finish, timeoutMs);
+        player.addEventListener('error', fail, { once: true });
+        player.addEventListener('fluxo-media-error', fail, { once: true });
+        timer = setTimeout(fail, timeoutMs);
     });
 }
 
