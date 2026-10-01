@@ -2,6 +2,7 @@ import { themes } from './themes.js';
 import { loadModel, unique, cleanTrack, filterTracks, duration, size, publicBackup, validateBackup } from './model.js';
 import { commands, native, artURL } from './platform.js';
 import { startVisualizer, stopVisualizer } from './visualizer.js';
+import { appearanceDefaults, normalizeSettings, normalizeAppearance, playlistAppearance, playlistIcons, playlistColors, surfacePalette, contrastText } from './appearance.js';
 
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -9,7 +10,7 @@ const icon = (name, cls = '') => `<i data-lucide="${name}" class="${cls}"></i>`;
 const ib = (name, action, label, attrs = '', cls = '') => `<button class="icon-button ${cls}" data-action="${action}" aria-label="${esc(label)}" title="${esc(label)}" ${attrs}>${icon(name)}</button>`;
 const button = (name, action, label, attrs = '', cls = '') => `<button class="text-button ${cls}" data-action="${action}" ${attrs}>${icon(name)}${esc(label)}</button>`;
 const model = loadModel(localStorage);
-model.settings = { theme: 'fluxobug', accent: '#a5f060', ...model.settings };
+model.settings = normalizeSettings(model.settings);
 model.searches ||= [];
 let downloads = [];
 let current = { queue: [], index: 0, duration: 0, position: 0, playing: false, buffering: false, repeat: 0, shuffle: false, speed: 1 };
@@ -32,6 +33,10 @@ let playerKey = '';
 let historyId = '';
 let toastTimer;
 let permissionAsked = localStorage.getItem('fluxo_v2_permissions') === 'yes';
+let appearanceOpen = false;
+let appearanceTab = 'visual';
+let themeFavoritesOnly = false;
+let themeQuery = '';
 const offline = () => model.settings.offline || !navigator.onLine;
 const ready = () => downloads.filter(t => t.status === 'ready');
 const downloaded = track => ready().find(t => t.id === track?.id || (t.url && t.url === track?.url));
@@ -45,6 +50,12 @@ function theme() {
   const id = themes.some(t => t.id === model.settings.theme) ? model.settings.theme : 'fluxobug';
   document.body.className = `theme-${id}${current.queue.length ? ' has-player' : ''}`;
   document.body.style.setProperty('--cyan', model.settings.customAccent ? model.settings.accent : '');
+  document.body.style.setProperty('--pink', model.settings.customSecondary ? model.settings.secondary : '');
+  for (const key of ['--bg', '--panel', '--panel-2', '--text', '--muted']) document.body.style.removeProperty(key);
+  if (model.settings.customBackground) for (const [key, value] of Object.entries(surfacePalette(model.settings.background))) document.body.style.setProperty(key, value);
+  document.body.style.setProperty('--accent-ink', contrastText(getComputedStyle(document.body).getPropertyValue('--cyan').trim()));
+  document.body.style.setProperty('--radius', `${model.settings.radius}px`);
+  for (const key of ['density', 'textSize', 'font', 'artworkShape', 'playlistView', 'playerLayout', 'visualizer', 'reducedMotion']) document.body.dataset[key] = String(model.settings[key]);
   const rgb = getComputedStyle(document.body).backgroundColor.match(/[\d.]+/g)?.map(Number) || [0, 0, 0];
   document.documentElement.style.colorScheme = (rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722) > 140 ? 'light' : 'dark';
   document.querySelector('meta[name=theme-color]').content = getComputedStyle(document.body).getPropertyValue('--bg').trim();
@@ -59,8 +70,9 @@ function art(track, cls = 'track-cover') {
   return `<span class="${cls} artwork-placeholder art-${color}" aria-hidden="true"><span class="record-ring"></span>${icon('music-2')}<span class="art-mark">FLUXO</span></span>`;
 }
 function playlistArt(playlist) {
+  const look = playlistAppearance(playlist);
   const covers = playlist.tracks.slice(0, 4);
-  if (!covers.length) return `<div class="playlist-art">${icon(playlist.offlineOnly ? 'hard-drive-download' : 'list-music')}</div>`;
+  if (!covers.length || look.coverStyle === 'symbol') return `<div class="playlist-art playlist-symbol" ${look.coverColor !== 'auto' ? `style="--cover-color:${look.coverColor}"` : ''}>${icon(look.coverIcon === 'list-music' && playlist.offlineOnly ? 'hard-drive-download' : look.coverIcon)}<span>${esc(playlist.title?.slice(0, 1) || 'F')}</span></div>`;
   return `<div class="playlist-art playlist-mosaic ${covers.length === 1 ? 'single' : ''}">${covers.map(t => art(t, 'mosaic-image')).join('')}</div>`;
 }
 function trackCopy(track) { const record = downloads.find(t => t.id === track.id); return `<span class="track-copy"><strong>${esc(track.title)}</strong><small>${downloaded(track) ? icon('circle-check') : ''}${esc(record?.statusDetail || track.artist)}</small></span>`; }
@@ -69,6 +81,7 @@ function list(tracks, context = 'list') {
   return `<div class="track-list">${tracks.map((track, i) => {
     const dl = downloads.find(t => t.id === track.id);
     return `<div class="track ${current.queue[current.index]?.id === track.id ? 'playing' : ''}" data-row="${esc(track.id)}">
+      ${context === 'queue' ? `<span class="queue-number">${i === current.index ? icon('audio-lines') : i + 1}</span>` : ''}
       <button class="track-main" data-action="${context === 'queue' ? 'jump' : 'track-play'}" data-index="${i}" data-track="${esc(track.id)}" aria-label="Tocar ${esc(track.title)}">${art(track)}${trackCopy(track)}</button>
       ${dl?.status === 'downloading' ? `<progress class="download-progress" value="${dl.progress || 0}" max="100" aria-label="Download"></progress>` : `<span class="track-time">${dl?.status === 'failed' ? 'Falhou' : track.duration ? duration(track.duration) : ''}</span>`}
       ${ib('ellipsis-vertical', 'track-menu', `Opções de ${track.title}`, `data-track="${esc(track.id)}" data-index="${i}" data-context="${context}"`)}
@@ -83,7 +96,7 @@ function library() {
   html += `<div class="segmented" role="tablist" aria-label="Biblioteca">${tabs.map(([id, label]) => `<button role="tab" aria-selected="${libraryTab === id}" class="${libraryTab === id ? 'active' : ''}" data-action="library-tab" data-value="${id}">${label}</button>`).join('')}</div>`;
   if (libraryTab === 'home') {
     html += `<div class="stats"><button class="collection" data-action="library-tab" data-value="downloads"><strong>${ready().length}</strong>${icon('download')}<small>Músicas baixadas</small></button><button class="collection" data-action="library-tab" data-value="favorites"><strong>${model.favorites.length}</strong>${icon('heart')}<small>Suas favoritas</small></button></div>`;
-    html += `<div class="section-heading"><h2>Playlists</h2>${ib('plus', 'new-playlist', 'Nova playlist')}</div>`;
+    html += `<div class="section-heading"><h2>Playlists</h2><div class="section-tools"><div class="view-switch" role="group" aria-label="Visualização das playlists">${ib('layout-grid', 'playlist-view', 'Playlists em grade', 'data-value="grid"', model.settings.playlistView === 'grid' ? 'active' : '')}${ib('list', 'playlist-view', 'Playlists em lista', 'data-value="list"', model.settings.playlistView === 'list' ? 'active' : '')}</div>${ib('plus', 'new-playlist', 'Nova playlist')}</div></div>`;
     html += model.playlists.length ? `<div class="playlist-grid">${model.playlists.map(p => `<button class="playlist-card" data-action="open-playlist" data-id="${esc(p.id)}">${playlistArt(p)}<div><strong>${esc(p.title)}</strong><small>${p.tracks.length} músicas${p.offlineOnly ? ' · Offline' : ''}</small></div></button>`).join('')}</div>` : empty('list-music', 'Sua primeira playlist', '', button('plus', 'new-playlist', 'Criar playlist'), true);
     html += `<div class="section-heading"><h2>Ouvidas recentemente</h2>${model.history.length ? ib('trash-2', 'clear-history', 'Limpar histórico') : ''}</div>`;
     html += model.history.length ? list(model.history.slice(0, 8)) : empty('disc-3', 'Dê o primeiro play', '', button('folder-plus', 'import', 'Importar músicas'), true);
@@ -116,7 +129,7 @@ function searchPage() {
   return html;
 }
 function queuePage() {
-  return heading('Na sequência', `${current.queue.length} músicas`, current.queue.length ? ib('trash-2', 'clear-queue', 'Limpar fila') : '')
+  return heading('Na sequência', `${current.queue.length} músicas${current.queue.length ? ` · ${duration(current.queue.reduce((n, t) => n + t.duration, 0))}` : ''}`, current.queue.length ? ib('trash-2', 'clear-queue', 'Limpar fila') : '')
     + (current.error ? `<div class="error-state"><p>${esc(current.error)}</p>${ib('rotate-cw', 'retry-play', 'Tentar reprodução novamente')}</div>` : '')
     + (current.queue.length ? list(current.queue, 'queue') : empty('list-music', 'A fila está vazia', '', button('library', 'go-library', 'Abrir biblioteca')));
 }
@@ -124,12 +137,59 @@ const setting = (name, title, description, control) => `<div class="setting">${i
 const toggle = (id, label) => `<input class="toggle" type="checkbox" data-setting="${id}" aria-label="${esc(label)}" ${model.settings[id] ? 'checked' : ''}>`;
 const actionSetting = (name, title, desc, action) => `<button class="setting action-row" data-action="${action}">${icon(name)}<div><strong>${esc(title)}</strong>${desc ? `<small>${esc(desc)}</small>` : ''}</div>${icon('chevron-right', 'chevron')}</button>`;
 function settingsPage() {
+  if (appearanceOpen) return appearancePage();
   return heading('Ajustes')
     + `<section class="settings-group"><h2>Reprodução</h2>${setting('wifi-off', 'Modo offline', '', toggle('offline', 'Modo offline'))}${actionSetting('moon', 'Temporizador', current.sleepAt ? `${Math.max(1, Math.ceil((current.sleepAt - Date.now()) / 60000))} min restantes` : 'Desativado', 'sleep')}${actionSetting('gauge', 'Velocidade', `${current.speed || 1}×`, 'speed')}</section>`
     + (native ? actionSetting('audio-lines', 'Equalizador', ['Normal', 'Graves', 'Voz', 'Agudos'][current.eqPreset || 0], 'equalizer') : '')
-    + `<section class="settings-group"><h2>Aparência</h2>${actionSetting('palette', 'Temas do Fluxo', `${themes.length} temas · ${themes.find(t => t.id === model.settings.theme)?.name || 'Fluxo Bug'}`, 'themes')}${setting('pipette', 'Cor personalizada', '', toggle('customAccent', 'Usar cor personalizada'))}${model.settings.customAccent ? setting('paintbrush', 'Cor de destaque', '', `<input class="color-input" type="color" id="accent" value="${esc(model.settings.accent)}" aria-label="Cor de destaque">`) : ''}</section>`
+    + `<section class="settings-group"><h2>Aparência</h2>${actionSetting('palette', 'Temas do Fluxo', `${themes.length} temas · ${themes.find(t => t.id === model.settings.theme)?.name || 'Fluxo Bug'}`, 'themes')}${actionSetting('paintbrush', 'Personalizar aparência', `${model.settings.density === 'compact' ? 'Compacto' : 'Confortável'} · ${model.settings.profiles.length} estilos salvos`, 'appearance')}</section>`
     + `<section class="settings-group"><h2>Armazenamento</h2>${setting('wifi', 'Baixar só no Wi-Fi', '', toggle('wifiOnly', 'Baixar só no Wi-Fi'))}${actionSetting('hard-drive', 'Músicas no dispositivo', `${ready().length} arquivos · ${size(downloads.reduce((n, d) => n + (d.bytes || 0), 0))}`, 'go-downloads')}${actionSetting('folder-plus', 'Importar arquivos', '', 'import')}</section>`
-    + `<section class="settings-group"><h2>Dados e permissões</h2>${actionSetting('file-down', 'Exportar backup', 'Playlists, favoritos e preferências', 'export')}${actionSetting('file-up', 'Restaurar backup', '', 'restore')}${native ? actionSetting('bell', 'Permitir notificações', '', 'permissions') : ''}${actionSetting('info', 'Sobre o Fluxo Mobile', 'Versão 2.0.0', 'about')}</section>`;
+    + `<section class="settings-group"><h2>Dados e permissões</h2>${actionSetting('file-down', 'Exportar backup', 'Playlists, favoritos e preferências', 'export')}${actionSetting('file-up', 'Restaurar backup', '', 'restore')}${native ? actionSetting('bell', 'Permitir notificações', '', 'permissions') : ''}${actionSetting('info', 'Sobre o Fluxo Mobile', 'Versão 2.1.0', 'about')}</section>`;
+}
+function selectSetting(key, label, options) {
+  return `<select data-preference="${key}" aria-label="${esc(label)}">${options.map(([value, text]) => `<option value="${value}" ${model.settings[key] === value ? 'selected' : ''}>${esc(text)}</option>`).join('')}</select>`;
+}
+function appearancePage() {
+  const t = current.queue[current.index] || model.history[0] || { id: 'preview', title: 'Fluxo Mobile', artist: themes.find(t => t.id === model.settings.theme)?.name || 'Fluxo Bug' };
+  let html = `<div class="appearance-heading">${ib('arrow-left', 'back-settings', 'Voltar aos ajustes')}<h1>Aparência</h1>${ib('rotate-ccw', 'reset-appearance', 'Restaurar aparência')}</div>`;
+  html += `<div class="appearance-preview" aria-label="Prévia da aparência">${art(t)}<div><strong>${esc(t.title)}</strong><small>${esc(t.artist)}</small></div><span class="preview-accent">${icon('audio-lines')}</span></div>`;
+  html += `<div class="segmented" role="tablist" aria-label="Personalização">${[['visual', 'Visual'], ['player', 'Player'], ['profiles', 'Estilos salvos']].map(([id, label]) => `<button role="tab" aria-selected="${appearanceTab === id}" data-action="appearance-tab" data-value="${id}" class="${appearanceTab === id ? 'active' : ''}">${label}</button>`).join('')}</div>`;
+  if (appearanceTab === 'visual') {
+    html += `<section class="settings-group"><h2>Cores</h2>${actionSetting('palette', 'Temas do Fluxo', themes.find(t => t.id === model.settings.theme)?.name || 'Fluxo Bug', 'themes')}`;
+    for (const [flag, key, label] of [['customAccent', 'accent', 'Cor de destaque'], ['customSecondary', 'secondary', 'Cor secundária'], ['customBackground', 'background', 'Cor de fundo']]) {
+      html += setting('pipette', label, '', `<input class="color-input" type="color" data-color="${key}" value="${model.settings[key]}" aria-label="${label}" ${model.settings[flag] ? '' : 'disabled'}>${toggle(flag, `Personalizar ${label.toLowerCase()}`)}`);
+    }
+    html += `</section><section class="settings-group"><h2>Layout e leitura</h2>`
+      + setting('rows-3', 'Espaçamento', '', selectSetting('density', 'Espaçamento', [['comfortable', 'Confortável'], ['compact', 'Compacto']]))
+      + setting('type', 'Tamanho do texto', '', selectSetting('textSize', 'Tamanho do texto', [['normal', 'Padrão'], ['large', 'Maior']]))
+      + setting('case-sensitive', 'Fonte', '', selectSetting('font', 'Fonte', [['system', 'Sistema'], ['mono', 'Mono'], ['serif', 'Serifada']]))
+      + setting('square', 'Cantos', '', selectSetting('radius', 'Cantos', [[0, 'Retos'], [4, 'Suaves'], [8, 'Arredondados']]))
+      + setting('disc-3', 'Formato das capas', '', selectSetting('artworkShape', 'Formato das capas', [['square', 'Quadradas'], ['round', 'Circulares']]))
+      + setting('layout-grid', 'Playlists', '', selectSetting('playlistView', 'Visualização das playlists', [['grid', 'Grade'], ['list', 'Lista']]))
+      + setting('sparkles', 'Reduzir animações', '', toggle('reducedMotion', 'Reduzir animações')) + '</section>';
+  } else if (appearanceTab === 'player') {
+    html += `<section class="settings-group"><h2>Player</h2>`
+      + setting('panels-top-left', 'Layout do player', '', selectSetting('playerLayout', 'Layout do player', [['cover', 'Capa em destaque'], ['compact', 'Compacto']]))
+      + setting('audio-lines', 'Visualizador', '', selectSetting('visualizer', 'Visualizador', [['bars', 'Barras'], ['wave', 'Onda'], ['off', 'Desativado']]))
+      + actionSetting('play', 'Abrir player', t.title, 'open-player') + '</section>';
+  } else {
+    html += `<div class="section-heading"><h2>Meus estilos</h2>${ib('plus', 'save-profile', 'Salvar estilo atual')}</div>`;
+    html += model.settings.profiles.length ? model.settings.profiles.map(p => `<div class="profile-row"><button class="profile-main" data-action="apply-profile" data-id="${esc(p.id)}"><span class="profile-swatch" style="background:${p.values.accent};border-color:${p.values.secondary}"></span><span><strong>${esc(p.name)}</strong><small>${esc(themes.find(t => t.id === p.values.theme)?.name || 'Fluxo')}</small></span>${icon('arrow-up-right')}</button>${ib('trash-2', 'delete-profile', `Excluir estilo ${p.name}`, `data-id="${esc(p.id)}"`)}</div>`).join('') : empty('bookmark', 'Nenhum estilo salvo', '', button('plus', 'save-profile', 'Salvar estilo atual'));
+  }
+  return html;
+}
+function applyAppearance() {
+  model.settings = normalizeSettings(model.settings); save(); theme(); render(); renderPlayer(true);
+  stopVisualizer(); if ($('#player').open && model.settings.visualizer !== 'off') startVisualizer(() => current, () => model.settings);
+}
+function themeTiles() {
+  return themes.map(t => `<div class="theme-option" data-theme-id="${t.id}" data-name="${esc(t.name.toLowerCase())}"><button class="theme-tile ${t.id === model.settings.theme ? 'active' : ''}" data-action="theme" data-id="${t.id}" aria-label="Tema ${esc(t.name)}"><span class="theme-swatch theme-${t.id}"><span></span><span></span><span></span></span><strong>${esc(t.name)}</strong></button>${ib('star', 'favorite-theme', `${model.settings.themeFavorites.includes(t.id) ? 'Desfavoritar' : 'Favoritar'} tema ${t.name}`, `data-id="${t.id}"`, `theme-star ${model.settings.themeFavorites.includes(t.id) ? 'active' : ''}`)}</div>`).join('');
+}
+function filterThemes() {
+  document.querySelectorAll('.theme-option').forEach(t => t.hidden = !t.dataset.name.includes(themeQuery.toLowerCase()) || (themeFavoritesOnly && !model.settings.themeFavorites.includes(t.dataset.themeId)));
+  $('#themes-empty').hidden = !!document.querySelector('.theme-option:not([hidden])');
+}
+function showThemes() {
+  modal('Temas', `<div class="theme-search"><label class="field">${icon('search')}<input id="theme-filter" type="search" value="${esc(themeQuery)}" placeholder="Encontrar tema" aria-label="Encontrar tema"></label><div class="theme-filter-tabs" role="group" aria-label="Filtro de temas">${button('palette', 'all-themes', 'Todos', '', themeFavoritesOnly ? '' : 'active')}${button('star', 'favorite-themes', 'Favoritos', '', themeFavoritesOnly ? 'active' : '')}</div></div><div class="theme-grid">${themeTiles()}</div><div id="themes-empty" hidden>${empty('star', 'Nenhum tema encontrado', '', '', true)}</div>`); filterThemes();
 }
 function render() {
   $('#view').innerHTML = ({ library, search: searchPage, queue: queuePage, settings: settingsPage })[tab]();
@@ -152,7 +212,17 @@ function confirm(title, message, action) {
 }
 function newPlaylist(edit = false) {
   const p = edit ? model.playlists.find(p => p.id === playlistId) : null;
-  modal(edit ? 'Editar playlist' : 'Nova playlist', `<form id="playlist-form" data-edit="${edit}"><label class="field"><input name="title" type="text" placeholder="Nome da playlist" aria-label="Nome da playlist" maxlength="100" value="${esc(p?.title || '')}" required></label><label class="check-label"><input name="offline" type="checkbox" ${!p || p.offlineOnly ? 'checked' : ''}>Somente músicas baixadas</label><button class="text-button primary full" type="submit">${icon('check')}Salvar playlist</button></form>`);
+  const look = playlistAppearance(p || {});
+  modal(edit ? 'Editar playlist' : 'Nova playlist', `<form id="playlist-form" data-edit="${edit}"><label class="field"><input name="title" type="text" placeholder="Nome da playlist" aria-label="Nome da playlist" maxlength="100" value="${esc(p?.title || '')}" required></label><label class="check-label"><input name="offline" type="checkbox" ${!p || p.offlineOnly ? 'checked' : ''}>Somente músicas baixadas</label><div class="playlist-customize"><label class="form-label">Capa<select name="coverStyle" aria-label="Estilo da capa"><option value="mosaic" ${look.coverStyle === 'mosaic' ? 'selected' : ''}>Capas das músicas</option><option value="symbol" ${look.coverStyle === 'symbol' ? 'selected' : ''}>Ícone personalizado</option></select></label><fieldset class="icon-choices"><legend>Ícone</legend>${playlistIcons.map((name, i) => `<label title="${['Playlist', 'Fones', 'Disco', 'Favoritas', 'Rádio', 'Música', 'Brilho'][i]}"><input type="radio" name="coverIcon" value="${name}" ${look.coverIcon === name ? 'checked' : ''} aria-label="Ícone ${name}">${icon(name)}</label>`).join('')}</fieldset><fieldset class="color-choices"><legend>Cor</legend>${['auto', ...playlistColors].map(color => `<label title="${color === 'auto' ? 'Cor do tema' : color}" style="--swatch:${color === 'auto' ? 'var(--cyan)' : color}"><input type="radio" name="coverColor" value="${color}" ${look.coverColor === color ? 'checked' : ''} aria-label="Cor ${color === 'auto' ? 'do tema' : color}"><span></span></label>`).join('')}</fieldset></div><button class="text-button primary full" type="submit">${icon('check')}Salvar playlist</button></form>`);
+  $('#playlist-form .playlist-customize').insertAdjacentHTML('afterbegin', '<div id="playlist-cover-preview" class="playlist-cover-preview" aria-label="Prévia da capa"></div>');
+  updatePlaylistPreview();
+}
+function updatePlaylistPreview() {
+  const form = $('#playlist-form'); if (!form) return;
+  const values = Object.fromEntries(new FormData(form));
+  const p = form.dataset.edit === 'true' ? model.playlists.find(p => p.id === playlistId) : null;
+  $('#playlist-cover-preview').innerHTML = playlistArt({ ...p, ...playlistAppearance(values), title: String(values.title || 'Playlist'), tracks: p?.tracks || [] });
+  form.querySelectorAll('fieldset').forEach(el => el.hidden = values.coverStyle !== 'symbol'); icons();
 }
 function playlistAdd() {
   const p = model.playlists.find(p => p.id === playlistId);
@@ -172,7 +242,7 @@ function trackMenu(track, index = -1, context = '') {
     + (context === 'queue' ? `${index > 0 ? mi('arrow-up', 'Subir na fila', 'queue-up') : ''}${index < current.queue.length - 1 ? mi('arrow-down', 'Descer na fila', 'queue-down') : ''}${mi('list-minus', 'Remover da fila', 'queue-remove')}` : '')
     + (context === 'playlist' ? `${index > 0 ? mi('arrow-up', 'Mover para cima', 'playlist-up') : ''}${index < model.playlists.find(p => p.id === playlistId).tracks.length - 1 ? mi('arrow-down', 'Mover para baixo', 'playlist-down') : ''}${mi('list-minus', 'Remover da playlist', 'playlist-remove')}` : ''));
 }
-function showPlayer() { if (!current.queue.length) return; renderPlayer(true); if (!$('#player').open) $('#player').showModal(); startVisualizer(() => current); }
+function showPlayer() { if (!current.queue.length) return toast('Escolha uma música primeiro.'); renderPlayer(true); if (!$('#player').open) $('#player').showModal(); if (model.settings.visualizer !== 'off') startVisualizer(() => current, () => model.settings); }
 function renderPlayer(force = false) {
   const t = current.queue[current.index];
   const key = JSON.stringify([t?.id, current.playing, current.playWhenReady, current.buffering, current.error, current.repeat, current.shuffle, favorite(t), current.speed, current.sleepAt]);
@@ -189,7 +259,11 @@ function renderPlayer(force = false) {
     $('#player').innerHTML = `<div class="player-header">${ib('chevron-down', 'close-player', 'Minimizar player')}<small>Reproduzindo agora</small>${ib('ellipsis', 'current-menu', 'Opções da música')}</div>${art(t, 'player-art')}<div class="player-info"><div><h2>${esc(t.title)}</h2><p>${esc(t.artist)}</p></div>${ib('heart', 'favorite-current', favorite(t) ? 'Desfavoritar' : 'Favoritar', '', favorite(t) ? 'active' : '')}</div><input class="seek" id="seek" type="range" min="0" max="${Math.max(1, current.duration)}" step="0.1" value="${current.position || 0}" aria-label="Posição da música"><div class="time-labels"><span id="elapsed">${duration(current.position)}</span><span id="total">${duration(current.duration)}</span></div><div class="player-controls">${ib('shuffle', 'shuffle', 'Reprodução aleatória', '', current.shuffle ? 'active' : '')}${ib('skip-back', 'previous', 'Música anterior')}${ib(toggleIcon, 'toggle', current.playing ? 'Pausar' : 'Reproduzir', '', `big-play ${current.buffering ? 'spin' : ''}`)}${ib('skip-forward', 'next', 'Próxima música')}${ib(current.repeat === 1 ? 'repeat-1' : 'repeat', 'repeat', current.repeat === 0 ? 'Repetição desativada' : current.repeat === 1 ? 'Repetir uma' : 'Repetir fila', '', current.repeat ? 'active' : '')}</div><div class="player-status">${esc(current.error || (current.buffering ? 'Preparando áudio...' : downloaded(t) ? 'Reprodução offline' : ''))}</div><div class="player-footer"><button data-action="current-download">${icon(downloaded(t) ? 'circle-check' : 'download')}<span>${downloaded(t) ? 'Baixada' : 'Baixar'}</span></button><button data-action="sleep">${icon('moon')}<span>Timer</span></button><button data-action="speed">${icon('gauge')}<span>${current.speed || 1}×</span></button><button data-action="player-queue">${icon('list-music')}<span>Fila</span></button></div>`;
   }
   if ($('#player').open || force) {
-    $('.player-info')?.insertAdjacentHTML('afterend', '<canvas id="audio-visual" class="audio-visual" aria-hidden="true"></canvas>');
+    const info = $('#player .player-info');
+    const artwork = $('#player .player-art');
+    const stage = document.createElement('div'); stage.className = 'player-stage';
+    artwork.before(stage); stage.append(artwork, info);
+    stage.insertAdjacentHTML('afterend', '<canvas id="audio-visual" class="audio-visual" aria-hidden="true"></canvas>');
     const statusLabel = $('#player .player-status');
     if (statusLabel) statusLabel.textContent = current.error || (loading ? 'Preparando áudio...' : downloaded(t) ? 'Reprodução offline' : '');
   }
@@ -263,6 +337,18 @@ async function action(name, el) {
   switch (name) {
     case 'close-sheet': closeSheet(); break;
     case 'close-player': $('#player').close(); stopVisualizer(); break;
+    case 'appearance': appearanceOpen = true; appearanceTab = 'visual'; render(); window.scrollTo(0, 0); break;
+    case 'back-settings': appearanceOpen = false; render(); window.scrollTo(0, 0); break;
+    case 'appearance-tab': appearanceTab = el.dataset.value; render(); window.scrollTo(0, 0); break;
+    case 'playlist-view': model.settings.playlistView = el.dataset.value; applyAppearance(); break;
+    case 'reset-appearance': confirm('Restaurar aparência?', 'Seus estilos salvos, músicas e playlists serão mantidos.', 'reset-appearance-confirm'); break;
+    case 'reset-appearance-confirm': Object.assign(model.settings, appearanceDefaults); closeSheet(); applyAppearance(); break;
+    case 'save-profile':
+      if (model.settings.profiles.length >= 12) throw new Error('Você pode salvar até 12 estilos.');
+      modal('Salvar estilo', `<form id="profile-form"><label class="field"><input type="text" name="name" aria-label="Nome do estilo" placeholder="Nome do estilo" maxlength="40" required></label><button class="text-button primary full" type="submit">${icon('check')}Salvar estilo</button></form>`); break;
+    case 'apply-profile': { const profile = model.settings.profiles.find(p => p.id === el.dataset.id); if (profile) { Object.assign(model.settings, normalizeAppearance(profile.values)); applyAppearance(); toast(`Estilo ${profile.name} aplicado.`); } break; }
+    case 'delete-profile': confirm('Excluir estilo?', 'A aparência atual será mantida.', 'delete-profile-confirm'); $('#sheet [data-action=delete-profile-confirm]').dataset.id = el.dataset.id; break;
+    case 'delete-profile-confirm': model.settings.profiles = model.settings.profiles.filter(p => p.id !== el.dataset.id); closeSheet(); applyAppearance(); break;
     case 'open-player': showPlayer(); break;
     case 'go-library': location.hash = 'library'; break;
     case 'go-downloads': playlistId = ''; libraryTab = 'downloads'; location.hash = 'library'; tab = 'library'; render(); break;
@@ -272,7 +358,7 @@ async function action(name, el) {
     case 'new-playlist': newPlaylist(); break;
     case 'playlist-edit': newPlaylist(true); break;
     case 'playlist-add': playlistAdd(); break;
-    case 'playlist-menu': modal('Playlist', `${button('pencil', 'playlist-edit', 'Editar nome', '', 'full')}${button('download', 'playlist-download', 'Baixar músicas', '', 'full')}${button('trash-2', 'playlist-delete', 'Excluir playlist', '', 'full danger')}`); break;
+    case 'playlist-menu': modal('Playlist', `${button('pencil', 'playlist-edit', 'Editar playlist', '', 'full')}${button('download', 'playlist-download', 'Baixar músicas', '', 'full')}${button('trash-2', 'playlist-delete', 'Excluir playlist', '', 'full danger')}`); break;
     case 'playlist-delete': confirm('Excluir playlist?', 'Os arquivos baixados serão mantidos.', 'playlist-delete-confirm'); break;
     case 'playlist-delete-confirm': model.playlists = model.playlists.filter(p => p.id !== playlistId); playlistId = ''; save(); closeSheet(); render(); break;
     case 'playlist-play': case 'playlist-shuffle': { const p = model.playlists.find(p => p.id === playlistId); const tracks = p.offlineOnly || offline() ? p.tracks.filter(downloaded) : p.tracks; await play(tracks, name === 'playlist-shuffle' ? Math.floor(Math.random() * tracks.length) : 0, p.offlineOnly); await cmd('shuffle', name === 'playlist-shuffle' ? 1 : 0); break; }
@@ -301,18 +387,20 @@ async function action(name, el) {
     case 'next': case 'previous': await cmd(name); break;
     case 'shuffle': await cmd('shuffle', current.shuffle ? 0 : 1); break;
     case 'repeat': await cmd('repeat', ((current.repeat || 0) + 1) % 3); break;
-    case 'player-queue': $('#player').close(); location.hash = 'queue'; break;
+    case 'player-queue': $('#player').close(); stopVisualizer(); location.hash = 'queue'; break;
     case 'sleep': modal('Temporizador', [0, 15, 30, 45, 60, 90].map(n => `<button class="menu-item" data-action="set-sleep" data-value="${n}">${icon(n ? 'moon' : 'moon-star')}${n ? `${n} minutos` : 'Desativado'}</button>`).join('')); break;
     case 'set-sleep': await cmd('sleep', Number(el.dataset.value)); closeSheet(); if (tab === 'settings') render(); toast(Number(el.dataset.value) ? 'Temporizador ativado.' : 'Temporizador desativado.'); break;
     case 'speed': modal('Velocidade', `<div class="slider-row"><span>0,5×</span><input id="speed-slider" type="range" min="0.5" max="2" step="0.05" value="${current.speed || 1}" aria-label="Velocidade"><span>2×</span></div><p class="player-status" id="speed-value">${current.speed || 1}×</p>${button('rotate-ccw', 'reset-speed', 'Restaurar 1×', '', 'full')}`); break;
     case 'reset-speed': await cmd('speed', 1); closeSheet(); render(); break;
     case 'equalizer': modal('Equalizador', ['Normal', 'Graves', 'Voz', 'Agudos'].map((label, i) => `<button class="menu-item" data-action="set-equalizer" data-value="${i}">${icon('audio-lines')}${label}${current.eqPreset === i ? '<small>Ativo</small>' : ''}</button>`).join('') + (!current.eqAvailable ? '<p class="footnote">O efeito será aplicado ao iniciar o áudio, se houver suporte no dispositivo.</p>' : '')); break;
     case 'set-equalizer': await cmd('equalizer', Number(el.dataset.value)); closeSheet(); render(); break;
-    case 'themes': modal('Temas', `<div class="theme-search"><label class="field">${icon('search')}<input id="theme-filter" type="search" placeholder="Encontrar tema" aria-label="Encontrar tema"></label></div><div class="theme-grid">${themes.map(t => `<button class="theme-tile ${t.id === model.settings.theme ? 'active' : ''}" data-action="theme" data-id="${t.id}" data-name="${esc(t.name.toLowerCase())}" aria-label="Tema ${esc(t.name)}"><span class="theme-swatch theme-${t.id}"><span></span><span></span><span></span></span><strong>${esc(t.name)}</strong></button>`).join('')}</div>`); break;
-    case 'theme': model.settings.theme = el.dataset.id; model.settings.customAccent = false; save(); theme(); document.querySelectorAll('.theme-tile').forEach(t => t.classList.toggle('active', t.dataset.id === model.settings.theme)); render(); break;
+    case 'themes': themeQuery = ''; themeFavoritesOnly = false; showThemes(); break;
+    case 'theme': model.settings.theme = el.dataset.id; model.settings.customAccent = false; model.settings.customSecondary = false; model.settings.customBackground = false; applyAppearance(); document.querySelectorAll('.theme-tile').forEach(t => t.classList.toggle('active', t.dataset.id === model.settings.theme)); break;
+    case 'favorite-theme': { const id = el.dataset.id; model.settings.themeFavorites = model.settings.themeFavorites.includes(id) ? model.settings.themeFavorites.filter(t => t !== id) : [...model.settings.themeFavorites, id]; save(); $('#sheet .theme-grid').innerHTML = themeTiles(); filterThemes(); icons(); break; }
+    case 'all-themes': case 'favorite-themes': themeFavoritesOnly = name === 'favorite-themes'; document.querySelectorAll('.theme-filter-tabs button').forEach(b => b.classList.toggle('active', b.dataset.action === name)); filterThemes(); break;
     case 'permissions': await commands.notifications(); break;
     case 'export': await commands.exportBackup(JSON.stringify(publicBackup(model), null, 2)); break;
-    case 'restore': { const value = await commands.importBackup(); if (!value) break; const backup = validateBackup(JSON.parse(value)); model.favorites = unique([...model.favorites, ...backup.favorites]); model.playlists = [...new Map([...model.playlists, ...backup.playlists].map(p => [p.id, p])).values()]; model.history = unique([...model.history, ...backup.history]).slice(0, 100); model.settings = { ...model.settings, ...backup.settings }; save(); theme(); render(); toast('Backup restaurado. Seus arquivos locais foram mantidos.'); break; }
+    case 'restore': { const value = await commands.importBackup(); if (!value) break; const backup = validateBackup(JSON.parse(value)); model.favorites = unique([...model.favorites, ...backup.favorites]); model.playlists = [...new Map([...model.playlists, ...backup.playlists].map(p => [p.id, p])).values()]; model.history = unique([...model.history, ...backup.history]).slice(0, 100); model.settings = { ...model.settings, ...backup.settings }; applyAppearance(); toast('Backup restaurado. Seus arquivos locais foram mantidos.'); break; }
     case 'clear-history': confirm('Limpar histórico?', 'A biblioteca e as playlists serão mantidas.', 'clear-history-confirm'); break;
     case 'clear-history-confirm': model.history = []; save(); closeSheet(); render(); break;
     case 'clear-searches': model.searches = []; save(); render(); break;
@@ -337,13 +425,19 @@ document.addEventListener('submit', event => {
       const title = String(data.get('title')).trim(); if (!title) throw new Error('Dê um nome à playlist.');
       const p = form.dataset.edit === 'true' ? model.playlists.find(p => p.id === playlistId) : { id: crypto.randomUUID(), tracks: [] };
       if (data.has('offline') && p.tracks.some(t => !downloaded(t))) throw new Error('Baixe todas as músicas antes de tornar esta playlist offline.');
-      p.title = title; p.offlineOnly = data.has('offline');
+      p.title = title; p.offlineOnly = data.has('offline'); Object.assign(p, playlistAppearance(Object.fromEntries(data)));
       if (form.dataset.edit !== 'true') model.playlists.push(p);
       playlistId = p.id; save(); closeSheet(); render();
     }
     if (form.id === 'playlist-tracks') {
       const p = model.playlists.find(p => p.id === playlistId); const tracks = data.getAll('tracks').map(find).filter(Boolean);
       p.tracks = unique([...p.tracks, ...tracks]); save(); closeSheet(); render();
+    }
+    if (form.id === 'profile-form') {
+      const name = String(data.get('name') || '').trim(); if (!name) throw new Error('Dê um nome ao estilo.');
+      if (model.settings.profiles.length >= 12) throw new Error('Você pode salvar até 12 estilos.');
+      model.settings.profiles.push({ id: crypto.randomUUID(), name, values: normalizeAppearance(model.settings) });
+      closeSheet(); applyAppearance(); toast('Estilo salvo.');
     }
     if (form.id === 'link-form') {
       const url = new URL(String(data.get('url')).trim()); if (url.protocol !== 'https:') throw new Error('Use um link HTTPS.');
@@ -355,15 +449,19 @@ document.addEventListener('submit', event => {
 document.addEventListener('input', event => {
   const el = event.target;
   if (el.id === 'library-filter') { query = el.value; const tracks = libraryTab === 'downloads' ? [...downloads].reverse() : model.favorites; $('#filtered-list').innerHTML = list(filterTracks(tracks, query, sort)); icons(); }
-  if (el.id === 'theme-filter') document.querySelectorAll('.theme-tile').forEach(t => t.hidden = !t.dataset.name.includes(el.value.toLowerCase()));
+  if (el.id === 'theme-filter') { themeQuery = el.value; filterThemes(); }
+  if (el.dataset.color) { model.settings[el.dataset.color] = el.value; save(); theme(); }
+  if (el.closest('#playlist-form')) updatePlaylistPreview();
   if (el.id === 'speed-slider') $('#speed-value').textContent = `${el.value}×`;
   if (el.id === 'seek') $('#elapsed').textContent = duration(el.value);
 });
 document.addEventListener('change', event => {
   const el = event.target;
   (async () => {
-    if (el.dataset.setting) { model.settings[el.dataset.setting] = el.checked; save(); theme(); render(); }
-    if (el.id === 'accent') { model.settings.accent = el.value; save(); theme(); }
+    if (el.dataset.setting) { model.settings[el.dataset.setting] = el.checked; applyAppearance(); }
+    if (el.dataset.preference) { model.settings[el.dataset.preference] = el.dataset.preference === 'radius' ? Number(el.value) : el.value; applyAppearance(); }
+    if (el.dataset.color) { model.settings[el.dataset.color] = el.value; applyAppearance(); }
+    if (el.closest('#playlist-form')) updatePlaylistPreview();
     if (el.id === 'provider') { provider = el.value; if (searchTerm) await runSearch(); }
     if (el.id === 'sort') { sort = el.value; render(); }
     if (el.id === 'seek') await commands.command({ action: 'seek', value: Number(el.value) });
@@ -374,7 +472,7 @@ document.addEventListener('error', event => { if (event.target instanceof HTMLIm
 $('#player').addEventListener('close', stopVisualizer);
 window.addEventListener('hashchange', route);
 window.addEventListener('online', connection); window.addEventListener('offline', connection);
-window.fluxoBack = () => { if ($('#sheet').open) closeSheet(); else if ($('#player').open) $('#player').close(); else if (playlistId) { playlistId = ''; render(); } else if (tab !== 'library') location.hash = 'library'; else return false; return true; };
+window.fluxoBack = () => { if ($('#sheet').open) closeSheet(); else if ($('#player').open) $('#player').close(); else if (appearanceOpen && tab === 'settings') { appearanceOpen = false; render(); } else if (playlistId && tab === 'library') { playlistId = ''; render(); } else if (tab !== 'library') location.hash = 'library'; else return false; return true; };
 window.addEventListener('unhandledrejection', event => { toast(event.reason?.message || 'Ocorreu um erro inesperado.'); });
 theme(); route();
 await commands.init(data => {

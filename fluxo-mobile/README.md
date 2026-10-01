@@ -1,12 +1,12 @@
-# Fluxo Mobile 2
+# Fluxo Mobile 2.1
 
 App independente para **Android 7 ou superior**, reconstruido na pasta `fluxo-mobile`. Nao precisa do Fluxo de PC nem de um servidor seu para tocar. A interface usa HTML/CSS/JavaScript dentro do Capacitor; o audio, a sessao de midia, a extracao de streams e os arquivos sao tratados em Java no Android.
 
 ## Instalar e usar
 
-Download publicado: [Fluxo Mobile 2.0.0 para Android](https://github.com/Harleyzinn/fluxo/releases/tag/mobile-v2.0.0). Baixe o arquivo `Fluxo-Mobile-2.0.0.apk`, nao os pacotes de codigo-fonte.
+Download: [Fluxo Mobile 2.1.0 para Android](https://github.com/Harleyzinn/fluxo/releases/tag/mobile-v2.1.0). Baixe o arquivo `Fluxo-Mobile-2.1.0.apk`, nao os pacotes de codigo-fonte.
 
-1. Pegue `dist/Fluxo-Mobile-2.0.0.apk` e envie ao celular por USB, Drive ou outro meio de sua preferencia.
+1. Pegue `dist/Fluxo-Mobile-2.1.0.apk` e envie ao celular por USB, Drive ou outro meio de sua preferencia.
 2. Abra o APK no celular. Quando o Android pedir, permita instalar apps dessa origem. Depois da instalacao, voce pode desativar essa permissao novamente.
 3. Abra o Fluxo. Procure uma musica na aba **Buscar** ou use o botao de pasta para importar seus arquivos.
 4. Ao iniciar a primeira reproducao ou download, o app pede notificacoes no Android 13 ou superior. Negar nao impede tocar. O seletor de arquivos concede acesso somente aos arquivos escolhidos, sem pedir acesso geral ao armazenamento.
@@ -16,6 +16,19 @@ Download publicado: [Fluxo Mobile 2.0.0 para Android](https://github.com/Harleyz
 **Nao precisa upar um site para usar o aplicativo.** O APK ja contem o app. O endereco de pre-visualizacao no computador e apenas uma ferramenta de desenvolvimento, nao e o app Android.
 
 Este APK e uma compilacao de desenvolvimento assinada para instalacao pessoal. Para publicar na Play Store ou distribuir atualizacoes permanentes, gere uma chave de assinatura de producao no Android Studio em **Build > Generate Signed App Bundle / APK**. Guarde essa chave: uma atualizacao precisa da mesma assinatura. Nao envie senhas nem a chave ao GitHub. Uma assinatura diferente exige desinstalar o app anterior, apagando seus arquivos privados; exporte os dados antes e preserve os audios originais.
+
+## Novidades da 2.1.0
+
+- Biblioteca com capas maiores nas playlists, alternancia entre grade/lista e fila numerada.
+- Area de Aparencia dividida em Visual, Player e Estilos salvos.
+- Cor principal, secundaria e fundo personalizaveis. O fundo ajusta automaticamente texto e superficies; botoes usam texto com contraste.
+- Espacamento compacto/confortavel, texto padrao/maior, fonte sistema/mono/serifada, cantos retos/suaves/arredondados e capas quadradas/circulares.
+- Player com capa em destaque ou layout compacto e visualizador em barras, onda de niveis ou desativado.
+- Favoritos entre os 68 temas, filtro de favoritos e busca.
+- Ate 12 estilos pessoais salvos, aplicacao rapida e restauracao da aparencia sem apagar biblioteca ou estilos.
+- Playlists com mosaicos ou icones personalizados, sete simbolos e seis cores, com previa da capa.
+- Estilos, temas favoritos e capas personalizadas acompanham o backup de metadados.
+- A base de reproducao da 2.0 foi mantida; esta atualizacao nao depende do aplicativo de PC.
 
 ## O Que Foi Refeito
 

@@ -6,7 +6,7 @@ Seu player, do seu jeito. O Fluxo Music para Windows e o Fluxo Mobile para Andro
 
 ## Fluxo Mobile para Android
 
-**Versao mobile 2.0.0** | [Baixar o APK Android](https://github.com/Harleyzinn/fluxo/releases/download/mobile-v2.0.0/Fluxo-Mobile-2.0.0.apk) | [Release mobile](https://github.com/Harleyzinn/fluxo/releases/tag/mobile-v2.0.0) | [Guia de instalacao](fluxo-mobile/INSTALAR-NO-CELULAR.md)
+**Versao mobile 2.1.0** | [Baixar o APK Android](https://github.com/Harleyzinn/fluxo/releases/download/mobile-v2.1.0/Fluxo-Mobile-2.1.0.apk) | [Release mobile](https://github.com/Harleyzinn/fluxo/releases/tag/mobile-v2.1.0) | [Guia de instalacao](fluxo-mobile/INSTALAR-NO-CELULAR.md)
 
 App independente para **Android 7 ou superior**. Nao e um controle remoto: toca no proprio celular e nao precisa do computador ligado nem de um site hospedado.
 
@@ -15,6 +15,8 @@ App independente para **Android 7 ou superior**. Nao e um controle remoto: toca 
 - Reproducao com a tela apagada e controles de midia do Android.
 - 68 paletas adaptadas do desktop, favoritos, historico, fila editavel, temporizador, velocidade e equalizador.
 - Permissao de notificacoes quando necessaria; importacao pelo seletor de arquivos, sem acesso geral ao armazenamento.
+
+**Novidades da 2.1.0:** area de Aparencia dividida em Visual, Player e Estilos salvos; cores principal, secundaria e fundo; fontes e tamanho do texto; espacamento, cantos e formato das capas; temas favoritos; ate 12 estilos pessoais; capas de playlists com icones e cores; visualizadores em barras/onda e player compacto. Playlists alternam entre grade/lista e a fila mostra a ordem das faixas. A personalizacao acompanha o backup.
 
 Envie o APK ao celular, abra o arquivo e autorize a instalacao dessa origem quando o Android solicitar. Para ouvir offline, espere o download terminar. O APK publicado e uma compilacao de desenvolvimento para uso pessoal, nao uma versao da Play Store.
 

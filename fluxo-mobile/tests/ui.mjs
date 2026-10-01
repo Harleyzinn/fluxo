@@ -48,11 +48,11 @@ try {
   await page.getByRole('button', { name: /Temas do Fluxo/ }).click();
   assert.equal(await page.locator('.theme-tile').count(), 68);
   await page.getByRole('searchbox', { name: 'Encontrar tema' }).fill('manga');
-  await page.getByRole('button', { name: 'Tema Manga Edition' }).click();
+  await page.getByRole('button', { name: 'Tema Manga Edition', exact: true }).click();
   await page.getByRole('button', { name: 'Fechar', exact: true }).click();
   await page.screenshot({ path: '.qa/screenshots/light-theme.png', fullPage: true });
   await page.getByRole('button', { name: /Temas do Fluxo/ }).click();
-  await page.getByRole('button', { name: 'Tema Fluxo Bug' }).click();
+  await page.getByRole('button', { name: 'Tema Fluxo Bug', exact: true }).click();
   await page.getByRole('button', { name: 'Fechar', exact: true }).click();
   for (const viewport of [{ width: 320, height: 640 }, { width: 390, height: 844 }, { width: 820, height: 1180 }, { width: 1280, height: 800 }]) {
     await page.setViewportSize(viewport);

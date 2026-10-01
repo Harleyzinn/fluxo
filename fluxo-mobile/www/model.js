@@ -1,3 +1,4 @@
+import { normalizeSettings, playlistAppearance } from './appearance.js';
 export const cleanTrack = value => {
   if (!value || typeof value !== 'object') return null;
   const url = typeof value.url === 'string' ? value.url : '';
@@ -21,7 +22,8 @@ export function validateBackup(input) {
   if (!Array.isArray(input.playlists) || !Array.isArray(input.favorites)) throw new Error('Backup incompleto.');
   if (input.playlists.length > 500 || input.favorites.length > 20000) throw new Error('Backup grande demais.');
   return { ...input, favorites: unique(input.favorites), history: unique(input.history || []).slice(0, 100),
-    playlists: input.playlists.filter(p => p && Array.isArray(p.tracks)).map(p => ({ id: String(p.id || crypto.randomUUID()), title: String(p.title || 'Playlist').slice(0, 100), offlineOnly: !!p.offlineOnly, tracks: unique(p.tracks) })) };
+    settings: normalizeSettings(input.settings),
+    playlists: input.playlists.filter(p => p && Array.isArray(p.tracks)).map(p => ({ id: String(p.id || crypto.randomUUID()), title: String(p.title || 'Playlist').slice(0, 100), offlineOnly: !!p.offlineOnly, ...playlistAppearance(p), tracks: unique(p.tracks) })) };
 }
 export function loadModel(storage) {
   const read = (key, fallback) => { try { return JSON.parse(storage.getItem(key)) ?? fallback; } catch { return fallback; } };
@@ -33,5 +35,5 @@ export function loadModel(storage) {
 export function publicBackup(model) {
   const strip = tracks => unique(tracks).map(({ localUri, ...t }) => t);
   return { format: 'fluxo-mobile', version: 2, exportedAt: new Date().toISOString(), favorites: strip(model.favorites),
-    history: strip(model.history), playlists: model.playlists.map(p => ({ ...p, tracks: strip(p.tracks) })), settings: model.settings };
+    history: strip(model.history), playlists: model.playlists.map(p => ({ ...p, tracks: strip(p.tracks) })), settings: normalizeSettings(model.settings) };
 }

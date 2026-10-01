@@ -46,8 +46,9 @@ jobs:
         working-directory: .
         run: |
           mkdir -p fluxo-mobile/dist
-          cp fluxo-mobile/android/app/build/outputs/apk/debug/app-debug.apk fluxo-mobile/dist/Fluxo-Mobile-2.0.0.apk
-          git archive --format=zip -o fluxo-mobile/dist/Fluxo-Mobile-2.0.0-codigo.zip HEAD fluxo-mobile
+          version=$(node -p "require('./fluxo-mobile/package.json').version")
+          cp fluxo-mobile/android/app/build/outputs/apk/debug/app-debug.apk "fluxo-mobile/dist/Fluxo-Mobile-$version.apk"
+          git archive --format=zip -o "fluxo-mobile/dist/Fluxo-Mobile-$version-codigo.zip" HEAD fluxo-mobile
           cp fluxo-mobile/README.md fluxo-mobile/INSTALAR-NO-CELULAR.md fluxo-mobile/LICENSE fluxo-mobile/THIRD_PARTY.md fluxo-mobile/dist/
       - uses: actions/upload-artifact@v4
         with:

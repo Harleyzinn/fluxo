@@ -6,7 +6,11 @@ const shell = (...args) => execFileSync(adb, args, { encoding: 'utf8' }).trim();
 const pid = shell('shell', 'pidof', 'com.fluxo.music.mobile');
 shell('forward', 'tcp:9223', `localabstract:webview_devtools_remote_${pid}`);
 shell('shell', 'pm', 'grant', 'com.fluxo.music.mobile', 'android.permission.POST_NOTIFICATIONS');
-const browser = await chromium.connectOverCDP('http://127.0.0.1:9223');
+let browser;
+for (let i = 0; i < 20; i++) {
+  try { browser = await chromium.connectOverCDP('http://127.0.0.1:9223'); break; }
+  catch (error) { if (i === 19) throw error; await new Promise(resolve => setTimeout(resolve, 300)); }
+}
 const page = browser.contexts()[0].pages()[0];
 try {
   await page.locator('.navigation [data-tab=settings]').click();
@@ -25,5 +29,28 @@ try {
   await page.screenshot({ path: '.qa/screenshots/final-apk-player.png' });
   await page.getByRole('button', { name: 'Pausar', exact: true }).last().click();
   await page.getByRole('button', { name: 'Minimizar player' }).click();
-  console.log('Final APK UI passed: 68 themes, light mode, downloaded playback, player controls.');
+  await page.locator('.navigation [data-tab=settings]').click();
+  await page.getByRole('button', { name: /Personalizar aparência/ }).click();
+  await page.getByRole('combobox', { name: 'Espaçamento', exact: true }).selectOption('compact');
+  await page.getByRole('combobox', { name: 'Formato das capas', exact: true }).selectOption('round');
+  await page.getByRole('tab', { name: 'Player', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Layout do player', exact: true }).selectOption('compact');
+  await page.getByRole('combobox', { name: 'Visualizador', exact: true }).selectOption('wave');
+  await page.getByRole('button', { name: 'Abrir player', exact: true }).first().click();
+  await page.waitForTimeout(350);
+  assert.equal(await page.evaluate(() => document.body.dataset.playerLayout), 'compact');
+  assert.ok(await page.locator('#player .player-footer').evaluate(el => el.getBoundingClientRect().bottom <= innerHeight + 1));
+  await page.screenshot({ path: '.qa/screenshots/native-2.1-compact.png' });
+  await page.getByRole('button', { name: 'Minimizar player' }).click();
+  await page.getByRole('tab', { name: 'Estilos salvos', exact: true }).click();
+  await page.getByRole('button', { name: 'Salvar estilo atual', exact: true }).first().click();
+  await page.getByRole('textbox', { name: 'Nome do estilo' }).fill('Meu player Android');
+  await page.getByRole('button', { name: 'Salvar estilo', exact: true }).click();
+  await page.getByRole('button', { name: 'Restaurar aparência', exact: true }).click();
+  await page.getByRole('button', { name: 'Confirmar', exact: true }).click();
+  await page.locator('[data-action=apply-profile]').last().click();
+  assert.equal(await page.evaluate(() => document.body.dataset.playerLayout), 'compact');
+  await page.getByRole('button', { name: 'Voltar aos ajustes', exact: true }).click();
+  await page.locator('.navigation [data-tab=library]').click();
+  console.log('Final APK UI passed: 68 themes, light mode, downloaded playback, compact player, artwork shape, saved styles, reset and player controls.');
 } finally { await browser.close(); }

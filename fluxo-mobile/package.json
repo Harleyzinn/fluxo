@@ -1,6 +1,6 @@
 {
   "name": "fluxo-mobile",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
   "license": "GPL-3.0-or-later",
   "description": "Fluxo Music Mobile - app independente em Capacitor",
@@ -8,6 +8,7 @@
   "scripts": {
     "test": "node --test tests/model.test.mjs",
     "test:ui": "node tests/ui.mjs",
+    "test:appearance": "node tests/appearance-ui.mjs",
     "prepare:assets": "node scripts/prepare-assets.mjs",
     "dev": "node scripts/serve.mjs",
     "android:debug": "powershell -ExecutionPolicy Bypass -File scripts/build-android-debug.ps1",

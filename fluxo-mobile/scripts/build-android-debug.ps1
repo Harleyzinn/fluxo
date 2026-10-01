@@ -49,7 +49,7 @@ try {
 
 Push-Location $androidDir
 try {
-  & .\gradlew.bat assembleDebug
+  & .\gradlew.bat assembleDebug --no-daemon
   if ($LASTEXITCODE -ne 0) { throw 'A compilacao falhou. Nenhum APK novo foi gerado.' }
 } finally {
   Pop-Location
@@ -62,6 +62,7 @@ if (-not (Test-Path -LiteralPath $apkPath)) {
 Write-Host "APK gerado em: $apkPath"
 $deliveryDir = Join-Path $projectRoot 'dist'
 New-Item -ItemType Directory -Path $deliveryDir -Force | Out-Null
-$deliveryApk = Join-Path $deliveryDir 'Fluxo-Mobile-2.0.0.apk'
+$version = (Get-Content -Raw -LiteralPath (Join-Path $projectRoot 'package.json') | ConvertFrom-Json).version
+$deliveryApk = Join-Path $deliveryDir "Fluxo-Mobile-$version.apk"
 Copy-Item -LiteralPath $apkPath -Destination $deliveryApk -Force
 Write-Host "Pronto para instalar: $deliveryApk"
