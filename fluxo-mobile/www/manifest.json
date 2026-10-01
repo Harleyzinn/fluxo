@@ -1,0 +1,9 @@
+{
+  "name": "Fluxo Mobile",
+  "short_name": "Fluxo",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#05070d",
+  "theme_color": "#00f0ff",
+  "icons": []
+}

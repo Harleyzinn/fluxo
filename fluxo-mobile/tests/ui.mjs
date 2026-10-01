@@ -1,0 +1,74 @@
+import { createRequire } from 'node:module';
+import { mkdir } from 'node:fs/promises';
+import assert from 'node:assert/strict';
+const require = createRequire(import.meta.url);
+const { chromium } = require('playwright');
+await mkdir('.qa/screenshots', { recursive: true });
+const browser = await chromium.launch({ headless: true, channel: process.env.BROWSER_CHANNEL || 'msedge' });
+const errors = [];
+try {
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  page.on('pageerror', e => errors.push(e.message));
+  await page.goto(process.env.TEST_URL || 'http://127.0.0.1:5174');
+  await page.getByRole('heading', { name: 'Sua biblioteca' }).waitFor();
+  await page.screenshot({ path: '.qa/screenshots/library-empty.png', fullPage: true });
+  await page.getByRole('button', { name: 'Criar playlist', exact: true }).first().click();
+  await page.getByRole('textbox', { name: 'Nome da playlist' }).fill('Minha seleção offline');
+  await page.getByRole('button', { name: 'Salvar playlist' }).click();
+  await page.getByRole('heading', { name: 'Minha seleção offline' }).waitFor();
+  const chooserPromise = page.waitForEvent('filechooser');
+  await page.locator('.topbar [data-action=import]').click();
+  const chooser = await chooserPromise;
+  const rate = 8000, seconds = 18;
+  const wav = Buffer.alloc(44 + rate * seconds * 2);
+  wav.write('RIFF'); wav.writeUInt32LE(wav.length - 8, 4); wav.write('WAVEfmt ', 8); wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22); wav.writeUInt32LE(rate, 24); wav.writeUInt32LE(rate * 2, 28); wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34); wav.write('data', 36); wav.writeUInt32LE(wav.length - 44, 40);
+  for (let i = 0; i < rate * seconds; i++) wav.writeInt16LE(Math.round(1000 * Math.sin(i * 2 * Math.PI * 440 / rate)), 44 + i * 2);
+  await chooser.setFiles([{ name: 'Primeira faixa.wav', mimeType: 'audio/wav', buffer: wav }, { name: 'Segunda faixa.wav', mimeType: 'audio/wav', buffer: wav }]);
+  await page.getByRole('button', { name: 'Tocar Primeira faixa', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Tocar Primeira faixa', exact: true }).click();
+  await page.getByRole('button', { name: 'Pausar', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Abrir player', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Reproduzindo agora' }).waitFor();
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: '.qa/screenshots/player.png', fullPage: true });
+  await page.getByRole('button', { name: 'Favoritar', exact: true }).click();
+  await page.getByRole('button', { name: 'Minimizar player' }).click();
+  await page.getByRole('tab', { name: 'Coleções' }).click();
+  await page.getByRole('button', { name: /Minha seleção offline/ }).click();
+  await page.getByRole('button', { name: 'Adicionar músicas', exact: true }).first().click();
+  await page.locator('#playlist-tracks input').first().check();
+  await page.getByRole('button', { name: 'Adicionar selecionadas' }).click();
+  await page.getByRole('button', { name: 'Reproduzir', exact: true }).first().click();
+  await page.locator('.navigation [data-tab=settings]').click();
+  await page.getByRole('checkbox', { name: 'Modo offline' }).check();
+  await page.locator('.navigation [data-tab=search]').click();
+  await page.getByRole('heading', { name: 'Você está offline' }).waitFor();
+  await page.locator('.navigation [data-tab=settings]').click();
+  await page.getByRole('checkbox', { name: 'Modo offline' }).uncheck();
+  await page.getByRole('button', { name: /Temas do Fluxo/ }).click();
+  assert.equal(await page.locator('.theme-tile').count(), 68);
+  await page.getByRole('searchbox', { name: 'Encontrar tema' }).fill('manga');
+  await page.getByRole('button', { name: 'Tema Manga Edition' }).click();
+  await page.getByRole('button', { name: 'Fechar', exact: true }).click();
+  await page.screenshot({ path: '.qa/screenshots/light-theme.png', fullPage: true });
+  await page.getByRole('button', { name: /Temas do Fluxo/ }).click();
+  await page.getByRole('button', { name: 'Tema Fluxo Bug' }).click();
+  await page.getByRole('button', { name: 'Fechar', exact: true }).click();
+  for (const viewport of [{ width: 320, height: 640 }, { width: 390, height: 844 }, { width: 820, height: 1180 }, { width: 1280, height: 800 }]) {
+    await page.setViewportSize(viewport);
+    for (const tab of ['library', 'search', 'queue', 'settings']) {
+      await page.locator(`.navigation [data-tab=${tab}]`).click();
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `Overflow ${viewport.width} ${tab}`);
+      await page.screenshot({ path: `.qa/screenshots/${tab}-${viewport.width}.png`, fullPage: true });
+    }
+    await page.getByRole('button', { name: 'Abrir player', exact: true }).click();
+    await page.waitForTimeout(250);
+    assert.ok(await page.locator('#player .player-footer').evaluate(el => el.getBoundingClientRect().bottom <= innerHeight + 1), `Player controls overflow ${viewport.width}x${viewport.height}`);
+    await page.screenshot({ path: `.qa/screenshots/player-${viewport.width}.png` });
+    await page.getByRole('button', { name: 'Minimizar player' }).click();
+  }
+  await page.reload();
+  assert.ok(await page.evaluate(() => JSON.parse(localStorage.fluxo_mobile_v2).playlists[0].tracks.length === 1));
+  assert.deepEqual(errors, []);
+  console.log('UI passed: import, playback, favorites, offline playlist, themes, persistence, 16 responsive views.');
+} finally { await browser.close(); }

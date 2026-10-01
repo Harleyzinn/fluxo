@@ -1,0 +1,14 @@
+{
+  "appId": "com.fluxo.music.mobile",
+  "appName": "Fluxo Mobile",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    }
+  }
+}

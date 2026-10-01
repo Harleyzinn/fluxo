@@ -1,0 +1,53 @@
+name: Fluxo Mobile - Android APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'fluxo-mobile/**'
+      - '.github/workflows/mobile-android.yml'
+  pull_request:
+    paths:
+      - 'fluxo-mobile/**'
+      - '.github/workflows/mobile-android.yml'
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: fluxo-mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: fluxo-mobile/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - run: npm ci
+      - run: npm test
+      - run: npm run prepare:assets
+      - run: npx cap sync android
+      - run: chmod +x android/gradlew
+      - run: ./gradlew assembleDebug --no-daemon
+        working-directory: fluxo-mobile/android
+      - name: Preparar arquivos para download
+        working-directory: .
+        run: |
+          mkdir -p fluxo-mobile/dist
+          cp fluxo-mobile/android/app/build/outputs/apk/debug/app-debug.apk fluxo-mobile/dist/Fluxo-Mobile-2.0.0.apk
+          git archive --format=zip -o fluxo-mobile/dist/Fluxo-Mobile-2.0.0-codigo.zip HEAD fluxo-mobile
+          cp fluxo-mobile/README.md fluxo-mobile/INSTALAR-NO-CELULAR.md fluxo-mobile/LICENSE fluxo-mobile/THIRD_PARTY.md fluxo-mobile/dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Fluxo-Mobile-Android
+          path: fluxo-mobile/dist/
+          if-no-files-found: error

@@ -1,10 +1,28 @@
 # Fluxo Music
 
-Seu player, do seu jeito. Musica do YouTube e SoundCloud, dezenas de temas, ferramentas de audio e salas para ouvir junto, em um aplicativo para Windows.
+Seu player, do seu jeito. O Fluxo Music para Windows e o Fluxo Mobile para Android compartilham a identidade do projeto, com aplicativos independentes para cada plataforma.
 
 **Versao 3.9.33** | [Baixar o Fluxo](https://github.com/Harleyzinn/fluxo/releases/latest) | [Todas as releases](https://github.com/Harleyzinn/fluxo/releases) | [Apoiar no LivePix](https://livepix.gg/devpotato)
 
-## Baixar e instalar
+## Fluxo Mobile para Android
+
+**Versao mobile 2.0.0** | [Baixar o APK Android](https://github.com/Harleyzinn/fluxo/releases/download/mobile-v2.0.0/Fluxo-Mobile-2.0.0.apk) | [Release mobile](https://github.com/Harleyzinn/fluxo/releases/tag/mobile-v2.0.0) | [Guia de instalacao](fluxo-mobile/INSTALAR-NO-CELULAR.md)
+
+App independente para **Android 7 ou superior**. Nao e um controle remoto: toca no proprio celular e nao precisa do computador ligado nem de um site hospedado.
+
+- Interface compacta com Biblioteca, Buscar, Fila e Ajustes, capas, miniplayer e player expandido com visualizador.
+- Busca de audio no YouTube, importacao de arquivos, downloads e playlists para tocar offline.
+- Reproducao com a tela apagada e controles de midia do Android.
+- 68 paletas adaptadas do desktop, favoritos, historico, fila editavel, temporizador, velocidade e equalizador.
+- Permissao de notificacoes quando necessaria; importacao pelo seletor de arquivos, sem acesso geral ao armazenamento.
+
+Envie o APK ao celular, abra o arquivo e autorize a instalacao dessa origem quando o Android solicitar. Para ouvir offline, espere o download terminar. O APK publicado e uma compilacao de desenvolvimento para uso pessoal, nao uma versao da Play Store.
+
+Busca, streaming, download, reproducao offline e tela apagada foram verificados em emulador Android. Servicos externos e restricoes de bateria do aparelho podem afetar o funcionamento. As 68 opcoes mobile sao paletas: nao incluem todos os layouts, animacoes ou recursos exclusivos do desktop. Nao ha versao iOS nesta entrega.
+
+Codigo e instrucoes de compilacao: [fluxo-mobile](fluxo-mobile/README.md). O mobile e distribuido sob **GPL-3.0-or-later**, com codigo correspondente e avisos de terceiros na release. As versoes Windows continuam com seus downloads e atualizacoes separados.
+
+## Baixar e instalar no Windows
 
 Nao precisa usar terminal, clonar o repositorio ou instalar Node.js.
 

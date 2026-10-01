@@ -1,0 +1,101 @@
+import { createRequire } from 'node:module';
+import { execFileSync } from 'node:child_process';
+import { readFile, writeFile } from 'node:fs/promises';
+import assert from 'node:assert/strict';
+const { chromium } = createRequire(import.meta.url)('playwright');
+const adb = `${process.env.LOCALAPPDATA}/Android/Sdk/platform-tools/adb.exe`;
+const shell = (...args) => execFileSync(adb, args, { encoding: 'utf8' }).trim();
+const pid = shell('shell', 'pidof', 'com.fluxo.music.mobile');
+shell('forward', 'tcp:9223', `localabstract:webview_devtools_remote_${pid}`);
+const browser = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const page = browser.contexts()[0].pages()[0];
+const call = (method, data = {}) => page.evaluate(async ({ method, data }) => window.Capacitor.Plugins.FluxoAudio[method](data), { method, data });
+const delay = ms => new Promise(r => setTimeout(r, ms));
+const report = {};
+async function waitFor(test, timeout = 40000) {
+  const start = Date.now();
+  while (Date.now() - start < timeout) { const s = await call('getState'); if (test(s)) return s; await delay(500); }
+  throw new Error('Timed out: ' + JSON.stringify(await call('getState')));
+}
+try {
+  const track = JSON.parse(await readFile('.qa/youtube-results.json', 'utf8'))[0];
+  const started = Date.now();
+  await call('setQueue', { tracks: [track], index: 0 });
+  await waitFor(s => s.playing);
+  report.cachedStartMs = Date.now() - started;
+  await call('command', { action: 'seek', value: 20 });
+  await waitFor(s => s.position >= 20 && s.playing);
+  const metered = await waitFor(s => s.levels?.some(value => value > 0.01));
+  report.audioMeter = metered.levels.length === 32;
+  await page.getByRole('button', { name: 'Abrir player', exact: true }).click();
+  await delay(350);
+  assert.ok(await page.locator('#audio-visual').evaluate(canvas => {
+    const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+    return pixels.some((value, i) => i % 4 === 3 && value > 0);
+  }), 'Audio visualizer must render');
+  await page.screenshot({ path: '.qa/screenshots/mobile-final-player.png' });
+  await page.getByRole('button', { name: 'Minimizar player' }).click();
+  await call('command', { action: 'pause' });
+  assert.equal((await call('getState')).playing, false);
+  await call('command', { action: 'play' });
+  await waitFor(s => s.playing);
+  const before = (await call('getState')).position;
+  shell('shell', 'input', 'keyevent', 'KEYCODE_HOME');
+  shell('shell', 'input', 'keyevent', 'KEYCODE_SLEEP');
+  await delay(8000);
+  report.screenAsleep = shell('shell', 'dumpsys', 'power').includes('mWakefulness=Asleep');
+  const background = await call('getState');
+  assert.ok(background.playing && background.position > before + 5, 'Playback must continue with screen off');
+  report.screenOffPlayback = { playing: background.playing, advancedSeconds: background.position - before };
+  report.mediaSession = shell('shell', 'dumpsys', 'media_session').includes('com.fluxo.music.mobile');
+  shell('shell', 'input', 'keyevent', 'KEYCODE_WAKEUP');
+  shell('shell', 'wm', 'dismiss-keyguard');
+  shell('shell', 'am', 'start', '-n', 'com.fluxo.music.mobile/.MainActivity');
+  await call('download', { track, wifiOnly: false });
+  let local;
+  for (let i = 0; i < 300; i++) {
+    const records = (await call('downloads')).tracks;
+    local = records.find(t => t.id === track.id);
+    if (local?.status === 'failed') throw new Error('Android DownloadManager failed');
+    if (local?.status === 'ready') break;
+    await delay(1000);
+  }
+  assert.equal(local?.status, 'ready');
+  report.downloadBytes = local.bytes;
+  shell('shell', 'svc', 'wifi', 'disable');
+  shell('shell', 'svc', 'data', 'disable');
+  await call('setQueue', { tracks: [local, { ...local, id: local.id + '-second', title: 'Queue test' }], index: 0 });
+  await waitFor(s => s.playing);
+  await call('command', { action: 'next' });
+  await waitFor(s => s.playing && s.index === 1);
+  await call('command', { action: 'speed', value: 1.25 });
+  assert.equal((await call('getState')).speed, 1.25);
+  await call('command', { action: 'repeat', value: 1 });
+  assert.equal((await call('getState')).repeat, 1);
+  await call('command', { action: 'shuffle', value: 1 });
+  assert.equal((await call('getState')).shuffle, true);
+  await call('command', { action: 'sleep', value: 0.03 });
+  await delay(3000);
+  assert.equal((await call('getState')).playing, false);
+  report.offlinePlaybackAndControls = true;
+  await page.screenshot({ path: '.qa/screenshots/android-offline.png' });
+  shell('shell', 'svc', 'wifi', 'enable');
+  shell('shell', 'svc', 'data', 'enable');
+  await call('command', { action: 'repeat', value: 0 });
+  await call('command', { action: 'shuffle', value: 0 });
+  await call('command', { action: 'speed', value: 1 });
+  await call('setQueue', { tracks: [{ id: 'bad', title: 'Unavailable test', artist: '', url: 'https://example.invalid/audio.mp3' }], index: 0 });
+  const failure = await waitFor(s => !!s.error, 40000);
+  assert.equal(failure.buffering, false);
+  report.failureTerminates = true;
+  await call('setQueue', { tracks: [local], index: 0 });
+  await waitFor(s => s.playing);
+  await call('command', { action: 'pause' });
+  console.log(JSON.stringify(report, null, 2));
+  await writeFile('.qa/native-playback-report.json', JSON.stringify(report, null, 2));
+} finally {
+  shell('shell', 'svc', 'wifi', 'enable');
+  shell('shell', 'svc', 'data', 'enable');
+  shell('shell', 'input', 'keyevent', 'KEYCODE_WAKEUP');
+  await browser.close();
+}

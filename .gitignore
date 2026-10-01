@@ -35,7 +35,6 @@ database-debug.log
 .runtimeconfig.json
 
 fluxo-mobile/node_modules/
-fluxo-mobile/
 fluxo-mobile/android/.gradle/
 fluxo-mobile/android/**/.gradle/
 fluxo-mobile/android/**/build/

@@ -1,0 +1,12 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { cleanTrack, unique, duration, filterTracks, validateBackup, loadModel, publicBackup } from '../www/model.js';
+const track = { id: 'one', title: 'Canção', artist: 'Álvaro', duration: 65, url: 'https://example.com/a.mp3' };
+test('normalizes tracks and rejects invalid entries', () => { assert.equal(cleanTrack(null), null); assert.equal(cleanTrack({}), null); assert.equal(cleanTrack({ ...track, duration: -2 }).duration, 0); });
+test('deduplicates playlists and favorites', () => assert.equal(unique([track, track, null]).length, 1));
+test('migrates original IDs from old offline tracks', () => assert.equal(cleanTrack({ ...track, id: 'offline-one', originalId: 'one' }).id, 'one'));
+test('filters accents and sorts tracks', () => { assert.equal(filterTracks([track], 'cancao').length, 1); assert.equal(filterTracks([track], 'alvaro').length, 1); assert.equal(filterTracks([track], 'other').length, 0); });
+test('formats durations safely', () => { assert.equal(duration(65), '1:05'); assert.equal(duration(NaN), '0:00'); assert.equal(duration(-10), '0:00'); });
+test('preserves old user data on migration', () => { const storage = { getItem: k => k === 'fluxo_mobile_favorites' ? JSON.stringify([track]) : null }; assert.equal(loadModel(storage).favorites[0].id, 'one'); });
+test('backup contains no device private paths', () => { const data = publicBackup({ favorites: [{ ...track, localUri: 'file:///private/file' }], history: [], playlists: [], settings: {} }); assert.equal(data.favorites[0].localUri, undefined); assert.equal(validateBackup(data).favorites.length, 1); });
+test('rejects invalid backup before overwriting data', () => { assert.throws(() => validateBackup({})); assert.throws(() => validateBackup({ format: 'fluxo-mobile', version: 2, playlists: null, favorites: [] })); });
