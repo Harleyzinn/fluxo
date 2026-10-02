@@ -46,7 +46,13 @@ audio.addEventListener('waiting', () => { state.buffering = true; emit(); });
 audio.addEventListener('error', () => { clearTimeout(timeout); state.buffering = false; state.error = 'Não foi possível abrir este áudio.'; emit(); });
 audio.addEventListener('timeupdate', () => { state.position = audio.currentTime; state.duration = Number.isFinite(audio.duration) ? audio.duration : 0; emit(); });
 audio.addEventListener('loadedmetadata', () => { state.duration = Number.isFinite(audio.duration) ? audio.duration : 0; emit(); });
-audio.addEventListener('ended', () => { if (state.repeat === 1) return browserPlay(); if (state.index + 1 < state.queue.length || state.repeat === 2) commands.command({ action: 'next' }); });
+audio.addEventListener('ended', () => {
+  state.playing = false;
+  if (state.sleepEnd) { state.sleepEnd = false; emit(); return; }
+  if (state.repeat === 1) return browserPlay();
+  if (state.index + 1 < state.queue.length || state.repeat === 2 || state.radio) commands.command({ action: 'next' });
+  else emit();
+});
 setInterval(() => { if (state.sleepAt && Date.now() >= state.sleepAt) { audio.pause(); state.sleepAt = 0; emit(); } }, 1000);
 export const commands = {
   async migrateOldDownloads(onProgress) {
@@ -73,7 +79,15 @@ export const commands = {
       for (let i = 0; i < 8; i++) { try { state = await plugin.getState(); emit(); break; } catch (e) { if (i === 7) throw e; await new Promise(r => setTimeout(r, 250)); } }
     } else emit();
   },
-  async setQueue(options) { if (native) return plugin.setQueue(options); state.queue = options.tracks; state.index = options.index || 0; await browserPlay(); },
+  async setQueue(options) { if (native) return plugin.setQueue(options); state.radio = false; state.queue = options.tracks; state.index = options.index || 0; await browserPlay(); },
+  async radio(track, offline, tracks) {
+    if (native) return plugin.radio({ track, offline });
+    if (!offline) throw new Error('O rádio online está disponível no aplicativo Android.');
+    state.queue = [track, ...tracks.filter(t => t.id !== track.id).sort(() => Math.random() - .5).map(t => ({ ...t, radioGenerated: true }))];
+    state.index = 0; state.radio = true; state.radioOffline = true; state.radioSeed = track; state.repeat = 0; state.shuffle = false;
+    await browserPlay();
+  },
+  async syncLibrary(tracks, enabled, wifiOnly, retry = false) { if (native) await plugin.syncLibrary({ tracks, enabled, wifiOnly, retry }); },
   async append(options) { if (native) return plugin.append(options); state.queue.splice(options.next ? state.index + 1 : state.queue.length, 0, options.track); emit(); },
   async command(options) {
     if (native) return plugin.command(options);
@@ -85,13 +99,14 @@ export const commands = {
       case 'previous': if (audio.currentTime > 3) audio.currentTime = 0; else { state.index = Math.max(0, state.index - 1); await browserPlay(); } break;
       case 'jump': state.index = index; await browserPlay(); break;
       case 'seek': audio.currentTime = value; break;
-      case 'clear': audio.pause(); state.queue = []; state.index = 0; break;
+      case 'clear': audio.pause(); state.radio = false; state.queue = []; state.index = 0; break;
+      case 'radio-stop': state.radio = false; state.queue = state.queue.filter((track, i) => i <= state.index || !track.radioGenerated); break;
       case 'remove': state.queue.splice(index, 1); if (index < state.index) state.index--; else if (index === state.index) { state.index = Math.min(state.index, state.queue.length - 1); await browserPlay(); } break;
       case 'move': { const current = state.queue[state.index]; const [item] = state.queue.splice(index, 1); state.queue.splice(value, 0, item); state.index = state.queue.indexOf(current); break; }
       case 'repeat': state.repeat = value; break;
       case 'shuffle': state.shuffle = !!value; break;
       case 'speed': state.speed = value; audio.playbackRate = value; break;
-      case 'sleep': state.sleepAt = value ? Date.now() + value * 60000 : 0; break;
+      case 'sleep': state.sleepEnd = value === -1; state.sleepAt = value > 0 ? Date.now() + value * 60000 : 0; break;
     } emit();
   },
   async search(query, provider) { if (!native) throw new Error('A busca online está disponível no aplicativo Android.'); return (await plugin.search({ query, provider })).tracks; },
@@ -113,6 +128,8 @@ export const commands = {
     return { tracks: files };
   },
   async notifications() { if (native) return plugin.notifications(); },
+  async diagnostics() { return native ? plugin.diagnostics() : { notifications: false, batteryUnrestricted: false, manufacturer: 'Prévia', model: '', android: '', foreground: false }; },
+  async openSettings(page) { if (native) return plugin.openSettings({ page }); },
   async exportBackup(data) {
     if (native) return plugin.exportBackup({ data });
     const url = URL.createObjectURL(new Blob([data], { type: 'application/json' }));

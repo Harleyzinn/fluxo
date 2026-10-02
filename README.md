@@ -6,13 +6,15 @@ Seu player, do seu jeito. O Fluxo Music para Windows e o Fluxo Mobile para Andro
 
 ## Fluxo Mobile para Android
 
-**Versao mobile 2.1.0** | [Baixar o APK Android](https://github.com/Harleyzinn/fluxo/releases/download/mobile-v2.1.0/Fluxo-Mobile-2.1.0.apk) | [Release mobile](https://github.com/Harleyzinn/fluxo/releases/tag/mobile-v2.1.0) | [Guia de instalacao](fluxo-mobile/INSTALAR-NO-CELULAR.md)
+**Versao mobile 2.2.0** | [Baixar o APK Android](https://github.com/Harleyzinn/fluxo/releases/download/mobile-v2.2.0/Fluxo-Mobile-2.2.0.apk) | [Release mobile](https://github.com/Harleyzinn/fluxo/releases/tag/mobile-v2.2.0) | [Guia de instalacao](fluxo-mobile/INSTALAR-NO-CELULAR.md)
 
 App independente para **Android 7 ou superior**. Nao e um controle remoto: toca no proprio celular e nao precisa do computador ligado nem de um site hospedado.
 
 - Interface compacta com Biblioteca, Buscar, Fila e Ajustes, capas, miniplayer e player expandido com visualizador.
-- Busca de audio no YouTube, importacao de arquivos, downloads e playlists para tocar offline.
-- Reproducao com a tela apagada e controles de midia do Android.
+- Busca de audio no YouTube, importacao de arquivos, downloads automaticos da biblioteca e playlists offline.
+- Infinite Radio opcional online/offline; tocar uma musica nao enfileira toda a lista.
+- Servico de audio em primeiro plano, tela apagada e central de midia com controles na notificacao.
+- Central de downloads, recuperacao de conexao, timer ao fim da faixa e ajustes de bateria/notificacoes para HyperOS.
 - 68 paletas adaptadas do desktop, favoritos, historico, fila editavel, temporizador, velocidade e equalizador.
 - Permissao de notificacoes quando necessaria; importacao pelo seletor de arquivos, sem acesso geral ao armazenamento.
 

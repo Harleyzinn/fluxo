@@ -1,8 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cleanTrack, unique, duration, filterTracks, validateBackup, loadModel, publicBackup } from '../www/model.js';
+import { cleanTrack, unique, libraryTracks, duration, filterTracks, validateBackup, loadModel, publicBackup } from '../www/model.js';
 import { normalizeSettings, normalizeAppearance, playlistAppearance, contrastText, surfacePalette } from '../www/appearance.js';
 const track = { id: 'one', title: 'Canção', artist: 'Álvaro', duration: 65, url: 'https://example.com/a.mp3' };
+test('library downloads include saved, favorites and playlists but never history', () => {
+  const history = { ...track, id: 'history' };
+  assert.deepEqual(libraryTracks({ library: [track], favorites: [track], playlists: [{ tracks: [track] }], history: [history] }).map(t => t.id), ['one']);
+});
+test('automatic downloads default on and survive normalization and backup', () => {
+  assert.equal(normalizeSettings({}).autoDownload, true);
+  const data = publicBackup({ library: [track], favorites: [], history: [], playlists: [], settings: { autoDownload: false, wifiOnly: true } });
+  const copy = validateBackup(data);
+  assert.equal(copy.library[0].id, track.id); assert.equal(copy.settings.autoDownload, false); assert.equal(copy.settings.wifiOnly, true);
+});
+test('public backup removes artwork private paths and rejects invalid library', () => {
+  const data = publicBackup({ library: [{ ...track, thumbnail: 'file:///private/cover.jpg' }], favorites: [], history: [], playlists: [], settings: {} });
+  assert.equal(data.library[0].thumbnail, ''); assert.throws(() => validateBackup({ ...data, library: 'invalid' }));
+});
 test('normalizes tracks and rejects invalid entries', () => { assert.equal(cleanTrack(null), null); assert.equal(cleanTrack({}), null); assert.equal(cleanTrack({ ...track, duration: -2 }).duration, 0); });
 test('deduplicates playlists and favorites', () => assert.equal(unique([track, track, null]).length, 1));
 test('migrates original IDs from old offline tracks', () => assert.equal(cleanTrack({ ...track, id: 'offline-one', originalId: 'one' }).id, 'one'));

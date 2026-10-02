@@ -35,7 +35,7 @@ public class FluxoAudioPlugin extends Plugin {
     private LibraryStore library;
     @Override public void load() {
         current = new WeakReference<>(this);
-        library = new LibraryStore(getContext());
+        library = LibraryStore.get(getContext());
         getContext().startService(new Intent(getContext(), PlaybackService.class));
     }
     static void emit(String event, JSONObject value) {
@@ -57,6 +57,9 @@ public class FluxoAudioPlugin extends Plugin {
         });
     }
     @PluginMethod public void getState(PluginCall call) { player(call, () -> {}); }
+    @PluginMethod public void radio(PluginCall call) {
+        player(call, () -> PlaybackService.instance.startRadio(call.getObject("track"), call.getBoolean("offline", false)));
+    }
     @PluginMethod public void setQueue(PluginCall call) {
         player(call, () -> PlaybackService.instance.setQueue(call.getArray("tracks", new JSArray()), call.getInt("index", 0), true));
     }
@@ -75,17 +78,39 @@ public class FluxoAudioPlugin extends Plugin {
         async(call, () -> call.resolve(new JSObject().put("tracks", StreamResolver.search(call.getString("query", ""), call.getString("provider", "youtube")))));
     }
     @PluginMethod public void downloads(PluginCall call) {
-        async(call, () -> call.resolve(new JSObject().put("tracks", library.list())));
+        async(call, () -> {
+            JSONArray tracks = library.list(); JSONArray pending = LibrarySync.pending(getContext());
+            for (int i = 0; i < pending.length(); i++) {
+                JSONObject candidate = pending.getJSONObject(i); boolean found = false;
+                for (int j = 0; j < tracks.length(); j++) if (tracks.getJSONObject(j).optString("id").equals(candidate.optString("id"))) { found = true; break; }
+                if (!found) tracks.put(candidate);
+            }
+            call.resolve(new JSObject().put("tracks", tracks));
+        });
+    }
+    @PluginMethod public void syncLibrary(PluginCall call) {
+        async(call, () -> {
+            LibrarySync.sync(getContext(), call.getArray("tracks", new JSArray()), call.getBoolean("enabled", true), call.getBoolean("wifiOnly", false), call.getBoolean("retry", false));
+            call.resolve();
+        });
     }
     @PluginMethod public void download(PluginCall call) {
         async(call, () -> {
             JSONObject track = call.getObject("track");
+            JSONArray records = library.list();
+            for (int i = 0; i < records.length(); i++) {
+                JSONObject existing = records.getJSONObject(i);
+                if (existing.optString("id").equals(track.optString("id")) && !existing.optString("status").equals("failed")) {
+                    call.resolve(JSObject.fromJSONObject(existing)); return;
+                }
+            }
+            LibrarySync.unblock(getContext(), track.optString("id"));
             String url = StreamResolver.resolve(track.optString("url"));
             call.resolve(JSObject.fromJSONObject(library.download(track, url, call.getBoolean("wifiOnly", false))));
         });
     }
     @PluginMethod public void removeDownload(PluginCall call) {
-        async(call, () -> { library.remove(call.getString("id", "")); call.resolve(); });
+        async(call, () -> { String id = call.getString("id", ""); LibrarySync.block(getContext(), id); library.remove(id); call.resolve(); });
     }
     @PluginMethod public void migrateAudio(PluginCall call) {
         async(call, () -> {
@@ -105,6 +130,22 @@ public class FluxoAudioPlugin extends Plugin {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("audio/*")
             .addCategory(Intent.CATEGORY_OPENABLE).putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
         startActivityForResult(call, intent, "audioPicked");
+    }
+    @PluginMethod public void diagnostics(PluginCall call) {
+        var power = (android.os.PowerManager)getContext().getSystemService(android.content.Context.POWER_SERVICE);
+        call.resolve(new JSObject().put("notifications", androidx.core.app.NotificationManagerCompat.from(getContext()).areNotificationsEnabled())
+            .put("batteryUnrestricted", power.isIgnoringBatteryOptimizations(getContext().getPackageName()))
+            .put("manufacturer", Build.MANUFACTURER).put("model", Build.MODEL).put("android", Build.VERSION.RELEASE)
+            .put("foreground", PlaybackService.instance != null && PlaybackService.instance.isPlaybackOngoing()));
+    }
+    @PluginMethod public void openSettings(PluginCall call) {
+        String page = call.getString("page", "app");
+        Intent intent = page.equals("notifications") ? new Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+            .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, getContext().getPackageName())
+            : page.equals("battery") ? new Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+            : new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getContext().getPackageName()));
+        try { getActivity().startActivity(intent); call.resolve(); }
+        catch (Exception failure) { call.reject("Nao foi possivel abrir os ajustes do dispositivo."); }
     }
     @ActivityCallback private void audioPicked(PluginCall call, ActivityResult result) {
         if (call == null) return;

@@ -27,6 +27,9 @@ try {
   await page.getByRole('button', { name: 'Tocar Primeira faixa', exact: true }).waitFor();
   await page.getByRole('button', { name: 'Tocar Primeira faixa', exact: true }).click();
   await page.getByRole('button', { name: 'Pausar', exact: true }).waitFor();
+  await page.locator('.navigation [data-tab=queue]').click();
+  assert.equal(await page.locator('#view .track').count(), 1, 'A track tap must not enqueue the complete library');
+  await page.locator('.navigation [data-tab=library]').click();
   await page.getByRole('button', { name: 'Abrir player', exact: true }).click();
   await page.getByRole('dialog', { name: 'Reproduzindo agora' }).waitFor();
   await page.waitForTimeout(300);
@@ -67,8 +70,20 @@ try {
     await page.screenshot({ path: `.qa/screenshots/player-${viewport.width}.png` });
     await page.getByRole('button', { name: 'Minimizar player' }).click();
   }
+  await page.getByRole('button', { name: 'Abrir player', exact: true }).click();
+  await page.getByRole('button', { name: 'Infinite Radio', exact: true }).click();
+  await page.getByRole('button', { name: 'Rádio das músicas baixadas', exact: true }).click();
+  await page.getByRole('button', { name: 'Minimizar player' }).click();
+  await page.locator('.navigation [data-tab=queue]').click();
+  await page.locator('.radio-strip').waitFor();
+  assert.equal(await page.locator('#view .track').count(), 2);
+  await page.getByRole('button', { name: 'Encerrar rádio', exact: true }).click();
+  assert.equal(await page.locator('.radio-strip').count(), 0);
+  await page.locator('.navigation [data-tab=settings]').click();
+  await page.getByRole('checkbox', { name: 'Download automático', exact: true }).uncheck();
   await page.reload();
   assert.ok(await page.evaluate(() => JSON.parse(localStorage.fluxo_mobile_v2).playlists[0].tracks.length === 1));
+  assert.equal(await page.getByRole('checkbox', { name: 'Download automático', exact: true }).isChecked(), false);
   assert.deepEqual(errors, []);
-  console.log('UI passed: import, playback, favorites, offline playlist, themes, persistence, 16 responsive views.');
+  console.log('UI passed: no automatic queue, offline radio, auto-download preference, import, playback, favorites, offline playlist, themes, persistence, 16 responsive views.');
 } finally { await browser.close(); }

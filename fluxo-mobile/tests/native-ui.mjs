@@ -2,17 +2,27 @@ import { chromium } from 'playwright';
 import { execFileSync } from 'node:child_process';
 import assert from 'node:assert/strict';
 const adb = `${process.env.LOCALAPPDATA}/Android/Sdk/platform-tools/adb.exe`;
-const shell = (...args) => execFileSync(adb, args, { encoding: 'utf8' }).trim();
-const pid = shell('shell', 'pidof', 'com.fluxo.music.mobile');
-shell('forward', 'tcp:9223', `localabstract:webview_devtools_remote_${pid}`);
+const shell = (...args) => execFileSync(adb, args, { encoding: 'utf8', timeout: 15000 }).trim();
+shell('shell', 'input', 'keyevent', 'KEYCODE_WAKEUP');
+shell('shell', 'wm', 'dismiss-keyguard');
+shell('shell', 'am', 'start', '-n', 'com.fluxo.music.mobile/.MainActivity');
 shell('shell', 'pm', 'grant', 'com.fluxo.music.mobile', 'android.permission.POST_NOTIFICATIONS');
 let browser;
 for (let i = 0; i < 20; i++) {
-  try { browser = await chromium.connectOverCDP('http://127.0.0.1:9223'); break; }
+  try {
+    const pid = shell('shell', 'pidof', 'com.fluxo.music.mobile');
+    shell('forward', 'tcp:9223', `localabstract:webview_devtools_remote_${pid}`);
+    browser = await chromium.connectOverCDP('http://127.0.0.1:9223', { timeout: 5000 });
+    break;
+  }
   catch (error) { if (i === 19) throw error; await new Promise(resolve => setTimeout(resolve, 300)); }
 }
 const page = browser.contexts()[0].pages()[0];
 try {
+  await page.locator('.navigation [data-tab=settings]').waitFor();
+  const downloads = await page.evaluate(async () => (await window.Capacitor.Plugins.FluxoAudio.downloads()).tracks);
+  const track = downloads.find(item => item.status === 'ready');
+  assert.ok(track, 'Download or import a track before this test');
   await page.locator('.navigation [data-tab=settings]').click();
   await page.getByRole('button', { name: /Temas do Fluxo/ }).click();
   assert.equal(await page.locator('.theme-tile').count(), 68);
@@ -20,8 +30,9 @@ try {
   assert.equal(await page.evaluate(() => document.documentElement.style.colorScheme), 'light');
   await page.getByRole('button', { name: 'Tema Fluxo Bug', exact: true }).click();
   await page.getByRole('button', { name: 'Fechar', exact: true }).click();
+  await page.getByRole('button', { name: /Músicas no dispositivo/ }).evaluate(el => el.scrollIntoView({ block: 'center' }));
   await page.getByRole('button', { name: /Músicas no dispositivo/ }).click();
-  await page.getByRole('button', { name: 'Tocar Big Buck Bunny 60fps 4K - Official Blender Foundation Short Film', exact: true }).first().click();
+  await page.getByRole('button', { name: `Tocar ${track.title}`, exact: true }).first().click();
   await page.getByRole('button', { name: 'Pausar', exact: true }).waitFor();
   await page.getByRole('button', { name: 'Abrir player' }).click();
   await page.waitForTimeout(450);

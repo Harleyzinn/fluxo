@@ -27,7 +27,7 @@ export function normalizeAppearance(value = {}) {
 export function normalizeSettings(value = {}) {
   value = value && typeof value === 'object' ? value : {};
   const profiles = Array.isArray(value.profiles) ? value.profiles : [];
-  return { ...normalizeAppearance(value), offline: value.offline === true, wifiOnly: value.wifiOnly === true,
+  return { ...normalizeAppearance(value), offline: value.offline === true, wifiOnly: value.wifiOnly === true, autoDownload: value.autoDownload !== false,
     themeFavorites: [...new Set((Array.isArray(value.themeFavorites) ? value.themeFavorites : []).filter(id => typeof id === 'string' && /^[a-z0-9-]{1,60}$/.test(id)))].slice(0, 100),
     profiles: [...new Map(profiles.filter(p => p && typeof p.id === 'string' && typeof p.name === 'string' && p.name.trim()).slice(0, 12)
       .map(p => [p.id, { id: p.id.slice(0, 100), name: p.name.trim().slice(0, 40), values: normalizeAppearance(p.values) }])).values()] };

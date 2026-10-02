@@ -100,6 +100,36 @@ public final class StreamResolver {
 
     public static void invalidate(String url) { cache.remove(url); }
 
+    public static JSONArray related(JSONObject seed) throws Exception {
+        init();
+        JSONArray result = new JSONArray();
+        if (isPage(seed.optString("url"))) {
+            try {
+                var extractor = NewPipe.getServiceByUrl(seed.getString("url")).getStreamExtractor(seed.getString("url"));
+                extractor.fetchPage();
+                var related = extractor.getRelatedItems();
+                if (related != null) for (InfoItem item : related.getItems()) {
+                    if (item instanceof StreamInfoItem stream && stream.getDuration() > 30 && stream.getDuration() < 1800)
+                        result.put(describe(stream, "youtube"));
+                    if (result.length() >= 20) break;
+                }
+            } catch (Exception failure) { android.util.Log.w("FluxoRadio", "Related items unavailable", failure); }
+        }
+        if (result.length() == 0) {
+            String topic = seed.optString("artist", "");
+            if (topic.isBlank() || topic.equals("Arquivo local")) topic = seed.optString("title", "music");
+            result = search(topic + " music", "youtube");
+        }
+        return result;
+    }
+
+    private static JSONObject describe(StreamInfoItem stream, String provider) throws Exception {
+        return new JSONObject().put("id", Integer.toHexString(stream.getUrl().hashCode()))
+            .put("url", stream.getUrl()).put("title", stream.getName()).put("artist", stream.getUploaderName())
+            .put("duration", stream.getDuration()).put("source", provider)
+            .put("thumbnail", stream.getThumbnails().isEmpty() ? "" : stream.getThumbnails().get(0).getUrl());
+    }
+
     public static JSONArray search(String query, String provider) throws Exception {
         init();
         var service = "soundcloud".equals(provider) ? ServiceList.SoundCloud : ServiceList.YouTube;
@@ -109,15 +139,7 @@ public final class StreamResolver {
         for (InfoItem item : extractor.getInitialPage().getItems()) {
             if (!(item instanceof StreamInfoItem stream)) continue;
             if (stream.getDuration() <= 0) continue;
-            JSONObject track = new JSONObject();
-            track.put("id", Integer.toHexString(stream.getUrl().hashCode()));
-            track.put("url", stream.getUrl());
-            track.put("title", stream.getName());
-            track.put("artist", stream.getUploaderName());
-            track.put("duration", stream.getDuration());
-            track.put("source", provider);
-            track.put("thumbnail", stream.getThumbnails().isEmpty() ? "" : stream.getThumbnails().get(0).getUrl());
-            result.put(track);
+            result.put(describe(stream, provider));
             if (result.length() == 30) break;
         }
         return result;

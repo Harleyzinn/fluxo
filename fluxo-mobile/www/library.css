@@ -1,0 +1,18 @@
+.setting, .track, .playlist-card { scroll-margin-block: 16px; }
+html { scroll-padding-bottom: calc(180px + env(safe-area-inset-bottom)); }
+.radio-strip { display:flex; align-items:center; gap:12px; padding:14px 0; margin-bottom:16px; border-bottom:1px solid var(--line); }
+.radio-strip > svg { flex:none; color:var(--pink); }
+.radio-strip > div { flex:1; min-width:0; }
+.radio-strip strong { display:block; font-size:14px; }
+.radio-strip small { display:block; font-size:12px; margin-top:4px; color:var(--muted); overflow-wrap:anywhere; }
+.radio-strip .icon-button { flex:none; }
+.menu-divider { border:0; border-top:1px solid var(--line); margin:8px 0; }
+.device-status { display:flex; flex-direction:column; gap:6px; padding:8px 0 18px; }
+.device-status strong { overflow-wrap:anywhere; }
+.device-status small { color:var(--muted); }
+.download-summary { display:grid; grid-template-columns:auto 1fr auto 1fr; align-items:center; gap:10px; padding:18px 0 24px; }
+.download-summary strong { font-size:24px; color:var(--cyan); }
+.download-summary span { font-size:12px; color:var(--muted); }
+.player-footer { gap:3px; }
+.player-footer button { min-width:0; }
+@media (max-width:360px) { .segmented button { font-size:12px; padding-inline:2px; } }

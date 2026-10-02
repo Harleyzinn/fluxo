@@ -1,23 +1,44 @@
-# Fluxo Mobile 2.1
+# Fluxo Mobile 2.2
 
 App independente para **Android 7 ou superior**, reconstruido na pasta `fluxo-mobile`. Nao precisa do Fluxo de PC nem de um servidor seu para tocar. A interface usa HTML/CSS/JavaScript dentro do Capacitor; o audio, a sessao de midia, a extracao de streams e os arquivos sao tratados em Java no Android.
 
 ## Instalar e usar
 
-Download: [Fluxo Mobile 2.1.0 para Android](https://github.com/Harleyzinn/fluxo/releases/tag/mobile-v2.1.0). Baixe o arquivo `Fluxo-Mobile-2.1.0.apk`, nao os pacotes de codigo-fonte.
+Download: [Fluxo Mobile 2.2.0 para Android](https://github.com/Harleyzinn/fluxo/releases/tag/mobile-v2.2.0). Baixe o arquivo `Fluxo-Mobile-2.2.0.apk`, nao os pacotes de codigo-fonte.
 
-1. Pegue `dist/Fluxo-Mobile-2.1.0.apk` e envie ao celular por USB, Drive ou outro meio de sua preferencia.
+1. Pegue `dist/Fluxo-Mobile-2.2.0.apk` e envie ao celular por USB, Drive ou outro meio de sua preferencia.
 2. Abra o APK no celular. Quando o Android pedir, permita instalar apps dessa origem. Depois da instalacao, voce pode desativar essa permissao novamente.
 3. Abra o Fluxo. Procure uma musica na aba **Buscar** ou use o botao de pasta para importar seus arquivos.
 4. Ao iniciar a primeira reproducao ou download, o app pede notificacoes no Android 13 ou superior. Negar nao impede tocar. O seletor de arquivos concede acesso somente aos arquivos escolhidos, sem pedir acesso geral ao armazenamento.
-5. No menu de uma musica, escolha **Baixar musica**. Ela aparece em **Biblioteca > Baixadas**, com progresso ou motivo de espera. Aguarde a conclusao antes de desligar a internet.
+5. Salve uma musica na biblioteca, favorite ou adicione a uma playlist. Com **Download automatico** ativo, o app agenda o download. Ela aparece em **Biblioteca > Baixadas**, com progresso ou motivo de espera. Aguarde a conclusao antes de desligar a internet. Historico, resultados de busca e radio nao sao baixados so por serem ouvidos.
 6. Crie uma playlist com **Somente musicas baixadas**, adicione os arquivos e reproduza. O modo offline fica em Ajustes.
 
 **Nao precisa upar um site para usar o aplicativo.** O APK ja contem o app. O endereco de pre-visualizacao no computador e apenas uma ferramenta de desenvolvimento, nao e o app Android.
 
 Este APK e uma compilacao de desenvolvimento assinada para instalacao pessoal. Para publicar na Play Store ou distribuir atualizacoes permanentes, gere uma chave de assinatura de producao no Android Studio em **Build > Generate Signed App Bundle / APK**. Guarde essa chave: uma atualizacao precisa da mesma assinatura. Nao envie senhas nem a chave ao GitHub. Uma assinatura diferente exige desinstalar o app anterior, apagando seus arquivos privados; exporte os dados antes e preserve os audios originais.
 
-## Novidades da 2.1.0
+## Novidades da 2.2.0
+
+- Tocar uma musica inicia apenas aquela faixa. Uma playlist inteira so entra na fila pelo comando Reproduzir da playlist; adicionar a fila continua sendo uma acao manual.
+- Infinite Radio opcional, iniciado pelo menu da musica ou pelo player. Recomendacoes do provedor, deduplicacao, preparacao das proximas faixas e reposicao no servico Android, mesmo com a tela apagada.
+- Radio offline com arquivos ja baixados, sem consultas a internet. Encerrar o radio remove as recomendacoes futuras e preserva faixas colocadas manualmente.
+- Aba Salvas e downloads automaticos de musicas salvas, favoritas e playlists. Trabalhos persistentes do WorkManager e transferencias pelo DownloadManager Android; retomada apos falhas com tentativas limitadas.
+- Preferencia Wi-Fi, cancelamento que impede baixar o mesmo arquivo automaticamente outra vez, e central para retomar downloads pendentes ou com falha.
+- Correcao do registro da sessao no MediaSessionService. O audio passa a promover o servico para primeiro plano e exibir a central de midia, com capa, titulo, artista, pausa, continuar, anterior/proxima e progresso conforme a versao do Android.
+- Protecao de CPU e Wi-Fi durante a reproducao, recuperacao limitada de streams e renovacao de URLs mantendo a posicao.
+- Temporizador para parar ao fim da faixa, alem dos intervalos em minutos.
+- Tela com estado de notificacoes, bateria, versao Android e servico de audio, com acesso aos ajustes do aparelho.
+- Biblioteca salva incluida no backup, sem caminhos privados de audio ou capas. Os 68 temas e a personalizacao da 2.1 foram preservados.
+
+**Dados moveis:** downloads automaticos estao ativos por padrao. Ative Ajustes > Baixar so no Wi-Fi para evitar transferencias de audio por dados moveis. Nenhum download e garantia de disponibilidade: conteudo bloqueado ou sem permissao de armazenamento nao pode ser baixado.
+
+## POCO / Xiaomi com HyperOS
+
+No POCO X5 5G, abra **Ajustes > Tela apagada e notificacoes** no Fluxo. Permita notificacoes. Nos ajustes do aplicativo no telefone, procure a opcao de bateria e escolha **Sem restricoes**, se disponivel. Em **Configuracoes > Apps > Inicializacao automatica em segundo plano**, permita o Fluxo quando necessario. Os nomes e caminhos variam com a versao do HyperOS; o app abre os ajustes, mas nao muda essas permissoes sozinho.
+
+O estado "sem otimizacao do Android" nao confirma todas as regras extras do HyperOS. A documentacao da Xiaomi descreve as [restricoes de bateria por aplicativo](https://www.mi.com/global/support/article/KA-61830/) e o [controle de inicializacao automatica](https://www.mi.com/global/support/faq/details/KA-497677/). A central usa a [sessao de midia oficial do Android](https://developer.android.com/media/media3/session/background-playback), e nao uma notificacao decorativa que depende da tela aberta.
+
+## Personalizacao da 2.1.0
 
 - Biblioteca com capas maiores nas playlists, alternancia entre grade/lista e fila numerada.
 - Area de Aparencia dividida em Visual, Player e Estilos salvos.

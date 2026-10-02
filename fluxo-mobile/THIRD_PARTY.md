@@ -4,6 +4,7 @@
 | --- | --- | --- | --- |
 | NewPipeExtractor | v0.26.5 | GPL-3.0-or-later | https://github.com/TeamNewPipe/NewPipeExtractor/tree/v0.26.5 |
 | AndroidX Media3 | 1.9.4 | Apache-2.0 | https://github.com/androidx/media |
+| AndroidX WorkManager | 2.11.2 | Apache-2.0 | https://android.googlesource.com/platform/frameworks/support/+/androidx-main/work/ |
 | Capacitor | 8.3.4 | MIT | https://github.com/ionic-team/capacitor |
 | OkHttp | 4.12.0 | Apache-2.0 | https://github.com/square/okhttp |
 | Lucide | 0.468.0 | ISC | https://github.com/lucide-icons/lucide |

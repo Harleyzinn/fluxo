@@ -9,6 +9,7 @@ export const cleanTrack = value => {
     source: String(value.source || 'direct'), ...(value.localUri ? { localUri: String(value.localUri) } : {}) };
 };
 export const unique = tracks => [...new Map(tracks.map(cleanTrack).filter(Boolean).map(t => [t.id, t])).values()];
+export const libraryTracks = model => unique([...(model.library || []), ...(model.favorites || []), ...(model.playlists || []).flatMap(p => p.tracks || [])]);
 export const duration = n => { n = Math.max(0, Math.floor(Number(n) || 0)); return `${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')}`; };
 export const size = n => n > 1073741824 ? `${(n / 1073741824).toFixed(1)} GB` : `${Math.round((n || 0) / 1048576)} MB`;
 export function filterTracks(tracks, query = '', sort = 'recent') {
@@ -21,7 +22,8 @@ export function validateBackup(input) {
   if (!input || input.format !== 'fluxo-mobile' || input.version !== 2) throw new Error('Este arquivo não é um backup do Fluxo Mobile 2.');
   if (!Array.isArray(input.playlists) || !Array.isArray(input.favorites)) throw new Error('Backup incompleto.');
   if (input.playlists.length > 500 || input.favorites.length > 20000) throw new Error('Backup grande demais.');
-  return { ...input, favorites: unique(input.favorites), history: unique(input.history || []).slice(0, 100),
+  if (input.library && (!Array.isArray(input.library) || input.library.length > 20000)) throw new Error('Biblioteca inválida.');
+  return { ...input, library: unique(input.library || []), favorites: unique(input.favorites), history: unique(input.history || []).slice(0, 100),
     settings: normalizeSettings(input.settings),
     playlists: input.playlists.filter(p => p && Array.isArray(p.tracks)).map(p => ({ id: String(p.id || crypto.randomUUID()), title: String(p.title || 'Playlist').slice(0, 100), offlineOnly: !!p.offlineOnly, ...playlistAppearance(p), tracks: unique(p.tracks) })) };
 }
@@ -33,7 +35,7 @@ export function loadModel(storage) {
     searches: [], settings: { theme: storage.getItem('fluxo_mobile_theme') || 'fluxobug', wifiOnly: false, offline: false, accent: '#a5f060' } };
 }
 export function publicBackup(model) {
-  const strip = tracks => unique(tracks).map(({ localUri, ...t }) => t);
-  return { format: 'fluxo-mobile', version: 2, exportedAt: new Date().toISOString(), favorites: strip(model.favorites),
+  const strip = tracks => unique(tracks).map(({ localUri, ...t }) => ({ ...t, thumbnail: t.thumbnail.startsWith('file:') ? '' : t.thumbnail }));
+  return { format: 'fluxo-mobile', version: 2, exportedAt: new Date().toISOString(), library: strip(model.library || []), favorites: strip(model.favorites),
     history: strip(model.history), playlists: model.playlists.map(p => ({ ...p, tracks: strip(p.tracks) })), settings: normalizeSettings(model.settings) };
 }

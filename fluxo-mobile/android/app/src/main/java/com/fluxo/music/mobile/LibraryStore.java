@@ -15,9 +15,14 @@ import java.io.InputStream;
 import java.util.UUID;
 
 public class LibraryStore {
+    private static LibraryStore instance;
+    public static synchronized LibraryStore get(Context context) {
+        if (instance == null) instance = new LibraryStore(context);
+        return instance;
+    }
     private final Context context;
     private final DownloadManager manager;
-    public LibraryStore(Context context) {
+    private LibraryStore(Context context) {
         this.context = context.getApplicationContext();
         manager = (DownloadManager)context.getSystemService(Context.DOWNLOAD_SERVICE);
     }
