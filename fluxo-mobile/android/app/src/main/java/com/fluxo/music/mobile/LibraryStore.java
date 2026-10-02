@@ -34,19 +34,40 @@ public class LibraryStore {
     }
     public synchronized JSONArray list() throws Exception {
         JSONArray records = records();
+        java.util.ArrayList<Long> downloadIds = new java.util.ArrayList<>();
+        for (int i = 0; i < records.length(); i++) {
+            long id = records.getJSONObject(i).optLong("downloadId", -1);
+            if (id >= 0) downloadIds.add(id);
+        }
+        java.util.Map<Long, JSONObject> states = new java.util.HashMap<>();
+        if (!downloadIds.isEmpty()) {
+            long[] ids = new long[downloadIds.size()];
+            for (int i = 0; i < ids.length; i++) ids[i] = downloadIds.get(i);
+            try (Cursor cursor = manager.query(new DownloadManager.Query().setFilterById(ids))) {
+                if (cursor != null) while (cursor.moveToNext()) {
+                    states.put(cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_ID)), new JSONObject()
+                        .put("status", cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS)))
+                        .put("reason", cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON)))
+                        .put("total", cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)))
+                        .put("bytes", cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)))
+                        .put("local", cursor.getString(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_LOCAL_URI))));
+                }
+            }
+        }
         for (int i = 0; i < records.length(); i++) {
             JSONObject record = records.getJSONObject(i);
             long downloadId = record.optLong("downloadId", -1);
             if (downloadId < 0) continue;
-            try (Cursor cursor = manager.query(new DownloadManager.Query().setFilterById(downloadId))) {
-                if (cursor == null || !cursor.moveToFirst()) { record.put("status", "failed"); continue; }
-                int status = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS));
-                int reason = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON));
-                long total = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
-                long done = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR));
+            JSONObject snapshot = states.get(downloadId);
+            if (snapshot == null) { record.put("status", "failed").put("statusDetail", "Download nao encontrado. Tente novamente."); continue; }
+            {
+                int status = snapshot.getInt("status");
+                int reason = snapshot.getInt("reason");
+                long total = snapshot.getLong("total");
+                long done = snapshot.getLong("bytes");
                 record.put("bytes", done).put("total", total).put("progress", total > 0 ? Math.min(100, done * 100 / total) : 0);
                 if (status == DownloadManager.STATUS_SUCCESSFUL) {
-                    String local = cursor.getString(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_LOCAL_URI));
+                    String local = snapshot.optString("local");
                     record.put("localUri", local).put("status", "ready").put("progress", 100);
                     record.remove("statusDetail");
                 } else if (status == DownloadManager.STATUS_FAILED) {

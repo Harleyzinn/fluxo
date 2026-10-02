@@ -1,4 +1,25 @@
-# Verificacao da Versao 2.2.0
+# Verificacao da Versao 2.3.0
+
+Validacao da 2.3.0 em 2 de outubro de 2026, Android API 37 em emulador e Microsoft Edge. O celular POCO fisico nao estava conectado.
+
+- 20 testes de dados e backup passaram, incluindo filtros de downloads, tamanhos de arquivos, preferencias do radio e bloqueio de caminhos privados em backups importados.
+- Interface com biblioteca de 250 faixas: 80 linhas iniciais, carregamento de mais linhas e busca que encontra uma faixa fora da primeira pagina.
+- Busca e selecao de musicas visiveis para playlists mantiveram a selecao ao trocar o filtro. Reordenar uma playlist filtrada moveu o item correto na lista original.
+- Duplicacao de playlist, fila salva como playlist e indicador de disponibilidade offline conferidos.
+- Interface do gerenciador de downloads conferida em 320x640, 390x844 e 820x1180, sem rolagem horizontal ou texto fora dos controles.
+- 24 combinacoes de layouts/visualizadores e os recursos de personalizacao anteriores passaram no teste de aparencia.
+- Radio Android preservou a posicao da faixa atual e as faixas manuais. As recomendacoes offline respeitaram a musica excluida do radio.
+- Download manual foi agendado em 35 ms nesta execucao, sem esperar a extracao na interface. Esse tempo nao representa o inicio ou termino da transferencia.
+- O agendamento manual permaneceu pendente apos sincronizar com Download automatico desativado e apos recarregar o aplicativo.
+- Apenas a faixa solicitada foi agendada, sem baixar a faixa de outra colecao. Cancelamento pelo controle da interface confirmado.
+- Download manual concluiu 965.128 bytes e tocou com Wi-Fi e dados moveis desligados.
+- Cancelar apenas pendentes preservou um arquivo que ja estava concluido quando o estado nativo foi conferido.
+- Download automatico esperou Wi-Fi, concluiu o arquivo de teste de 965.128 bytes durante 45 segundos com a tela apagada e tocou offline. Cancelar impediu novo agendamento automatico; repetir explicitamente liberou o download.
+- Stream da 2.3 continuou tocando durante 180 segundos com a tela realmente apagada e avancou mais de 180 segundos. O servico permaneceu em primeiro plano, com notificacao de reproducao ativa.
+- Pausar, continuar e proxima faixa foram acionados na notificacao Android. Radio online retornou sete faixas sem IDs repetidos; encerrar removeu as recomendacoes futuras. Radio offline avancou sem Wi-Fi ou dados moveis e o temporizador ao fim da faixa pausou a reproducao.
+- APK atualizado sem desinstalar, com a mesma assinatura das versoes 2.0/2.1/2.2. Temas, player compacto e estilos salvos conferidos no Android.
+
+## Evidencias anteriores da base 2.2.0
 
 Validacao realizada em 1 e 2 de outubro de 2026 em emulador Android API 37 e navegador Microsoft Edge.
 

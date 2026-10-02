@@ -60,6 +60,9 @@ public class FluxoAudioPlugin extends Plugin {
     @PluginMethod public void radio(PluginCall call) {
         player(call, () -> PlaybackService.instance.startRadio(call.getObject("track"), call.getBoolean("offline", false)));
     }
+    @PluginMethod public void radioExclusions(PluginCall call) {
+        player(call, () -> PlaybackService.instance.setRadioExclusions(call.getArray("tracks", new JSArray())));
+    }
     @PluginMethod public void setQueue(PluginCall call) {
         player(call, () -> PlaybackService.instance.setQueue(call.getArray("tracks", new JSArray()), call.getInt("index", 0), true));
     }
@@ -82,7 +85,10 @@ public class FluxoAudioPlugin extends Plugin {
             JSONArray tracks = library.list(); JSONArray pending = LibrarySync.pending(getContext());
             for (int i = 0; i < pending.length(); i++) {
                 JSONObject candidate = pending.getJSONObject(i); boolean found = false;
-                for (int j = 0; j < tracks.length(); j++) if (tracks.getJSONObject(j).optString("id").equals(candidate.optString("id"))) { found = true; break; }
+                for (int j = 0; j < tracks.length(); j++) if (tracks.getJSONObject(j).optString("id").equals(candidate.optString("id"))) {
+                    if (tracks.getJSONObject(j).optString("status").equals("failed") && candidate.optString("status").equals("queued")) tracks.put(j, candidate);
+                    found = true; break;
+                }
                 if (!found) tracks.put(candidate);
             }
             call.resolve(new JSObject().put("tracks", tracks));
@@ -97,20 +103,31 @@ public class FluxoAudioPlugin extends Plugin {
     @PluginMethod public void download(PluginCall call) {
         async(call, () -> {
             JSONObject track = call.getObject("track");
-            JSONArray records = library.list();
-            for (int i = 0; i < records.length(); i++) {
-                JSONObject existing = records.getJSONObject(i);
-                if (existing.optString("id").equals(track.optString("id")) && !existing.optString("status").equals("failed")) {
-                    call.resolve(JSObject.fromJSONObject(existing)); return;
-                }
-            }
-            LibrarySync.unblock(getContext(), track.optString("id"));
-            String url = StreamResolver.resolve(track.optString("url"));
-            call.resolve(JSObject.fromJSONObject(library.download(track, url, call.getBoolean("wifiOnly", false))));
+            if (track == null || !track.optString("url").startsWith("https://")) throw new IllegalArgumentException("Use um link HTTPS de audio.");
+            LibrarySync.queueManual(getContext(), new JSONArray().put(track), call.getBoolean("wifiOnly", false));
+            call.resolve();
         });
     }
+    @PluginMethod public void downloadBatch(PluginCall call) {
+        async(call, () -> { LibrarySync.queueManual(getContext(), call.getArray("tracks", new JSArray()), call.getBoolean("wifiOnly", false)); call.resolve(); });
+    }
     @PluginMethod public void removeDownload(PluginCall call) {
-        async(call, () -> { String id = call.getString("id", ""); LibrarySync.block(getContext(), id); library.remove(id); call.resolve(); });
+        async(call, () -> {
+            String id = call.getString("id", "");
+            synchronized (LibrarySync.class) {
+                if (call.getBoolean("pendingOnly", false)) {
+                    JSONArray records = library.list();
+                    for (int i = 0; i < records.length(); i++) {
+                        JSONObject record = records.getJSONObject(i);
+                        if (record.optString("id").equals(id) && record.optString("status").equals("ready")) {
+                            call.resolve(new JSObject().put("cancelled", false)); return;
+                        }
+                    }
+                }
+                LibrarySync.block(getContext(), id); library.remove(id);
+            }
+            call.resolve(new JSObject().put("cancelled", true));
+        });
     }
     @PluginMethod public void migrateAudio(PluginCall call) {
         async(call, () -> {

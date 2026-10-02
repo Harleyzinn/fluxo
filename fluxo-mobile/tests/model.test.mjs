@@ -1,8 +1,29 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cleanTrack, unique, libraryTracks, duration, filterTracks, validateBackup, loadModel, publicBackup } from '../www/model.js';
+import { cleanTrack, unique, libraryTracks, filterDownloads, downloadStats, size, duration, filterTracks, validateBackup, loadModel, publicBackup } from '../www/model.js';
 import { normalizeSettings, normalizeAppearance, playlistAppearance, contrastText, surfacePalette } from '../www/appearance.js';
 const track = { id: 'one', title: 'Canção', artist: 'Álvaro', duration: 65, url: 'https://example.com/a.mp3' };
+test('storage sizes remain meaningful for small files and invalid values', () => {
+  assert.equal(size(1024), '1 KB'); assert.equal(size(1048576), '1 MB'); assert.equal(size(-1), '0 B'); assert.equal(size(Infinity), '0 B');
+});
+
+test('download filters separate ready, pending and failed files', () => {
+  const rows = ['ready', 'queued', 'downloading', 'failed'].map((status, i) => ({ ...track, id: String(i), status, bytes: 1024 }));
+  assert.equal(filterDownloads(rows, 'pending').length, 2);
+  assert.equal(filterDownloads(rows, 'all').length, 4);
+  assert.deepEqual(downloadStats(rows), { ready: 1, pending: 2, failed: 1, bytes: 1024 });
+  assert.equal(downloadStats([{ status: 'ready', bytes: -1 }]).bytes, 0);
+});
+
+test('radio exclusions round trip and imported backups cannot inject private paths', () => {
+  const data = publicBackup({ radioExcluded: [track], library: [], favorites: [], history: [], playlists: [], settings: {} });
+  data.favorites.push({ ...track, localUri: 'file:///private/audio', thumbnail: 'file:///private/photo', url: 'file:///private/source' });
+  const copy = validateBackup(data);
+  assert.equal(copy.radioExcluded[0].id, track.id);
+  assert.equal(copy.favorites[0].localUri, undefined);
+  assert.equal(copy.favorites[0].url, ''); assert.equal(copy.favorites[0].thumbnail, '');
+  assert.throws(() => validateBackup({ ...data, radioExcluded: 'bad' }));
+});
 test('library downloads include saved, favorites and playlists but never history', () => {
   const history = { ...track, id: 'history' };
   assert.deepEqual(libraryTracks({ library: [track], favorites: [track], playlists: [{ tracks: [track] }], history: [history] }).map(t => t.id), ['one']);

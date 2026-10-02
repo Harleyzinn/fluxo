@@ -28,6 +28,7 @@ try {
   await page.getByRole('button', { name: 'Tocar Primeira faixa', exact: true }).click();
   await page.getByRole('button', { name: 'Pausar', exact: true }).waitFor();
   await page.locator('.navigation [data-tab=queue]').click();
+  await page.getByRole('heading', { name: 'Na sequência', exact: true }).waitFor();
   assert.equal(await page.locator('#view .track').count(), 1, 'A track tap must not enqueue the complete library');
   await page.locator('.navigation [data-tab=library]').click();
   await page.getByRole('button', { name: 'Abrir player', exact: true }).click();
@@ -39,7 +40,7 @@ try {
   await page.getByRole('tab', { name: 'Coleções' }).click();
   await page.getByRole('button', { name: /Minha seleção offline/ }).click();
   await page.getByRole('button', { name: 'Adicionar músicas', exact: true }).first().click();
-  await page.locator('#playlist-tracks input').first().check();
+  await page.locator('#playlist-tracks input[name=tracks]').first().check();
   await page.getByRole('button', { name: 'Adicionar selecionadas' }).click();
   await page.getByRole('button', { name: 'Reproduzir', exact: true }).first().click();
   await page.locator('.navigation [data-tab=settings]').click();
@@ -71,8 +72,11 @@ try {
     await page.getByRole('button', { name: 'Minimizar player' }).click();
   }
   await page.getByRole('button', { name: 'Abrir player', exact: true }).click();
+  await page.locator('#seek').evaluate(input => { input.value = '7'; input.dispatchEvent(new Event('change', { bubbles: true })); });
+  await page.waitForTimeout(250);
   await page.getByRole('button', { name: 'Infinite Radio', exact: true }).click();
   await page.getByRole('button', { name: 'Rádio das músicas baixadas', exact: true }).click();
+  assert.ok(Number(await page.locator('#seek').inputValue()) >= 7, 'Starting radio must preserve the current playback position');
   await page.getByRole('button', { name: 'Minimizar player' }).click();
   await page.locator('.navigation [data-tab=queue]').click();
   await page.locator('.radio-strip').waitFor();

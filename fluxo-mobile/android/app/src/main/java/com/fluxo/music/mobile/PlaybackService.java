@@ -48,6 +48,7 @@ public class PlaybackService extends MediaSessionService {
     private String radioError = "";
     private JSONObject radioSeed = new JSONObject();
     private final LinkedHashSet<String> radioSeen = new LinkedHashSet<>();
+    private final LinkedHashSet<String> radioExcluded = new LinkedHashSet<>();
     private android.net.ConnectivityManager connectivity;
     private android.net.ConnectivityManager.NetworkCallback networkCallback;
     private int ticks;
@@ -140,6 +141,7 @@ public class PlaybackService extends MediaSessionService {
         instance = this;
         try {
             var prefs = getSharedPreferences("player", MODE_PRIVATE);
+            setRadioExclusions(new JSONArray(prefs.getString("radioExcluded", "[]")));
             eqPreset = prefs.getInt("equalizer", 0);
             player.setRepeatMode(prefs.getInt("repeat", 0));
             player.setShuffleModeEnabled(prefs.getBoolean("shuffle", false));
@@ -203,11 +205,45 @@ public class PlaybackService extends MediaSessionService {
     }
 
     void startRadio(JSONObject seed, boolean local) throws Exception {
-        setQueue(new JSONArray().put(seed), 0, true);
+        if (local) {
+            JSONArray files = LibraryStore.get(this).list(); boolean alternative = false;
+            for (int i = 0; i < files.length(); i++) {
+                JSONObject file = files.getJSONObject(i);
+                boolean sameUrl = !seed.optString("url").isEmpty() && seed.optString("url").equals(file.optString("url"));
+                if (file.optString("status").equals("ready") && !file.optString("id").equals(seed.optString("id")) && !sameUrl && !excluded(file)) alternative = true;
+            }
+            if (!alternative) throw new IllegalArgumentException("Adicione outra musica baixada e permitida no radio.");
+        }
+        JSONObject now = player.getCurrentMediaItem() == null ? new JSONObject() : track(player.getCurrentMediaItem());
+        boolean same = now.optString("id").equals(seed.optString("id"));
+        if (same && (player.getPlaybackState() == Player.STATE_READY || player.getPlaybackState() == Player.STATE_BUFFERING)) {
+            stopRadio(); player.play();
+        } else setQueue(new JSONArray().put(seed), 0, true);
         radio = true; radioOffline = local; radioSeed = new JSONObject(seed.toString());
-        radioSeen.clear(); remember(seed); radioRetryAt = 0; radioError = "";
+        radioSeen.clear();
+        for (int i = 0; i < player.getMediaItemCount(); i++) remember(track(player.getMediaItemAt(i)));
+        radioRetryAt = 0; radioError = "";
         player.setRepeatMode(Player.REPEAT_MODE_OFF); player.setShuffleModeEnabled(false);
         refillRadio(); publish();
+    }
+
+    private boolean excluded(JSONObject track) {
+        return radioExcluded.contains(track.optString("id")) || (!track.optString("url").isEmpty() && radioExcluded.contains(track.optString("url")));
+    }
+
+    void setRadioExclusions(JSONArray tracks) throws Exception {
+        radioExcluded.clear();
+        for (int i = 0; i < Math.min(tracks.length(), 500); i++) {
+            JSONObject track = tracks.optJSONObject(i); if (track == null) continue;
+            radioExcluded.add(track.optString("id"));
+            if (!track.optString("url").isEmpty()) radioExcluded.add(track.optString("url"));
+        }
+        getSharedPreferences("player", MODE_PRIVATE).edit().putString("radioExcluded", tracks.toString()).apply();
+        if (radio) {
+            for (int i = player.getMediaItemCount() - 1; i > player.getCurrentMediaItemIndex(); i--)
+                if (track(player.getMediaItemAt(i)).optBoolean("radioGenerated") && excluded(track(player.getMediaItemAt(i)))) player.removeMediaItem(i);
+            radioRetryAt = 0; refillRadio(); publish();
+        }
     }
 
     private void remember(JSONObject track) {
@@ -237,7 +273,7 @@ public class PlaybackService extends MediaSessionService {
                 ArrayList<JSONObject> eligible = new ArrayList<>();
                 for (int i = 0; i < batch.length(); i++) {
                     JSONObject candidate = batch.optJSONObject(i);
-                    if (candidate == null || (local && !candidate.optString("status").equals("ready"))) continue;
+                    if (candidate == null || excluded(candidate) || (local && !candidate.optString("status").equals("ready"))) continue;
                     if (candidate.optString("id").equals(seed.optString("id"))) continue;
                     if (radioSeen.contains(candidate.optString("id")) || (!candidate.optString("url").isEmpty() && radioSeen.contains(candidate.optString("url")))) continue;
                     eligible.add(candidate);
@@ -246,13 +282,19 @@ public class PlaybackService extends MediaSessionService {
                     radioSeen.clear(); remember(seed);
                     for (int i = 0; i < batch.length(); i++) {
                         JSONObject candidate = batch.optJSONObject(i);
-                        if (candidate != null && candidate.optString("status").equals("ready") && !candidate.optString("id").equals(seed.optString("id"))) eligible.add(candidate);
+                        if (candidate != null && !excluded(candidate) && candidate.optString("status").equals("ready") && !candidate.optString("id").equals(seed.optString("id"))) eligible.add(candidate);
                     }
                 }
                 Collections.shuffle(eligible);
                 int added = 0;
                 for (JSONObject candidate : eligible) {
-                    if (radioSeen.contains(candidate.optString("id"))) continue;
+                    if (radioSeen.contains(candidate.optString("id")) || excluded(candidate)) continue;
+                    boolean queued = false;
+                    for (int i = player.getCurrentMediaItemIndex(); i < player.getMediaItemCount(); i++) {
+                        JSONObject present = track(player.getMediaItemAt(i));
+                        if (present.optString("id").equals(candidate.optString("id")) || (!present.optString("url").isEmpty() && present.optString("url").equals(candidate.optString("url")))) { queued = true; break; }
+                    }
+                    if (queued) continue;
                     remember(candidate);
                     try { candidate.put("radioGenerated", true); } catch (Exception ignored) {}
                     player.addMediaItem(item(candidate));
@@ -321,7 +363,7 @@ public class PlaybackService extends MediaSessionService {
 
     void setQueue(JSONArray queue, int index, boolean play) throws Exception {
         stopRadio(); playbackGeneration++; recovering = false; retries = 0;
-        if (queue.length() == 0) { player.clearMediaItems(); persist(); return; }
+        if (queue.length() == 0) { player.pause(); player.clearMediaItems(); persist(); return; }
         ArrayList<MediaItem> items = new ArrayList<>();
         for (int i = 0; i < queue.length(); i++) items.add(item(queue.getJSONObject(i)));
         error = "";
@@ -364,7 +406,7 @@ public class PlaybackService extends MediaSessionService {
             case "jump": if (index >= 0 && index < player.getMediaItemCount()) { player.seekTo(index, 0); player.prepare(); player.play(); } break;
             case "remove": if (index >= 0 && index < player.getMediaItemCount()) player.removeMediaItem(index); break;
             case "move": if (index >= 0 && index < player.getMediaItemCount() && value >= 0 && value < player.getMediaItemCount()) player.moveMediaItem(index, (int)value); break;
-            case "clear": stopRadio(); playbackGeneration++; player.clearMediaItems(); break;
+            case "clear": stopRadio(); playbackGeneration++; player.pause(); player.clearMediaItems(); sleepAt = 0; sleepEnd = false; player.setPauseAtEndOfMediaItems(false); break;
             case "shuffle": player.setShuffleModeEnabled(value == 1); break;
             case "repeat": player.setRepeatMode(Math.max(0, Math.min(2, (int)value))); break;
             case "speed": player.setPlaybackSpeed((float)Math.max(0.5, Math.min(2, value))); break;
@@ -386,7 +428,7 @@ public class PlaybackService extends MediaSessionService {
     }
     void publish() { if (FluxoAudioPlugin.visible) FluxoAudioPlugin.emit("state", state()); }
     @Nullable @Override public MediaSession onGetSession(MediaSession.ControllerInfo controller) { return session; }
-    @Override public void onTaskRemoved(Intent rootIntent) { if (!isPlaybackOngoing() && !player.getPlayWhenReady()) stopSelf(); }
+    @Override public void onTaskRemoved(Intent rootIntent) { if (player.getMediaItemCount() == 0 || (!isPlaybackOngoing() && !player.getPlayWhenReady())) stopSelf(); }
     @Override public void onDestroy() {
         persist(); handler.removeCallbacksAndMessages(null); instance = null;
         if (connectivity != null && networkCallback != null) connectivity.unregisterNetworkCallback(networkCallback);

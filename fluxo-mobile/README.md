@@ -1,12 +1,12 @@
-# Fluxo Mobile 2.2
+# Fluxo Mobile 2.3
 
 App independente para **Android 7 ou superior**, reconstruido na pasta `fluxo-mobile`. Nao precisa do Fluxo de PC nem de um servidor seu para tocar. A interface usa HTML/CSS/JavaScript dentro do Capacitor; o audio, a sessao de midia, a extracao de streams e os arquivos sao tratados em Java no Android.
 
 ## Instalar e usar
 
-Download: [Fluxo Mobile 2.2.0 para Android](https://github.com/Harleyzinn/fluxo/releases/tag/mobile-v2.2.0). Baixe o arquivo `Fluxo-Mobile-2.2.0.apk`, nao os pacotes de codigo-fonte.
+Download: [Fluxo Mobile 2.3.0 para Android](https://github.com/Harleyzinn/fluxo/releases/tag/mobile-v2.3.0). Baixe o arquivo `Fluxo-Mobile-2.3.0.apk`, nao os pacotes de codigo-fonte.
 
-1. Pegue `dist/Fluxo-Mobile-2.2.0.apk` e envie ao celular por USB, Drive ou outro meio de sua preferencia.
+1. Abra o link de download no celular ou envie `dist/Fluxo-Mobile-2.3.0.apk` por USB.
 2. Abra o APK no celular. Quando o Android pedir, permita instalar apps dessa origem. Depois da instalacao, voce pode desativar essa permissao novamente.
 3. Abra o Fluxo. Procure uma musica na aba **Buscar** ou use o botao de pasta para importar seus arquivos.
 4. Ao iniciar a primeira reproducao ou download, o app pede notificacoes no Android 13 ou superior. Negar nao impede tocar. O seletor de arquivos concede acesso somente aos arquivos escolhidos, sem pedir acesso geral ao armazenamento.
@@ -16,6 +16,23 @@ Download: [Fluxo Mobile 2.2.0 para Android](https://github.com/Harleyzinn/fluxo/
 **Nao precisa upar um site para usar o aplicativo.** O APK ja contem o app. O endereco de pre-visualizacao no computador e apenas uma ferramenta de desenvolvimento, nao e o app Android.
 
 Este APK e uma compilacao de desenvolvimento assinada para instalacao pessoal. Para publicar na Play Store ou distribuir atualizacoes permanentes, gere uma chave de assinatura de producao no Android Studio em **Build > Generate Signed App Bundle / APK**. Guarde essa chave: uma atualizacao precisa da mesma assinatura. Nao envie senhas nem a chave ao GitHub. Uma assinatura diferente exige desinstalar o app anterior, apagando seus arquivos privados; exporte os dados antes e preserve os audios originais.
+
+## Novidades da 2.3.0
+
+- Central de downloads integrada a Biblioteca > Baixadas, com filtros Todas/Prontas/Pendentes/Falhas, espaco ocupado, cancelamento direto e novas tentativas individuais ou em lote.
+- Downloads manuais agendados pelo Android, sem esperar a extracao na interface. Continuam ativos ao reabrir o app, mesmo com Download automatico desativado.
+- Baixar uma playlist agenda somente as faixas daquela playlist. A preferencia global de downloads automaticos nao e ativada por essa acao.
+- Cancelar pendentes confere o estado nativo novamente e preserva arquivos que ja estavam concluidos na verificacao.
+- Iniciar Infinite Radio com a musica atual preserva a posicao e as faixas inseridas manualmente. Recomendacoes nao duplicam URLs ja presentes na sequencia.
+- Opcao Nao recomendar no radio por musica, gerenciamento em Ajustes > Preferencias do radio e inclusao dessas preferencias no backup.
+- Salvar a fila como playlist e duplicar playlists, preservando a ordem e a capa personalizada.
+- Busca e selecao das musicas visiveis ao adicionar a uma playlist, com contador de selecionadas e selecao mantida ao mudar o filtro.
+- Indicador de disponibilidade offline e duracao total de playlists. Reordenacao e remocao respeitam a posicao original mesmo com a lista filtrada.
+- Listas extensas carregadas em grupos de 80, com busca em toda a biblioteca. Consulta nativa dos downloads em lote para reduzir acessos ao sistema.
+- Progresso de buffer no miniplayer e botao Proxima desativado quando nao ha proxima faixa. Importar arquivos limpa filtros antigos que poderiam esconder a importacao.
+- Backups importados nao podem introduzir caminhos privados de arquivos de outro aparelho.
+
+Os temas, estilos, central de notificacoes, reproducao em segundo plano e demais recursos da 2.2 foram mantidos. O comportamento no POCO fisico precisa ser confirmado apos instalar; os testes Android desta entrega foram realizados em emulador.
 
 ## Novidades da 2.2.0
 
@@ -30,7 +47,7 @@ Este APK e uma compilacao de desenvolvimento assinada para instalacao pessoal. P
 - Tela com estado de notificacoes, bateria, versao Android e servico de audio, com acesso aos ajustes do aparelho.
 - Biblioteca salva incluida no backup, sem caminhos privados de audio ou capas. Os 68 temas e a personalizacao da 2.1 foram preservados.
 
-**Dados moveis:** downloads automaticos estao ativos por padrao. Ative Ajustes > Baixar so no Wi-Fi para evitar transferencias de audio por dados moveis. Nenhum download e garantia de disponibilidade: conteudo bloqueado ou sem permissao de armazenamento nao pode ser baixado.
+**Dados moveis:** downloads automaticos estao ativos por padrao. Ative Ajustes > Baixar so no Wi-Fi para evitar transferencias de audio por dados moveis. A preferencia se aplica ao agendamento; transferencias ja iniciadas pelo gerenciador Android nao sao reiniciadas ao mudar a opcao. Nenhum download e garantia de disponibilidade: conteudo bloqueado ou sem espaco suficiente nao pode ser baixado.
 
 ## POCO / Xiaomi com HyperOS
 

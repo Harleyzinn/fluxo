@@ -7,6 +7,8 @@ const audio = new Audio();
 let objectURL = '';
 let timeout;
 let generation = 0;
+let radioExcluded = [];
+const excluded = track => radioExcluded.some(item => item.id === track.id || (item.url && item.url === track.url));
 const emit = () => callback({ ...state });
 const openDB = () => new Promise((resolve, reject) => {
   const request = indexedDB.open('fluxo-mobile-offline', 1);
@@ -83,9 +85,21 @@ export const commands = {
   async radio(track, offline, tracks) {
     if (native) return plugin.radio({ track, offline });
     if (!offline) throw new Error('O rádio online está disponível no aplicativo Android.');
-    state.queue = [track, ...tracks.filter(t => t.id !== track.id).sort(() => Math.random() - .5).map(t => ({ ...t, radioGenerated: true }))];
-    state.index = 0; state.radio = true; state.radioOffline = true; state.radioSeed = track; state.repeat = 0; state.shuffle = false;
-    await browserPlay();
+    const same = state.queue[state.index]?.id === track.id && !state.error && !!audio.src;
+    if (same) state.queue = state.queue.filter((item, i) => i <= state.index || !item.radioGenerated);
+    else { state.queue = [track]; state.index = 0; }
+    const candidates = tracks.filter(t => t.id !== track.id && !excluded(t) && !state.queue.slice(state.index).some(item => item.id === t.id));
+    if (!candidates.length && state.queue.length <= state.index + 1) throw new Error('Adicione outra música baixada e permitida no rádio.');
+    state.queue.push(...candidates.sort(() => Math.random() - .5).map(t => ({ ...t, radioGenerated: true })));
+    state.radio = true; state.radioOffline = true; state.radioSeed = track; state.repeat = 0; state.shuffle = false;
+    if (same) await audio.play(); else await browserPlay();
+    emit();
+  },
+  async radioExclusions(tracks) {
+    if (native) return plugin.radioExclusions({ tracks });
+    radioExcluded = tracks;
+    if (state.radio) state.queue = state.queue.filter((track, i) => i <= state.index || !track.radioGenerated || !excluded(track));
+    emit();
   },
   async syncLibrary(tracks, enabled, wifiOnly, retry = false) { if (native) await plugin.syncLibrary({ tracks, enabled, wifiOnly, retry }); },
   async append(options) { if (native) return plugin.append(options); state.queue.splice(options.next ? state.index + 1 : state.queue.length, 0, options.track); emit(); },
@@ -95,7 +109,18 @@ export const commands = {
     switch (action) {
       case 'play': if (!audio.src || state.error) await browserPlay(); else await audio.play(); break;
       case 'pause': audio.pause(); state.buffering = false; clearTimeout(timeout); break;
-      case 'next': state.index = state.shuffle ? Math.floor(Math.random() * state.queue.length) : (state.index + 1) % state.queue.length; await browserPlay(); break;
+      case 'next': {
+        if (!state.queue.length) break;
+        if (state.radio) {
+          const candidates = state.queue.map((track, i) => ({ track, i })).filter(({ track, i }) => i !== state.index && !excluded(track));
+          if (!candidates.length) { state.radio = false; audio.pause(); break; }
+          state.index = candidates.find(({ i }) => i > state.index)?.i ?? candidates[0].i;
+        } else if (state.shuffle) state.index = Math.floor(Math.random() * state.queue.length);
+        else if (state.index + 1 < state.queue.length) state.index++;
+        else if (state.repeat === 2) state.index = 0;
+        else break;
+        await browserPlay(); break;
+      }
       case 'previous': if (audio.currentTime > 3) audio.currentTime = 0; else { state.index = Math.max(0, state.index - 1); await browserPlay(); } break;
       case 'jump': state.index = index; await browserPlay(); break;
       case 'seek': audio.currentTime = value; break;
@@ -120,7 +145,12 @@ export const commands = {
     if (!response.ok) throw new Error('Falha no download.');
     const blob = await response.blob(); await dbRequest('readwrite', store => store.put({ id: track.id, meta: track, blob, savedAt: Date.now() }));
   },
+  async downloadBatch(tracks, wifiOnly) {
+    if (native) return plugin.downloadBatch({ tracks, wifiOnly });
+    for (const track of tracks) if (track.url && !(await commands.downloads()).some(item => item.id === track.id)) await commands.download(track, wifiOnly);
+  },
   async removeDownload(id) { return native ? plugin.removeDownload({ id }) : dbRequest('readwrite', store => store.delete(id)); },
+  async cancelDownload(id) { return native ? plugin.removeDownload({ id, pendingOnly: true }) : { cancelled: false }; },
   async importAudio() {
     if (native) return plugin.importAudio();
     const files = await chooseFiles('audio/*', true);

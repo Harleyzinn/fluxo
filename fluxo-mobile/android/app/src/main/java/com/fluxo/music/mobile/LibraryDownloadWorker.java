@@ -24,7 +24,10 @@ public class LibraryDownloadWorker extends Worker {
             String url = StreamResolver.resolve(track.optString("url"));
             synchronized (LibrarySync.class) {
                 if (isStopped() || LibrarySync.target(context, id) == null) return Result.success();
-                LibraryStore.get(context).download(track, url, LibrarySync.wifiOnly(context));
+                var desired = LibrarySync.target(context, id);
+                boolean wifiOnly = desired.optBoolean("_wifiOnly", LibrarySync.wifiOnly(context));
+                var metadata = new org.json.JSONObject(desired.toString()); metadata.remove("_wifiOnly");
+                LibraryStore.get(context).download(metadata, url, wifiOnly);
                 LibrarySync.status(context, id, "done", "");
             }
             return Result.success();

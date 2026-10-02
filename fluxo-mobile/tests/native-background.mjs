@@ -12,6 +12,7 @@ const browser = await chromium.connectOverCDP('http://127.0.0.1:9223');
 const page = browser.contexts()[0].pages()[0];
 const call = (method, data = {}) => page.evaluate(async ({ method, data }) => window.Capacitor.Plugins.FluxoAudio[method](data), { method, data });
 const report = {};
+const fixture = { id: 'qa-background-radio', title: 'Background radio fixture', artist: 'Test', duration: 12, url: '', source: 'local' };
 let notificationLayout;
 await mkdir('.qa/screenshots', { recursive: true });
 async function waitFor(test, timeout = 60000) {
@@ -55,19 +56,28 @@ async function notificationButton(pattern) {
   shell('shell', 'input', 'tap', String(point.x), String(point.y)); await delay(500);
 }
 try {
+  shell('shell', 'input', 'keyevent', 'KEYCODE_WAKEUP'); shell('shell', 'wm', 'dismiss-keyguard');
+  shell('shell', 'cmd', 'statusbar', 'collapse');
+  shell('shell', 'am', 'start', '-n', 'com.fluxo.music.mobile/.MainActivity'); await delay(1200);
   await waitFor(() => true);
   await call('command', { action: 'sleep', value: 0 }); await call('command', { action: 'repeat', value: 0 });
   await call('command', { action: 'speed', value: 1 }); await call('command', { action: 'shuffle', value: 0 });
   shell('shell', 'pm', 'grant', 'com.fluxo.music.mobile', 'android.permission.POST_NOTIFICATIONS');
+  const wav = Buffer.alloc(44 + 8000 * 12 * 2);
+  wav.write('RIFF'); wav.writeUInt32LE(wav.length - 8, 4); wav.write('WAVEfmt ', 8); wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22); wav.writeUInt32LE(8000, 24); wav.writeUInt32LE(16000, 28); wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34); wav.write('data', 36); wav.writeUInt32LE(wav.length - 44, 40);
+  await call('removeDownload', { id: fixture.id });
+  await call('migrateAudio', { track: fixture, offset: 0, data: wav.toString('base64'), complete: true });
   const localTracks = (await call('downloads')).tracks.filter(t => t.status === 'ready');
   assert.ok(localTracks.length >= 2, 'Import/download two tracks before this test');
+  const radioFixture = localTracks.find(track => track.id === fixture.id);
+  assert.ok(radioFixture?.localUri, 'The imported fixture must include its native file URI');
   await page.goto('https://localhost/#library'); await delay(1200);
   await page.getByRole('tab', { name: 'Baixadas', exact: true }).click();
   await page.locator('[data-action="track-play"]').first().click();
   await waitFor(s => s.playing);
   assert.equal((await call('getState')).queue.length, 1); report.noAutomaticQueue = true;
   const online = JSON.parse(await readFile('.qa/youtube-results.json', 'utf8'))[0];
-  await call('setQueue', { tracks: [online, localTracks[0]], index: 0 });
+  await call('setQueue', { tracks: [online, radioFixture], index: 0 });
   const start = Date.now(); await waitFor(s => s.playing); report.onlineStartMs = Date.now() - start;
   await call('command', { action: 'pause' });
   await notificationButton('^Play$'); await waitFor(s => s.playing);
@@ -98,6 +108,7 @@ try {
   await call('command', { action: 'clear' });
   await writeFile('.qa/native-background-report.json', JSON.stringify(report, null, 2)); console.log(report);
 } finally {
+  await call('removeDownload', { id: fixture.id }).catch(() => {});
   shell('shell', 'input', 'keyevent', 'KEYCODE_WAKEUP'); shell('shell', 'wm', 'dismiss-keyguard');
   shell('shell', 'svc', 'wifi', 'enable'); shell('shell', 'svc', 'data', 'enable'); shell('shell', 'cmd', 'statusbar', 'collapse');
   await call('command', { action: 'pause' }).catch(() => {}); await browser.close();
