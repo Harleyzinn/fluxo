@@ -79,6 +79,7 @@ try {
   await page.getByRole('button', { name: 'Voltar a recomendar Beta', exact: true }).click();
   assert.equal(await page.evaluate(() => JSON.parse(localStorage.fluxo_mobile_v2).radioExcluded.length), 0);
   await page.getByRole('button', { name: 'Fechar', exact: true }).click();
+  await page.getByRole('tab', { name: 'Biblioteca', exact: true }).click();
   await page.getByRole('button', { name: /Central de downloads/ }).click();
   for (const viewport of [{ width: 320, height: 640 }, { width: 390, height: 844 }, { width: 820, height: 1180 }]) {
     await page.setViewportSize(viewport);

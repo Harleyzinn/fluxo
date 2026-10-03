@@ -1,4 +1,22 @@
-# Verificacao da Versao 2.3.0
+# Verificacao da Versao 2.4.0
+
+Validacao em 3 de outubro de 2026, Android API 37 em emulador e Microsoft Edge. O POCO fisico nao estava conectado.
+
+- 23 testes de dados passaram, incluindo modelos locais incompletos, busca de playlists e valores numericos nao finitos.
+- Interface: busca local, busca de playlists, criacao de playlist com a faixa de origem, desfazer remocao e exclusao, indices da fila, temporizador personalizado e ajustes em quatro categorias passaram.
+- Proxima ficou disponivel ao adicionar uma faixa sem trocar a musica atual. Na previa, trocar de faixa enquanto pausado permaneceu pausado.
+- 16 telas de navegacao, 24 combinacoes de personalizacao do player e bibliotecas de 250 faixas passaram. Novo player e ajustes conferidos em 320x640, 390x844 e 820x1180.
+- Android tocou o arquivo privado offline a partir da metadata original, sem localUri, com Wi-Fi e dados moveis desligados. O caminho antigo de uma fila nao impediu usar o arquivo atual.
+- Volume escolhido na interface foi aplicado ao ExoPlayer e permaneceu apos encerrar e iniciar novamente o processo. A fila foi restaurada sem iniciar automaticamente.
+- Arquivo de teste apagado fora do app deixou de aparecer como pronto. A tentativa de reproducao terminou com erro legivel, sem carregamento infinito.
+- APK instalado por cima da versao anterior, com a mesma assinatura. Temas, modo claro, player compacto, capas circulares, estilos salvos e controles conferidos no Android.
+- Stream ainda nao baixado iniciou em 3,2 segundos nesta execucao e avancou 180,4 segundos durante tres minutos com a tela apagada. O servico permaneceu em primeiro plano. O tempo de inicio varia por faixa, rede e cache.
+- Pausar, continuar e proxima faixa foram acionados na notificacao. Radio online retornou sete faixas sem IDs repetidos; radio offline avancou com a internet desligada, e o temporizador ao fim da faixa pausou.
+- Download automatico aguardou Wi-Fi, concluiu 965.128 bytes e tocou offline. Cancelamento impediu novo agendamento e a tentativa explicita liberou o item. A transferencia passou por 45 segundos com a tela apagada; nesta execucao, a conclusao so foi confirmada apos retomar o app, nao durante os primeiros 45 segundos.
+
+As verificacoes nao substituem testes no aparelho fisico. Streams ainda dependem da rede e do provedor; restricoes adicionais do HyperOS podem exigir ajustes de bateria pelo usuario.
+
+## Evidencias da Versao 2.3.0
 
 Validacao da 2.3.0 em 2 de outubro de 2026, Android API 37 em emulador e Microsoft Edge. O celular POCO fisico nao estava conectado.
 

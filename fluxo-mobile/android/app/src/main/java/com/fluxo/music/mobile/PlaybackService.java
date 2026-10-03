@@ -63,6 +63,11 @@ public class PlaybackService extends MediaSessionService {
         var source = new ResolvingDataSource.Factory(new DefaultDataSource.Factory(this, http), spec -> {
             if (!"fluxo".equals(spec.uri.getScheme())) return spec;
             String page = spec.uri.getQueryParameter("url");
+            try {
+                String local = LibraryStore.get(this).playbackUri(spec.uri.getQueryParameter("id"), page);
+                if (local != null) return spec.withUri(Uri.parse(local));
+            } catch (Exception failure) { android.util.Log.w("FluxoPlayback", "Offline file lookup failed", failure); }
+            if (page == null || page.isEmpty()) throw new java.io.IOException("Arquivo local indisponivel. Importe novamente.");
             return spec.withUri(Uri.parse(StreamResolver.resolve(page)));
         });
         var renderers = new androidx.media3.exoplayer.DefaultRenderersFactory(this) {
@@ -146,6 +151,7 @@ public class PlaybackService extends MediaSessionService {
             player.setRepeatMode(prefs.getInt("repeat", 0));
             player.setShuffleModeEnabled(prefs.getBoolean("shuffle", false));
             player.setPlaybackSpeed(prefs.getFloat("speed", 1));
+            player.setVolume(Math.max(0, Math.min(1, prefs.getFloat("volume", 1))));
             JSONArray saved = new JSONArray(prefs.getString("queue", "[]"));
             long savedPosition = prefs.getLong("position", 0);
             if (saved.length() > 0) {
@@ -349,9 +355,9 @@ public class PlaybackService extends MediaSessionService {
     }
 
     static MediaItem item(JSONObject track) {
-        String url = track.optString("localUri", track.optString("url"));
-        Uri uri = StreamResolver.isPage(url)
-            ? new Uri.Builder().scheme("fluxo").authority("audio").appendQueryParameter("url", url).build() : Uri.parse(url);
+        String url = track.optString("url");
+        Uri uri = new Uri.Builder().scheme("fluxo").authority("audio")
+            .appendQueryParameter("id", track.optString("id")).appendQueryParameter("url", url).build();
         Bundle extras = new Bundle();
         extras.putString("track", track.toString());
         var metadata = new MediaMetadata.Builder().setTitle(track.optString("title", "Sem titulo"))
@@ -385,6 +391,7 @@ public class PlaybackService extends MediaSessionService {
             data.put("buffered", Math.max(0, player.getBufferedPosition()) / 1000.0);
             data.put("shuffle", player.getShuffleModeEnabled()).put("repeat", player.getRepeatMode());
             data.put("speed", player.getPlaybackParameters().speed).put("sleepAt", sleepAt).put("error", error);
+            data.put("volume", player.getVolume());
             data.put("sleepEnd", sleepEnd).put("recovering", recovering).put("retries", retries);
             data.put("radio", radio).put("radioOffline", radioOffline).put("radioLoading", radioLoading)
                 .put("radioError", radioError).put("radioSeed", radioSeed);
@@ -400,7 +407,7 @@ public class PlaybackService extends MediaSessionService {
         switch (action) {
             case "play": error = ""; retries = 0; recovering = false; playbackGeneration++; player.prepare(); player.play(); break;
             case "pause": playbackGeneration++; recovering = false; player.pause(); break;
-            case "next": player.seekToNextMediaItem(); break;
+            case "next": player.seekToNextMediaItem(); if (radio) { radioRetryAt = 0; refillRadio(); } break;
             case "previous": player.seekToPrevious(); break;
             case "seek": player.seekTo((long) (Math.max(0, value) * 1000)); break;
             case "jump": if (index >= 0 && index < player.getMediaItemCount()) { player.seekTo(index, 0); player.prepare(); player.play(); } break;
@@ -410,6 +417,7 @@ public class PlaybackService extends MediaSessionService {
             case "shuffle": player.setShuffleModeEnabled(value == 1); break;
             case "repeat": player.setRepeatMode(Math.max(0, Math.min(2, (int)value))); break;
             case "speed": player.setPlaybackSpeed((float)Math.max(0.5, Math.min(2, value))); break;
+            case "volume": if (Double.isFinite(value)) player.setVolume((float)Math.max(0, Math.min(1, value))); break;
             case "sleep": sleepEnd = value == -1; player.setPauseAtEndOfMediaItems(sleepEnd); sleepAt = value <= 0 ? 0 : System.currentTimeMillis() + (long)(value * 60000); break;
             case "radio-stop": stopRadio(); break;
             case "radio-retry": radioRetryAt = 0; refillRadio(); break;
@@ -424,7 +432,8 @@ public class PlaybackService extends MediaSessionService {
         getSharedPreferences("player", MODE_PRIVATE).edit().putString("queue", state().optJSONArray("queue").toString())
             .putInt("index", player.getCurrentMediaItemIndex()).putLong("position", player.getCurrentPosition())
             .putInt("equalizer", eqPreset).putInt("repeat", player.getRepeatMode())
-            .putBoolean("shuffle", player.getShuffleModeEnabled()).putFloat("speed", player.getPlaybackParameters().speed).apply();
+            .putBoolean("shuffle", player.getShuffleModeEnabled()).putFloat("speed", player.getPlaybackParameters().speed)
+            .putFloat("volume", player.getVolume()).apply();
     }
     void publish() { if (FluxoAudioPlugin.visible) FluxoAudioPlugin.emit("state", state()); }
     @Nullable @Override public MediaSession onGetSession(MediaSession.ControllerInfo controller) { return session; }

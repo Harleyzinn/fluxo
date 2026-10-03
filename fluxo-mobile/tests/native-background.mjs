@@ -76,7 +76,8 @@ try {
   await page.locator('[data-action="track-play"]').first().click();
   await waitFor(s => s.playing);
   assert.equal((await call('getState')).queue.length, 1); report.noAutomaticQueue = true;
-  const online = JSON.parse(await readFile('.qa/youtube-results.json', 'utf8'))[0];
+  const online = JSON.parse(await readFile('.qa/youtube-results.json', 'utf8')).find(track => !localTracks.some(local => local.id === track.id || local.url === track.url));
+  assert.ok(online, 'Choose a stream that is not already downloaded');
   await call('setQueue', { tracks: [online, radioFixture], index: 0 });
   const start = Date.now(); await waitFor(s => s.playing); report.onlineStartMs = Date.now() - start;
   await call('command', { action: 'pause' });

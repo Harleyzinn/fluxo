@@ -73,6 +73,7 @@ try {
   await page.reload(); await page.locator('.navigation').waitFor(); await delay(1000);
   assert.equal((await call('downloads')).tracks.find(track => track.id === manual.id)?.status, 'queued'); report.manualSurvivesReload = true;
   await page.locator('.navigation [data-tab=settings]').click();
+  await page.getByRole('tab', { name: 'Biblioteca', exact: true }).click();
   await page.getByRole('button', { name: /Central de downloads/ }).click();
   await page.getByRole('button', { name: /^Pendentes/ }).click();
   await page.getByRole('button', { name: `Cancelar download de ${manual.title}`, exact: true }).click();

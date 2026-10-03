@@ -1,8 +1,30 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cleanTrack, unique, libraryTracks, filterDownloads, downloadStats, size, duration, filterTracks, validateBackup, loadModel, publicBackup } from '../www/model.js';
+import { cleanTrack, unique, libraryTracks, filterDownloads, downloadStats, size, duration, filterTracks, filterPlaylists, validateBackup, loadModel, publicBackup } from '../www/model.js';
 import { normalizeSettings, normalizeAppearance, playlistAppearance, contrastText, surfacePalette } from '../www/appearance.js';
 const track = { id: 'one', title: 'Canção', artist: 'Álvaro', duration: 65, url: 'https://example.com/a.mp3' };
+
+test('partial or malformed stored models retain valid collections without breaking startup', () => {
+  const value = { library: [track], favorites: 'invalid', history: null, playlists: [{ id: 'keep', title: 'Keep', tracks: [track] }, null], searches: [null, 'MPB', 42], settings: null };
+  const storage = { getItem: key => key === 'fluxo_mobile_v2' ? JSON.stringify(value) : null };
+  const model = loadModel(storage);
+  assert.equal(model.library[0].id, track.id); assert.deepEqual(model.favorites, []); assert.deepEqual(model.history, []);
+  assert.equal(model.playlists[0].tracks[0].id, track.id); assert.deepEqual(model.searches, ['MPB']);
+  assert.equal(model.settings.autoDownload, true); assert.deepEqual(unique({ bad: true }), []);
+});
+
+test('nonfinite durations and file sizes cannot poison progress or totals', () => {
+  assert.equal(cleanTrack({ ...track, duration: Infinity }).duration, 0);
+  assert.equal(duration(Infinity), '0:00'); assert.equal(duration(NaN), '0:00');
+  assert.equal(downloadStats([{ status: 'ready', bytes: Infinity }, { status: 'ready', bytes: 100 }]).bytes, 100);
+});
+
+test('playlists search accents without mutating the saved order', () => {
+  const rows = [{ title: 'Zebra' }, { title: 'Canção' }, { title: 'Amanhecer' }];
+  assert.equal(filterPlaylists(rows, 'cancao')[0].title, 'Canção');
+  assert.deepEqual(filterPlaylists(rows, '', 'title').map(row => row.title), ['Amanhecer', 'Canção', 'Zebra']);
+  assert.equal(rows[0].title, 'Zebra');
+});
 test('storage sizes remain meaningful for small files and invalid values', () => {
   assert.equal(size(1024), '1 KB'); assert.equal(size(1048576), '1 MB'); assert.equal(size(-1), '0 B'); assert.equal(size(Infinity), '0 B');
 });

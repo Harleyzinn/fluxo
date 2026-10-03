@@ -1,0 +1,87 @@
+import { chromium } from 'playwright';
+import assert from 'node:assert/strict';
+import { mkdir } from 'node:fs/promises';
+
+const browser = await chromium.launch({ headless: true, channel: process.env.BROWSER_CHANNEL || 'msedge' });
+const errors = [];
+await mkdir('.qa/screenshots', { recursive: true });
+try {
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto(process.env.TEST_URL || 'http://127.0.0.1:5174');
+  const choose = page.waitForEvent('filechooser');
+  await page.locator('.topbar [data-action=import]').click();
+  const wav = Buffer.alloc(44 + 8000 * 90 * 2);
+  wav.write('RIFF'); wav.writeUInt32LE(wav.length - 8, 4); wav.write('WAVEfmt ', 8); wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22); wav.writeUInt32LE(8000, 24); wav.writeUInt32LE(16000, 28); wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34); wav.write('data', 36); wav.writeUInt32LE(wav.length - 44, 40);
+  await (await choose).setFiles(['Alfa', 'Beta', 'Gama'].map(name => ({ name: `${name}.wav`, mimeType: 'audio/wav', buffer: wav })));
+  await page.getByRole('button', { name: 'Tocar Alfa', exact: true }).click();
+  await page.locator('#mini [data-action=toggle][aria-label=Pausar]').waitFor();
+  assert.equal(await page.locator('#mini [data-action=next]').isDisabled(), true);
+  await page.getByRole('button', { name: 'Opções de Beta', exact: true }).click();
+  await page.getByRole('button', { name: 'Adicionar à fila', exact: true }).click();
+  assert.equal(await page.locator('#mini [data-action=next]').isDisabled(), false, 'Appending must refresh the next control without changing the current track');
+  await page.getByRole('button', { name: 'Opções de Gama', exact: true }).click();
+  await page.getByRole('button', { name: 'Adicionar à fila', exact: true }).click();
+  await page.locator('#mini [data-action=toggle]').click();
+  await page.getByRole('button', { name: 'Abrir player', exact: true }).click();
+  await page.locator('#player [data-action=next]').click();
+  assert.equal(await page.locator('#player [data-action=toggle]').getAttribute('aria-label'), 'Reproduzir', 'Next while paused must stay paused');
+  await page.getByRole('button', { name: 'Volume do app', exact: true }).click();
+  await page.locator('#volume-slider').evaluate(input => { input.value = '.35'; input.dispatchEvent(new Event('input', { bubbles: true })); input.dispatchEvent(new Event('change', { bubbles: true })); });
+  assert.equal(await page.locator('#volume-value').textContent(), '35%');
+  await page.getByRole('button', { name: 'Fechar', exact: true }).click();
+  await page.getByRole('button', { name: 'Minimizar player', exact: true }).click();
+  await page.locator('.navigation [data-tab=queue]').click();
+  await page.getByRole('heading', { name: 'Tocando agora', exact: true }).waitFor();
+  await page.locator('[data-action=jump][data-index="2"]').click();
+  assert.equal(await page.locator('.queue-history summary').textContent(), '2 anteriores');
+  await page.locator('.navigation [data-tab=search]').click();
+  await page.getByRole('tab', { name: 'Na biblioteca', exact: true }).click();
+  await page.getByRole('searchbox', { name: 'Buscar músicas', exact: true }).fill('beta');
+  assert.equal(await page.locator('#local-search-results .track').count(), 1);
+  await page.locator('.navigation [data-tab=library]').click();
+  await page.getByRole('button', { name: 'Opções de Beta', exact: true }).click();
+  await page.getByRole('button', { name: 'Adicionar a uma playlist', exact: true }).click();
+  await page.getByRole('button', { name: 'Criar playlist com esta música', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Nome da playlist', exact: true }).fill('Canção offline');
+  await page.getByRole('button', { name: 'Salvar playlist', exact: true }).click();
+  assert.equal(await page.locator('#filtered-list .track').count(), 1, 'Create from a track must include that track');
+  await page.getByRole('button', { name: 'Opções de Beta', exact: true }).click();
+  await page.getByRole('button', { name: 'Remover da playlist', exact: true }).click();
+  await page.getByRole('button', { name: 'Desfazer', exact: true }).click();
+  assert.equal(await page.locator('#filtered-list .track').count(), 1);
+  await page.getByRole('button', { name: 'Opções da playlist', exact: true }).click();
+  await page.getByRole('button', { name: 'Excluir playlist', exact: true }).click();
+  await page.getByRole('button', { name: 'Confirmar', exact: true }).click();
+  await page.getByRole('button', { name: 'Desfazer', exact: true }).click();
+  await page.getByRole('searchbox', { name: 'Buscar playlists', exact: true }).fill('cancao');
+  assert.equal(await page.locator('.playlist-card').count(), 1);
+  await page.getByRole('searchbox', { name: 'Buscar playlists', exact: true }).fill('missing');
+  assert.equal(await page.locator('.playlist-card').count(), 0);
+  await page.getByRole('searchbox', { name: 'Buscar playlists', exact: true }).fill('');
+  await page.screenshot({ path: '.qa/screenshots/library-2.4-390.png', fullPage: true });
+  await page.locator('.navigation [data-tab=settings]').click();
+  await page.getByRole('button', { name: /Volume do app/ }).click();
+  assert.equal(await page.locator('#volume-slider').inputValue(), '0.35');
+  await page.getByRole('button', { name: 'Fechar', exact: true }).click();
+  await page.getByRole('button', { name: /Temporizador/ }).click();
+  await page.getByRole('spinbutton', { name: 'Minutos do temporizador', exact: true }).fill('13');
+  await page.getByRole('button', { name: 'Ativar temporizador personalizado', exact: true }).click();
+  await page.getByRole('button', { name: /Temporizador/ }).click();
+  await page.getByRole('button', { name: 'Desativado', exact: true }).click();
+  for (const viewport of [{ width: 320, height: 640 }, { width: 390, height: 844 }, { width: 820, height: 1180 }]) {
+    await page.setViewportSize(viewport);
+    for (const tab of ['Áudio', 'Biblioteca', 'Visual', 'Sistema']) {
+      await page.getByRole('tab', { name: tab, exact: true }).click();
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    }
+    await page.screenshot({ path: `.qa/screenshots/settings-2.4-${viewport.width}.png`, fullPage: true });
+    await page.getByRole('button', { name: 'Abrir player', exact: true }).click();
+    await page.waitForTimeout(250);
+    assert.ok(await page.locator('#player .player-footer').evaluate(element => element.getBoundingClientRect().bottom <= innerHeight + 1));
+    await page.screenshot({ path: `.qa/screenshots/player-2.4-${viewport.width}.png` });
+    await page.getByRole('button', { name: 'Minimizar player', exact: true }).click();
+  }
+  assert.deepEqual(errors, []);
+  console.log('Refinements passed: next refresh, paused next, volume, queue indexes, local search, create from track, undo, playlist search, custom timer, categorized settings and responsive player.');
+} finally { await browser.close(); }

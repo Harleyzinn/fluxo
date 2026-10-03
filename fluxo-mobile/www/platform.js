@@ -2,7 +2,7 @@ import { cleanTrack } from './model.js';
 export const native = !!window.Capacitor?.isNativePlatform();
 const plugin = native ? (window.Capacitor.Plugins.FluxoAudio || window.Capacitor.registerPlugin('FluxoAudio')) : null;
 let callback = () => {};
-let state = { queue: [], index: 0, position: 0, duration: 0, playing: false, buffering: false, repeat: 0, shuffle: false, speed: 1, error: '', sleepAt: 0 };
+let state = { queue: [], index: 0, position: 0, duration: 0, playing: false, playWhenReady: false, buffering: false, repeat: 0, shuffle: false, speed: 1, volume: 1, error: '', sleepAt: 0 };
 const audio = new Audio();
 let objectURL = '';
 let timeout;
@@ -25,9 +25,9 @@ async function dbRequest(mode, operation) {
     tx.onerror = () => { db.close(); reject(tx.error); }; tx.onabort = tx.onerror;
   });
 }
-async function browserPlay() {
+async function browserPlay(play = true) {
   const token = ++generation;
-  clearTimeout(timeout); audio.pause(); state.error = ''; state.buffering = true; emit();
+  clearTimeout(timeout); audio.pause(); audio.removeAttribute('src'); audio.load(); state.error = ''; state.position = 0; state.duration = 0; state.buffered = 0; state.playWhenReady = play; state.buffering = play; emit();
   const track = state.queue[state.index];
   if (!track) { state.buffering = false; emit(); return; }
   try {
@@ -37,25 +37,26 @@ async function browserPlay() {
     objectURL = record?.blob ? URL.createObjectURL(record.blob) : '';
     if (!objectURL && !/^https:\/\//.test(track.url)) throw new Error('Importe o arquivo novamente.');
     if (!objectURL && /(?:youtube\.com|youtu\.be|soundcloud\.com)\//.test(track.url)) throw new Error('Esta fonte precisa do aplicativo Android.');
-    audio.src = objectURL || track.url; audio.playbackRate = state.speed;
-    timeout = setTimeout(() => { if (token === generation) { audio.pause(); state.buffering = false; state.error = 'O áudio demorou demais. Tente novamente.'; emit(); } }, 20000);
+    audio.src = objectURL || track.url; audio.playbackRate = state.speed; audio.volume = state.volume;
+    if (!play) { audio.load(); emit(); return; }
+    timeout = setTimeout(() => { if (token === generation) { audio.pause(); state.playWhenReady = false; state.buffering = false; state.error = 'O áudio demorou demais. Tente novamente.'; emit(); } }, 20000);
     await audio.play();
-  } catch (error) { clearTimeout(timeout); state.buffering = false; state.error = error.message; emit(); }
+  } catch (error) { if (token !== generation) return; clearTimeout(timeout); state.buffering = false; state.playWhenReady = false; state.error = error.message; emit(); }
 }
 audio.addEventListener('playing', () => { clearTimeout(timeout); state.playing = true; state.buffering = false; emit(); });
 audio.addEventListener('pause', () => { state.playing = false; emit(); });
 audio.addEventListener('waiting', () => { state.buffering = true; emit(); });
-audio.addEventListener('error', () => { clearTimeout(timeout); state.buffering = false; state.error = 'Não foi possível abrir este áudio.'; emit(); });
-audio.addEventListener('timeupdate', () => { state.position = audio.currentTime; state.duration = Number.isFinite(audio.duration) ? audio.duration : 0; emit(); });
+audio.addEventListener('error', () => { clearTimeout(timeout); state.playWhenReady = false; state.buffering = false; state.error = 'Não foi possível abrir este áudio.'; emit(); });
+audio.addEventListener('timeupdate', () => { state.position = audio.currentTime; state.duration = Number.isFinite(audio.duration) ? audio.duration : 0; state.buffered = audio.buffered.length ? audio.buffered.end(audio.buffered.length - 1) : 0; emit(); });
 audio.addEventListener('loadedmetadata', () => { state.duration = Number.isFinite(audio.duration) ? audio.duration : 0; emit(); });
 audio.addEventListener('ended', () => {
   state.playing = false;
-  if (state.sleepEnd) { state.sleepEnd = false; emit(); return; }
+  if (state.sleepEnd) { state.sleepEnd = false; state.playWhenReady = false; emit(); return; }
   if (state.repeat === 1) return browserPlay();
   if (state.index + 1 < state.queue.length || state.repeat === 2 || state.radio) commands.command({ action: 'next' });
-  else emit();
+  else { state.playWhenReady = false; emit(); }
 });
-setInterval(() => { if (state.sleepAt && Date.now() >= state.sleepAt) { audio.pause(); state.sleepAt = 0; emit(); } }, 1000);
+setInterval(() => { if (state.sleepAt && Date.now() >= state.sleepAt) { audio.pause(); state.playWhenReady = false; state.sleepAt = 0; emit(); } }, 1000);
 export const commands = {
   async migrateOldDownloads(onProgress) {
     if (!native || localStorage.fluxo_audio_migrated === 'yes') return;
@@ -92,6 +93,7 @@ export const commands = {
     if (!candidates.length && state.queue.length <= state.index + 1) throw new Error('Adicione outra música baixada e permitida no rádio.');
     state.queue.push(...candidates.sort(() => Math.random() - .5).map(t => ({ ...t, radioGenerated: true })));
     state.radio = true; state.radioOffline = true; state.radioSeed = track; state.repeat = 0; state.shuffle = false;
+    state.playWhenReady = true;
     if (same) await audio.play(); else await browserPlay();
     emit();
   },
@@ -107,30 +109,31 @@ export const commands = {
     if (native) return plugin.command(options);
     const { action, value = 0, index = 0 } = options;
     switch (action) {
-      case 'play': if (!audio.src || state.error) await browserPlay(); else await audio.play(); break;
-      case 'pause': audio.pause(); state.buffering = false; clearTimeout(timeout); break;
+      case 'play': state.playWhenReady = true; if (!audio.src || state.error) await browserPlay(); else await audio.play(); break;
+      case 'pause': generation++; audio.pause(); state.playWhenReady = false; state.buffering = false; clearTimeout(timeout); break;
       case 'next': {
         if (!state.queue.length) break;
         if (state.radio) {
           const candidates = state.queue.map((track, i) => ({ track, i })).filter(({ track, i }) => i !== state.index && !excluded(track));
           if (!candidates.length) { state.radio = false; audio.pause(); break; }
           state.index = candidates.find(({ i }) => i > state.index)?.i ?? candidates[0].i;
-        } else if (state.shuffle) state.index = Math.floor(Math.random() * state.queue.length);
+        } else if (state.shuffle && state.queue.length > 1) state.index = (state.index + 1 + Math.floor(Math.random() * (state.queue.length - 1))) % state.queue.length;
         else if (state.index + 1 < state.queue.length) state.index++;
         else if (state.repeat === 2) state.index = 0;
         else break;
-        await browserPlay(); break;
+        await browserPlay(state.playWhenReady); break;
       }
-      case 'previous': if (audio.currentTime > 3) audio.currentTime = 0; else { state.index = Math.max(0, state.index - 1); await browserPlay(); } break;
+      case 'previous': if (audio.currentTime > 3) audio.currentTime = 0; else { state.index = Math.max(0, state.index - 1); await browserPlay(state.playWhenReady); } break;
       case 'jump': state.index = index; await browserPlay(); break;
       case 'seek': audio.currentTime = value; break;
-      case 'clear': audio.pause(); state.radio = false; state.queue = []; state.index = 0; break;
+      case 'clear': generation++; clearTimeout(timeout); audio.pause(); audio.removeAttribute('src'); audio.load(); if (objectURL) URL.revokeObjectURL(objectURL); objectURL = ''; state.radio = false; state.queue = []; state.index = 0; state.playWhenReady = false; state.buffering = false; state.error = ''; state.sleepAt = 0; state.sleepEnd = false; break;
       case 'radio-stop': state.radio = false; state.queue = state.queue.filter((track, i) => i <= state.index || !track.radioGenerated); break;
       case 'remove': state.queue.splice(index, 1); if (index < state.index) state.index--; else if (index === state.index) { state.index = Math.min(state.index, state.queue.length - 1); await browserPlay(); } break;
       case 'move': { const current = state.queue[state.index]; const [item] = state.queue.splice(index, 1); state.queue.splice(value, 0, item); state.index = state.queue.indexOf(current); break; }
       case 'repeat': state.repeat = value; break;
       case 'shuffle': state.shuffle = !!value; break;
       case 'speed': state.speed = value; audio.playbackRate = value; break;
+      case 'volume': state.volume = Math.max(0, Math.min(1, Number(value) || 0)); audio.volume = state.volume; break;
       case 'sleep': state.sleepEnd = value === -1; state.sleepAt = value > 0 ? Date.now() + value * 60000 : 0; break;
     } emit();
   },

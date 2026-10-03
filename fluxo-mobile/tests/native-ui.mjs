@@ -24,12 +24,14 @@ try {
   const track = downloads.find(item => item.status === 'ready');
   assert.ok(track, 'Download or import a track before this test');
   await page.locator('.navigation [data-tab=settings]').click();
+  await page.getByRole('tab', { name: 'Visual', exact: true }).click();
   await page.getByRole('button', { name: /Temas do Fluxo/ }).click();
   assert.equal(await page.locator('.theme-tile').count(), 68);
   await page.getByRole('button', { name: 'Tema Portal / Aperture', exact: true }).click();
   assert.equal(await page.evaluate(() => document.documentElement.style.colorScheme), 'light');
   await page.getByRole('button', { name: 'Tema Fluxo Bug', exact: true }).click();
   await page.getByRole('button', { name: 'Fechar', exact: true }).click();
+  await page.getByRole('tab', { name: 'Biblioteca', exact: true }).click();
   await page.getByRole('button', { name: /Músicas no dispositivo/ }).evaluate(el => el.scrollIntoView({ block: 'center' }));
   await page.getByRole('button', { name: /Músicas no dispositivo/ }).click();
   await page.getByRole('button', { name: `Tocar ${track.title}`, exact: true }).first().click();
@@ -41,6 +43,7 @@ try {
   await page.getByRole('button', { name: 'Pausar', exact: true }).last().click();
   await page.getByRole('button', { name: 'Minimizar player' }).click();
   await page.locator('.navigation [data-tab=settings]').click();
+  await page.getByRole('tab', { name: 'Visual', exact: true }).click();
   await page.getByRole('button', { name: /Personalizar aparência/ }).click();
   await page.getByRole('combobox', { name: 'Espaçamento', exact: true }).selectOption('compact');
   await page.getByRole('combobox', { name: 'Formato das capas', exact: true }).selectOption('round');

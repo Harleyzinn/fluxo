@@ -18,6 +18,7 @@ try {
   await page.getByRole('button', { name: 'Tocar Minha faixa', exact: true }).click();
   await page.getByRole('button', { name: 'Pausar', exact: true }).waitFor();
   await page.locator('.navigation [data-tab=settings]').click();
+  await page.getByRole('tab', { name: 'Visual', exact: true }).click();
   await page.getByRole('button', { name: /Personalizar aparência/ }).click();
   await page.getByRole('combobox', { name: 'Espaçamento', exact: true }).selectOption('compact');
   await page.getByRole('combobox', { name: 'Tamanho do texto', exact: true }).selectOption('large');
@@ -71,6 +72,7 @@ try {
   for (const viewport of [{ width: 320, height: 640 }, { width: 390, height: 844 }, { width: 820, height: 1180 }, { width: 1280, height: 800 }]) {
     await page.setViewportSize(viewport);
     await page.locator('.navigation [data-tab=settings]').click();
+    await page.getByRole('tab', { name: 'Visual', exact: true }).click();
     await page.getByRole('button', { name: /Personalizar aparência/ }).click();
     await page.getByRole('combobox', { name: 'Tamanho do texto', exact: true }).selectOption('large');
     for (const lookTab of ['Visual', 'Player', 'Estilos salvos']) {

@@ -5,18 +5,18 @@ export const cleanTrack = value => {
   const id = String(value.originalId || value.id || url).slice(0, 500);
   if (!id) return null;
   return { id, title: String(value.title || 'Sem título').slice(0, 500), artist: String(value.artist || 'Arquivo local').slice(0, 500),
-    url, thumbnail: String(value.thumbnail || ''), duration: Math.max(0, Number(value.duration) || 0),
+    url, thumbnail: String(value.thumbnail || ''), duration: Number.isFinite(Number(value.duration)) ? Math.max(0, Number(value.duration)) : 0,
     source: String(value.source || 'direct'), ...(value.localUri ? { localUri: String(value.localUri) } : {}) };
 };
-export const unique = tracks => [...new Map(tracks.map(cleanTrack).filter(Boolean).map(t => [t.id, t])).values()];
+export const unique = tracks => [...new Map((Array.isArray(tracks) ? tracks : []).map(cleanTrack).filter(Boolean).map(t => [t.id, t])).values()];
 export const libraryTracks = model => unique([...(model.library || []), ...(model.favorites || []), ...(model.playlists || []).flatMap(p => p.tracks || [])]);
 export const publicTracks = tracks => unique(tracks).map(({ localUri, ...track }) => ({ ...track, url: track.url.startsWith('https://') ? track.url : '', thumbnail: track.thumbnail.startsWith('https://') ? track.thumbnail : '' }));
 export const filterDownloads = (tracks, status = 'all') => tracks.filter(track => status === 'pending' ? ['queued', 'downloading'].includes(track.status) : status === 'all' || track.status === status);
 export function downloadStats(tracks) {
   return { ready: filterDownloads(tracks, 'ready').length, pending: filterDownloads(tracks, 'pending').length, failed: filterDownloads(tracks, 'failed').length,
-    bytes: filterDownloads(tracks, 'ready').reduce((total, track) => total + Math.max(0, Number(track.bytes) || 0), 0) };
+    bytes: filterDownloads(tracks, 'ready').reduce((total, track) => total + (Number.isFinite(Number(track.bytes)) ? Math.max(0, Number(track.bytes)) : 0), 0) };
 }
-export const duration = n => { n = Math.max(0, Math.floor(Number(n) || 0)); return `${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')}`; };
+export const duration = n => { n = Number.isFinite(Number(n)) ? Math.max(0, Math.floor(Number(n))) : 0; return `${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')}`; };
 export const size = n => {
   n = Number.isFinite(Number(n)) ? Math.max(0, Number(n)) : 0;
   const [divisor, unit] = n >= 1073741824 ? [1073741824, 'GB'] : n >= 1048576 ? [1048576, 'MB'] : n >= 1024 ? [1024, 'KB'] : [1, 'B'];
@@ -27,6 +27,11 @@ export function filterTracks(tracks, query = '', sort = 'recent') {
   let result = tracks.filter(t => normalize(`${t.title} ${t.artist}`).includes(normalize(query.trim())));
   if (sort === 'title' || sort === 'artist') result = [...result].sort((a, b) => a[sort].localeCompare(b[sort], 'pt-BR'));
   return result;
+}
+export function filterPlaylists(playlists, query = '', sort = 'recent') {
+  const normalize = value => String(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const result = playlists.filter(playlist => normalize(playlist.title).includes(normalize(query.trim())));
+  return sort === 'title' ? result.sort((a, b) => a.title.localeCompare(b.title, 'pt-BR')) : result;
 }
 export function validateBackup(input) {
   if (!input || input.format !== 'fluxo-mobile' || input.version !== 2) throw new Error('Este arquivo não é um backup do Fluxo Mobile 2.');
@@ -42,9 +47,17 @@ export function validateBackup(input) {
 export function loadModel(storage) {
   const read = (key, fallback) => { try { return JSON.parse(storage.getItem(key)) ?? fallback; } catch { return fallback; } };
   const current = read('fluxo_mobile_v2', null);
-  return current || { favorites: unique(read('fluxo_mobile_favorites', [])), history: unique(read('fluxo_mobile_history', [])),
-    playlists: read('fluxo_mobile_playlists', []).filter(p => p && Array.isArray(p.tracks)).map(p => ({ ...p, tracks: unique(p.tracks) })),
-    searches: [], settings: { theme: storage.getItem('fluxo_mobile_theme') || 'fluxobug', wifiOnly: false, offline: false, accent: '#a5f060' } };
+  const value = current && typeof current === 'object' && !Array.isArray(current) ? current : {
+    favorites: read('fluxo_mobile_favorites', []), history: read('fluxo_mobile_history', []),
+    playlists: read('fluxo_mobile_playlists', []),
+    settings: { theme: storage.getItem('fluxo_mobile_theme') || 'fluxobug', wifiOnly: false, offline: false, accent: '#a5f060' }
+  };
+  return { ...value, library: unique(value.library), favorites: unique(value.favorites), history: unique(value.history).slice(0, 100),
+    radioExcluded: unique(value.radioExcluded).slice(0, 500),
+    playlists: (Array.isArray(value.playlists) ? value.playlists : []).filter(p => p && Array.isArray(p.tracks)).map(p => ({ ...p,
+      id: String(p.id || crypto.randomUUID()), title: String(p.title || 'Playlist').slice(0, 100), tracks: unique(p.tracks) })),
+    searches: (Array.isArray(value.searches) ? value.searches : []).filter(value => typeof value === 'string' && value.trim()).slice(0, 8),
+    settings: normalizeSettings(value.settings) };
 }
 export function publicBackup(model) {
   return { format: 'fluxo-mobile', version: 2, exportedAt: new Date().toISOString(), library: publicTracks(model.library || []), favorites: publicTracks(model.favorites),

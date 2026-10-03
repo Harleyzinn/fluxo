@@ -1,12 +1,12 @@
-# Fluxo Mobile 2.3
+# Fluxo Mobile 2.4
 
 App independente para **Android 7 ou superior**, reconstruido na pasta `fluxo-mobile`. Nao precisa do Fluxo de PC nem de um servidor seu para tocar. A interface usa HTML/CSS/JavaScript dentro do Capacitor; o audio, a sessao de midia, a extracao de streams e os arquivos sao tratados em Java no Android.
 
 ## Instalar e usar
 
-Download: [Fluxo Mobile 2.3.0 para Android](https://github.com/Harleyzinn/fluxo/releases/tag/mobile-v2.3.0). Baixe o arquivo `Fluxo-Mobile-2.3.0.apk`, nao os pacotes de codigo-fonte.
+Download: [Fluxo Mobile 2.4.0 para Android](https://github.com/Harleyzinn/fluxo/releases/tag/mobile-v2.4.0). Baixe o arquivo `Fluxo-Mobile-2.4.0.apk`, nao os pacotes de codigo-fonte.
 
-1. Abra o link de download no celular ou envie `dist/Fluxo-Mobile-2.3.0.apk` por USB.
+1. Abra o link de download no celular ou envie `dist/Fluxo-Mobile-2.4.0.apk` por USB.
 2. Abra o APK no celular. Quando o Android pedir, permita instalar apps dessa origem. Depois da instalacao, voce pode desativar essa permissao novamente.
 3. Abra o Fluxo. Procure uma musica na aba **Buscar** ou use o botao de pasta para importar seus arquivos.
 4. Ao iniciar a primeira reproducao ou download, o app pede notificacoes no Android 13 ou superior. Negar nao impede tocar. O seletor de arquivos concede acesso somente aos arquivos escolhidos, sem pedir acesso geral ao armazenamento.
@@ -16,6 +16,23 @@ Download: [Fluxo Mobile 2.3.0 para Android](https://github.com/Harleyzinn/fluxo/
 **Nao precisa upar um site para usar o aplicativo.** O APK ja contem o app. O endereco de pre-visualizacao no computador e apenas uma ferramenta de desenvolvimento, nao e o app Android.
 
 Este APK e uma compilacao de desenvolvimento assinada para instalacao pessoal. Para publicar na Play Store ou distribuir atualizacoes permanentes, gere uma chave de assinatura de producao no Android Studio em **Build > Generate Signed App Bundle / APK**. Guarde essa chave: uma atualizacao precisa da mesma assinatura. Nao envie senhas nem a chave ao GitHub. Uma assinatura diferente exige desinstalar o app anterior, apagando seus arquivos privados; exporte os dados antes e preserve os audios originais.
+
+## Novidades da 2.4.0
+
+- Ajustes divididos em Audio, Biblioteca, Visual e Sistema, com menos controles por tela.
+- Busca Na biblioteca funciona com faixas salvas e importadas; sem internet, exibe apenas as disponiveis offline. Busca online continua separada.
+- Biblioteca com area Continuar ouvindo, resumo compacto, busca de playlists sem diferenciar acentos, ordenacao por nome e indicador de arquivos locais nas capas.
+- Fila dividida em Tocando agora, A seguir e anteriores recolhiveis, preservando os indices corretos ao tocar ou mover itens.
+- Menu da musica com atalhos de favoritas/fila/download e grupos Biblioteca, Reproducao e Organizar.
+- Volume interno de 0 a 100%, salvo pelo player Android, sem alterar o volume geral do telefone. Controle acessivel pelo player e Ajustes > Audio.
+- Temporizador personalizado de 1 a 240 minutos, alem dos intervalos prontos e Ao fim desta musica.
+- Desfazer por dez segundos apos remover uma faixa da playlist ou excluir a playlist. Excluir uma colecao retorna para Colecoes.
+- Criar uma playlist pelo menu da musica inclui aquela musica, mesmo quando ainda nao existiam playlists.
+- Botao Proxima atualizado ao adicionar faixas sem trocar a musica atual. Trocar de faixa enquanto pausado nao inicia o audio na previa do navegador.
+- Player Android consulta o arquivo offline atual ao abrir o audio, inclusive para filas restauradas com um caminho antigo. Arquivos ausentes ou vazios deixam de aparecer como prontos.
+- Inicializacao tolera dados locais parciais; duracoes e tamanhos invalidos nao quebram os totais. Campos de busca mantem o foco ao atualizar a interface.
+
+A 2.4 mantem os 68 temas, estilos, downloads automaticos, preferencias do radio e central de notificacoes. A assinatura permanece igual para atualizar sem desinstalar. A validacao Android e feita em emulador; o POCO fisico ainda precisa ser conferido.
 
 ## Novidades da 2.3.0
 
@@ -51,7 +68,7 @@ Os temas, estilos, central de notificacoes, reproducao em segundo plano e demais
 
 ## POCO / Xiaomi com HyperOS
 
-No POCO X5 5G, abra **Ajustes > Tela apagada e notificacoes** no Fluxo. Permita notificacoes. Nos ajustes do aplicativo no telefone, procure a opcao de bateria e escolha **Sem restricoes**, se disponivel. Em **Configuracoes > Apps > Inicializacao automatica em segundo plano**, permita o Fluxo quando necessario. Os nomes e caminhos variam com a versao do HyperOS; o app abre os ajustes, mas nao muda essas permissoes sozinho.
+No POCO X5 5G, abra **Ajustes > Sistema > Tela apagada e notificacoes** no Fluxo. Permita notificacoes. Nos ajustes do aplicativo no telefone, procure a opcao de bateria e escolha **Sem restricoes**, se disponivel. Em **Configuracoes > Apps > Inicializacao automatica em segundo plano**, permita o Fluxo quando necessario. Os nomes e caminhos variam com a versao do HyperOS; o app abre os ajustes, mas nao muda essas permissoes sozinho.
 
 O estado "sem otimizacao do Android" nao confirma todas as regras extras do HyperOS. A documentacao da Xiaomi descreve as [restricoes de bateria por aplicativo](https://www.mi.com/global/support/article/KA-61830/) e o [controle de inicializacao automatica](https://www.mi.com/global/support/faq/details/KA-497677/). A central usa a [sessao de midia oficial do Android](https://developer.android.com/media/media3/session/background-playback), e nao uma notificacao decorativa que depende da tela aberta.
 

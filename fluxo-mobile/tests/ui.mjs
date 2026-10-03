@@ -49,6 +49,7 @@ try {
   await page.getByRole('heading', { name: 'Você está offline' }).waitFor();
   await page.locator('.navigation [data-tab=settings]').click();
   await page.getByRole('checkbox', { name: 'Modo offline' }).uncheck();
+  await page.getByRole('tab', { name: 'Visual', exact: true }).click();
   await page.getByRole('button', { name: /Temas do Fluxo/ }).click();
   assert.equal(await page.locator('.theme-tile').count(), 68);
   await page.getByRole('searchbox', { name: 'Encontrar tema' }).fill('manga');
@@ -84,8 +85,10 @@ try {
   await page.getByRole('button', { name: 'Encerrar rádio', exact: true }).click();
   assert.equal(await page.locator('.radio-strip').count(), 0);
   await page.locator('.navigation [data-tab=settings]').click();
+  await page.getByRole('tab', { name: 'Biblioteca', exact: true }).click();
   await page.getByRole('checkbox', { name: 'Download automático', exact: true }).uncheck();
   await page.reload();
+  await page.getByRole('tab', { name: 'Biblioteca', exact: true }).click();
   assert.ok(await page.evaluate(() => JSON.parse(localStorage.fluxo_mobile_v2).playlists[0].tracks.length === 1));
   assert.equal(await page.getByRole('checkbox', { name: 'Download automático', exact: true }).isChecked(), false);
   assert.deepEqual(errors, []);

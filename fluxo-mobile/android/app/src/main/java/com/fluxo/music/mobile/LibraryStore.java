@@ -57,7 +57,7 @@ public class LibraryStore {
         for (int i = 0; i < records.length(); i++) {
             JSONObject record = records.getJSONObject(i);
             long downloadId = record.optLong("downloadId", -1);
-            if (downloadId < 0) continue;
+            if (downloadId < 0) { verifyFile(record); continue; }
             JSONObject snapshot = states.get(downloadId);
             if (snapshot == null) { record.put("status", "failed").put("statusDetail", "Download nao encontrado. Tente novamente."); continue; }
             {
@@ -70,6 +70,7 @@ public class LibraryStore {
                     String local = snapshot.optString("local");
                     record.put("localUri", local).put("status", "ready").put("progress", 100);
                     record.remove("statusDetail");
+                    verifyFile(record);
                 } else if (status == DownloadManager.STATUS_FAILED) {
                     record.put("status", "failed").put("statusDetail", reason == DownloadManager.ERROR_INSUFFICIENT_SPACE ? "Sem espaco no dispositivo" : "Falha no download. Tente novamente.");
                 } else {
@@ -80,6 +81,29 @@ public class LibraryStore {
         }
         if (!records.toString().equals(context.getSharedPreferences("library", 0).getString("tracks", "[]"))) save(records);
         return records;
+    }
+    private void verifyFile(JSONObject record) throws Exception {
+        if (!record.optString("status").equals("ready")) return;
+        String uri = record.optString("localUri");
+        File file = uri.startsWith("file://") ? new File(Uri.parse(uri).getPath()) : null;
+        if (file == null || !file.isFile() || file.length() == 0) {
+            record.put("status", "failed").put("statusDetail", "Arquivo ausente. Baixe ou importe novamente.");
+            record.remove("localUri");
+        }
+    }
+    public synchronized String playbackUri(String id, String url) throws Exception {
+        JSONArray records = records();
+        for (int i = 0; i < records.length(); i++) {
+            JSONObject record = records.getJSONObject(i);
+            if (!record.optString("id").equals(id) && (url == null || url.isEmpty() || !url.equals(record.optString("url")))) continue;
+            if (!record.optString("status").equals("ready")) continue;
+            String uri = record.optString("localUri");
+            if (uri.startsWith("file://")) {
+                File file = new File(Uri.parse(uri).getPath());
+                if (file.isFile() && file.length() > 0) return uri;
+            }
+        }
+        return null;
     }
     public synchronized JSONObject download(JSONObject track, String url, boolean wifiOnly) throws Exception {
         JSONArray records = list();
