@@ -1,4 +1,23 @@
-# Verificacao da Versao 2.4.0
+# Verificacao da Versao 2.5.0
+
+Validacao em 3 de outubro de 2026, Android API 37 em emulador e Microsoft Edge. O POCO X5 5G fisico nao estava conectado.
+
+- 29 testes de dados passaram: identificadores de downloads, correspondencia por URL, remocao em lote, ordem no desfazer, playlists fixadas e preservacao de adicoes posteriores.
+- Biblioteca de 183 faixas: selecao mantida ao mudar o filtro, selecao de toda a colecao alem da primeira pagina, criacao de playlist em lote, fixacao, favoritas e remocao com desfazer passaram.
+- Historico completo, busca, limpeza com desfazer e reproducao da selecao filtrada passaram. Voltar recuperou a rolagem e as 160 linhas ja carregadas.
+- Na previa, a fila atualizou ao adicionar faixas, apenas a posicao atual foi destacada entre repetidas e remover a faixa pausada nao iniciou a seguinte.
+- Layouts de colecoes e selecao em 320x640, 390x844 e 820x844 sem rolagem horizontal. 16 telas de navegacao, 24 combinacoes de aparencia, biblioteca de 250 faixas e a suite da 2.4 tambem passaram.
+- No Android sem Wi-Fi/dados moveis, arquivos com identificadores antigos tocaram por sua URL correspondente. O indice solicitado da playlist foi preservado.
+- Os atalhos de dez segundos foram acionados pela interface. Limpar anteriores/proximas/repetidas preservou a faixa, a posicao de 35 segundos e o estado pausado. Remover a ultima faixa encerrou a sessao vazia sem erro antigo.
+- Playlist, fixacao e arquivos locais foram preservados ao encerrar e reiniciar o processo Android. APK instalado por cima da versao anterior com o mesmo certificado.
+- Migracao nativa de tres arquivos de 2.400.044 bytes por blocos: SHA-256 de cada copia Android igual ao original, verificando que os blocos nao se sobrescrevem.
+- Reparacao de uma copia de teste truncada criou um novo arquivo com SHA-256 igual ao original e preservou o anterior. Uma fila com o caminho antigo tocou a copia reparada. A verificacao da ponte de migracao confirmou offsets/tamanhos e que arquivos removidos pelo usuario, copias validas e registros do DownloadManager nao sao substituidos. Uma segunda execucao nao repetiu a migracao.
+- Stream online nao baixado iniciou em 3,2 segundos nesta execucao, avancou 180,4 segundos com a tela realmente apagada por tres minutos e manteve o servico em primeiro plano. Pausa, continuar e proxima foram acionados na notificacao.
+- Radio online retornou sete faixas sem IDs repetidos, encerrar limpou recomendacoes futuras, radio offline avancou sem internet e o temporizador Ao fim desta musica pausou.
+
+Os tempos de inicio dependem da faixa, rede e cache. A verificacao em emulador nao substitui teste no POCO fisico; as restricoes adicionais do HyperOS ainda podem exigir ajustes de bateria pelo usuario.
+
+## Evidencias da Versao 2.4.0
 
 Validacao em 3 de outubro de 2026, Android API 37 em emulador e Microsoft Edge. O POCO fisico nao estava conectado.
 

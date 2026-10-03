@@ -189,27 +189,41 @@ public class LibraryStore {
         JSONArray records = records(); records.put(track); save(records);
         return track;
     }
-    public synchronized void migrate(JSONObject track, long offset, byte[] bytes, boolean complete) throws Exception {
+    public synchronized void migrate(JSONObject track, long offset, byte[] bytes, boolean complete, boolean repair) throws Exception {
         String id = track.getString("id");
         JSONArray saved = records();
         for (int i = 0; i < saved.length(); i++) {
-            if (saved.getJSONObject(i).optString("id").equals(id)) return;
+            JSONObject existing = saved.getJSONObject(i);
+            if (existing.optString("id").equals(id)) {
+                if (!repair) return;
+                if (existing.optLong("downloadId", -1) >= 0) throw new java.io.IOException("Este download nao pode ser substituido pela migracao.");
+            }
         }
         File directory = new File(context.getFilesDir(), "music");
         directory.mkdirs();
         String key = UUID.nameUUIDFromBytes(id.getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString();
-        File partial = new File(directory, key + ".part");
+        File partial = new File(directory, key + (repair ? ".repair.part" : ".part"));
         try (java.io.RandomAccessFile file = new java.io.RandomAccessFile(partial, "rw")) {
+            if (offset < 0) throw new java.io.IOException("Posicao de migracao invalida.");
             if (offset == 0) file.setLength(0);
             if (offset != file.length() || bytes.length > 524288) throw new java.io.IOException("Bloco de migracao invalido.");
             file.seek(offset); file.write(bytes);
         }
         if (complete) {
-            File target = new File(directory, key + ".audio");
+            File target = new File(directory, (repair ? UUID.randomUUID().toString() : key) + ".audio");
             if (!partial.renameTo(target)) throw new java.io.IOException("Nao foi possivel salvar o audio antigo.");
             JSONObject record = new JSONObject(track.toString()).put("localUri", Uri.fromFile(target).toString())
                 .put("status", "ready").put("bytes", target.length()).put("savedAt", System.currentTimeMillis());
-            JSONArray records = records(); records.put(record); save(records);
+            JSONArray records = records(); boolean replaced = false;
+            for (int i = 0; i < records.length(); i++) if (records.getJSONObject(i).optString("id").equals(id)) {
+                if (!repair || records.getJSONObject(i).optLong("downloadId", -1) >= 0) { target.delete(); throw new java.io.IOException("A biblioteca mudou durante a migracao."); }
+                String artwork = records.getJSONObject(i).optString("thumbnail");
+                if (!artwork.isEmpty()) record.put("thumbnail", artwork);
+                records.put(i, record); replaced = true; break;
+            }
+            if (!replaced) records.put(record);
+            // A repair uses a new file so the previous copy remains recoverable.
+            save(records);
         }
     }
     public synchronized void remove(String id) throws Exception {

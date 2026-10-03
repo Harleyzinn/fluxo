@@ -1,5 +1,5 @@
 import { themes } from './themes.js';
-import { loadModel, unique, cleanTrack, libraryTracks, filterTracks, filterPlaylists, filterDownloads, downloadStats, duration, size, publicBackup, validateBackup } from './model.js';
+import { loadModel, unique, cleanTrack, sameTrack, withDownload, removeLibraryTracks, restoreLibraryTracks, libraryTracks, filterTracks, filterPlaylists, filterDownloads, downloadStats, duration, size, publicBackup, validateBackup } from './model.js';
 import { commands, native, artURL } from './platform.js';
 import { startVisualizer, stopVisualizer } from './visualizer.js';
 import { appearanceDefaults, normalizeSettings, normalizeAppearance, playlistAppearance, playlistIcons, playlistColors, surfacePalette, contrastText } from './appearance.js';
@@ -50,14 +50,31 @@ let appearanceOpen = false;
 let appearanceTab = 'visual';
 let themeFavoritesOnly = false;
 let themeQuery = '';
+let selectionMode = false;
+const selectedIds = new Set();
+let bulkTracks = [];
+let bulkContext = '';
+const scrollPositions = new Map();
+let renderedViewKey = '';
 const offline = () => model.settings.offline || !navigator.onLine;
 const ready = () => downloads.filter(t => t.status === 'ready');
-const downloaded = track => ready().find(t => t.id === track?.id || (t.url && t.url === track?.url));
-const available = track => ({ ...track, ...(downloaded(track) || {}) });
+const downloaded = track => ready().find(t => sameTrack(t, track));
+const available = track => withDownload(track, downloaded(track));
 const find = id => unique([...results, ...current.queue, ...downloads, ...libraryTracks(model), ...model.history]).find(t => t.id === id);
-const favorite = track => model.favorites.some(t => t.id === track?.id);
+const favorite = track => model.favorites.some(t => sameTrack(t, track));
 const radioExcluded = track => model.radioExcluded.some(t => t.id === track?.id || (t.url && t.url === track?.url));
-const librarySelection = () => playlistId ? model.playlists.find(p => p.id === playlistId)?.tracks || [] : libraryTab === 'downloads' ? filterDownloads([...downloads].reverse(), downloadFilter) : libraryTab === 'saved' ? libraryTracks(model) : model.favorites;
+const librarySelection = () => playlistId ? model.playlists.find(p => p.id === playlistId)?.tracks || [] : libraryTab === 'downloads' ? filterDownloads([...downloads].reverse(), downloadFilter) : libraryTab === 'saved' ? libraryTracks(model) : libraryTab === 'history' ? model.history : model.favorites;
+const selectedTracks = () => librarySelection().filter(track => selectedIds.has(track.id));
+const resetSelection = () => { selectionMode = false; selectedIds.clear(); };
+const viewKey = () => tab === 'library' ? `library:${playlistId || libraryTab}` : tab === 'settings' ? `settings:${appearanceOpen ? 'appearance' : settingsTab}` : tab;
+function navigate(change, reset = false) {
+  if (renderedViewKey) scrollPositions.set(renderedViewKey, { y: window.scrollY, limit: listLimit, query, sort });
+  change(); resetSelection();
+  const previous = reset ? null : scrollPositions.get(viewKey());
+  listLimit = previous?.limit || 80;
+  if (previous && tab === 'library') { query = previous.query; sort = previous.sort; }
+  render(); window.scrollTo(0, previous?.y || 0);
+}
 function save() { localStorage.setItem('fluxo_mobile_v2', JSON.stringify(model)); }
 async function syncLibrary(retry = false) {
   const tracks = libraryTracks(model);
@@ -66,7 +83,7 @@ async function syncLibrary(retry = false) {
   syncChain = syncChain.catch(() => {}).then(() => commands.syncLibrary(tracks, enabled, wifiOnly, retry));
   await syncChain; await refreshDownloads();
 }
-const savedTrack = track => libraryTracks(model).some(t => t.id === track?.id);
+const savedTrack = track => libraryTracks(model).some(t => sameTrack(t, track));
 function icons() { window.lucide?.createIcons(); }
 function toast(message, undo) {
   clearTimeout(toastTimer); clearTimeout(undoTimer); undoAction = undo;
@@ -109,18 +126,42 @@ function list(tracks, context = 'list', offset = 0) {
   return `<div class="track-list">${tracks.slice(0, listLimit).map((track, i) => {
     const dl = downloads.find(t => t.id === track.id);
     const rowIndex = context === 'playlist' ? model.playlists.find(p => p.id === playlistId).tracks.findIndex(t => t.id === track.id) : i + offset;
-    return `<div class="track ${current.queue[current.index]?.id === track.id ? 'playing' : ''}" data-row="${esc(track.id)}">
+    const selecting = selectionMode && tab === 'library' && context !== 'queue';
+    const playing = context === 'queue' ? rowIndex === current.index : sameTrack(current.queue[current.index], track);
+    return `<div class="track ${playing ? 'playing' : ''} ${selecting && selectedIds.has(track.id) ? 'selected' : ''}" data-row="${esc(track.id)}" data-row-url="${esc(track.url)}" ${context === 'queue' ? `data-queue-index="${rowIndex}"` : ''}>
+      ${selecting ? `<label class="track-select"><input type="checkbox" data-select-track="${esc(track.id)}" aria-label="Selecionar ${esc(track.title)}" ${selectedIds.has(track.id) ? 'checked' : ''}></label>` : ''}
       ${context === 'queue' ? `<span class="queue-number">${rowIndex === current.index ? icon('audio-lines') : rowIndex + 1}</span>` : ''}
-      <button class="track-main" data-action="${context === 'queue' ? 'jump' : 'track-play'}" data-index="${rowIndex}" data-track="${esc(track.id)}" aria-label="Tocar ${esc(track.title)}">${art(track)}${trackCopy(track)}</button>
+      <button class="track-main" data-action="${selecting ? 'select-track' : context === 'queue' ? 'jump' : 'track-play'}" data-index="${rowIndex}" data-track="${esc(track.id)}" aria-label="${selecting ? 'Selecionar' : 'Tocar'} ${esc(track.title)}">${art(track)}${trackCopy(track)}</button>
       ${dl?.status === 'downloading' ? `<progress class="download-progress" value="${dl.progress || 0}" max="100" aria-label="Download"></progress>` : `<span class="track-time">${dl?.status === 'failed' ? 'Falhou' : track.duration ? duration(track.duration) : ''}</span>`}
-      ${context === 'downloads' && dl?.status === 'failed' ? ib('rotate-cw', 'retry-download', `Tentar baixar ${track.title}`, `data-track="${esc(track.id)}"`) : ''}
-      ${context === 'downloads' && ['queued', 'downloading'].includes(dl?.status) ? ib('x', 'cancel-download', `Cancelar download de ${track.title}`, `data-track="${esc(track.id)}"`) : ib('ellipsis-vertical', 'track-menu', `Opções de ${track.title}`, `data-track="${esc(track.id)}" data-index="${rowIndex}" data-context="${context}"`)}
+      ${!selecting && context === 'downloads' && dl?.status === 'failed' ? ib('rotate-cw', 'retry-download', `Tentar baixar ${track.title}`, `data-track="${esc(track.id)}"`) : ''}
+      ${selecting ? '' : context === 'downloads' && ['queued', 'downloading'].includes(dl?.status) ? ib('x', 'cancel-download', `Cancelar download de ${track.title}`, `data-track="${esc(track.id)}"`) : ib('ellipsis-vertical', 'track-menu', `Opções de ${track.title}`, `data-track="${esc(track.id)}" data-index="${rowIndex}" data-context="${context}"`)}
     </div>`;
   }).join('')}${tracks.length > listLimit ? `<div class="list-more">${button('chevrons-down', 'load-more-tracks', 'Carregar mais músicas')}<small>${listLimit} de ${tracks.length}</small></div>` : ''}</div>`;
 }
 function playlistGrid() {
   const playlists = filterPlaylists(model.playlists, playlistQuery, playlistSort);
-  return playlists.length ? `<div class="playlist-grid">${playlists.map(p => `<button class="playlist-card" data-action="open-playlist" data-id="${esc(p.id)}">${playlistArt(p)}<div><strong>${esc(p.title)}</strong><small>${p.tracks.length} músicas${p.offlineOnly ? ' · Offline' : ''}</small><span class="playlist-availability">${icon('hard-drive')}${p.tracks.filter(downloaded).length}/${p.tracks.length}</span></div></button>`).join('')}</div>` : empty('list-music', playlistQuery ? 'Nenhuma playlist encontrada' : 'Sua primeira playlist', '', playlistQuery ? '' : button('plus', 'new-playlist', 'Criar playlist'), true);
+  return playlists.length ? `<div class="playlist-grid">${playlists.map(p => `<button class="playlist-card" data-action="open-playlist" data-id="${esc(p.id)}">${playlistArt(p)}<div><strong>${p.pinned ? `<span class="playlist-pin" aria-label="Fixada">${icon('pin')}</span>` : ''}${esc(p.title)}</strong><small>${p.tracks.length} músicas${p.offlineOnly ? ' · Offline' : ''}</small><span class="playlist-availability">${icon('hard-drive')}${p.tracks.filter(downloaded).length}/${p.tracks.length}</span></div></button>`).join('')}</div>` : empty('list-music', playlistQuery ? 'Nenhuma playlist encontrada' : 'Sua primeira playlist', '', playlistQuery ? '' : button('plus', 'new-playlist', 'Criar playlist'), true);
+}
+function selectionTools(tracks) {
+  if (!selectionMode) return `<div class="collection-toolbar"><small>${tracks.length} músicas · ${duration(tracks.reduce((sum, track) => sum + (track.duration || 0), 0))}</small><div>${ib('play', 'play-collection', 'Tocar esta seleção', tracks.length ? '' : 'disabled')}${ib('list-checks', 'start-selection', 'Selecionar músicas', tracks.length ? '' : 'disabled')}</div></div>`;
+  const count = selectedTracks().length;
+  const all = tracks.length > 0 && tracks.every(track => selectedIds.has(track.id));
+  return `<div class="bulk-toolbar"><div class="bulk-heading">${ib('x', 'end-selection', 'Sair da seleção')}<strong>${count} selecionadas</strong><label><input id="select-all-tracks" type="checkbox" aria-label="Selecionar todas as ${tracks.length} músicas filtradas" ${all ? 'checked' : ''}>Todas (${tracks.length})</label></div><div class="bulk-actions">${ib('play', 'bulk-play', 'Tocar selecionadas', count ? '' : 'disabled')}${ib('list-plus', 'bulk-playlist', 'Adicionar selecionadas a uma playlist', count ? '' : 'disabled')}${ib('heart', 'bulk-favorite', 'Favoritar selecionadas', count ? '' : 'disabled')}${ib('download', 'bulk-download', 'Baixar selecionadas', count ? '' : 'disabled')}${ib('ellipsis', 'bulk-menu', 'Mais ações da seleção', count ? '' : 'disabled')}</div></div>`;
+}
+function collectionTools(tracks) { return `<div id="collection-tools">${selectionTools(tracks)}</div>`; }
+function updateSelection() {
+  const allowed = new Set(librarySelection().map(track => track.id));
+  for (const id of selectedIds) if (!allowed.has(id)) selectedIds.delete(id);
+  const tracks = filterTracks(librarySelection(), query, sort);
+  if ($('#collection-tools')) $('#collection-tools').innerHTML = selectionTools(tracks);
+  document.querySelectorAll('[data-select-track]').forEach(input => { input.checked = selectedIds.has(input.dataset.selectTrack); input.closest('.track').classList.toggle('selected', input.checked); });
+  const visibleSelected = tracks.filter(track => selectedIds.has(track.id)).length;
+  if ($('#select-all-tracks')) $('#select-all-tracks').indeterminate = visibleSelected > 0 && visibleSelected < tracks.length;
+  icons();
+}
+function chooseBulkPlaylist() {
+  bulkTracks = selectedTracks();
+  modal('Adicionar selecionadas', model.playlists.map(p => `<button class="menu-item" data-action="bulk-add-playlist" data-id="${esc(p.id)}">${icon('list-plus')}${esc(p.title)}</button>`).join('') + button('plus', 'bulk-new-playlist', 'Criar playlist com a seleção', '', 'full'));
 }
 function resumeStrip() {
   const track = current.queue[current.index];
@@ -135,22 +176,23 @@ function downloadsOverview() {
 }
 function library() {
   if (playlistId) return playlistPage();
+  if (libraryTab === 'history') return `<div class="section-heading history-heading">${ib('arrow-left', 'back-collections', 'Voltar às coleções')}<h1>Histórico</h1>${ib('trash-2', 'clear-history', 'Limpar histórico', model.history.length ? '' : 'disabled')}</div>` + filterBar() + collectionTools(filterTracks(model.history, query, sort)) + `<div id="filtered-list">${model.history.length ? list(filterTracks(model.history, query, sort), 'history') : empty('history', 'Nenhuma música no histórico')}</div>`;
   const tabs = [['home', 'Coleções'], ['saved', 'Salvas'], ['downloads', 'Baixadas'], ['favorites', 'Favoritas']];
   let html = heading('Sua biblioteca', `${ready().length} músicas no dispositivo`, ib('plus', 'new-playlist', 'Criar playlist'));
   html += `<div class="segmented" role="tablist" aria-label="Biblioteca">${tabs.map(([id, label]) => `<button role="tab" aria-selected="${libraryTab === id}" class="${libraryTab === id ? 'active' : ''}" data-action="library-tab" data-value="${id}">${label}</button>`).join('')}</div>`;
   if (libraryTab === 'home') {
     html += radioStrip();
     html += `<div id="resume-slot">${resumeStrip()}</div>`;
-    html += `<div class="library-summary"><button data-action="library-tab" data-value="downloads">${icon('hard-drive-download')}<strong>${ready().length}</strong><span>Baixadas</span></button><button data-action="library-tab" data-value="favorites">${icon('heart')}<strong>${model.favorites.length}</strong><span>Favoritas</span></button></div>`;
+    html += `<div class="library-summary"><button data-action="library-tab" data-value="downloads">${icon('hard-drive-download')}<strong>${ready().length}</strong><span>Baixadas</span></button><button data-action="library-tab" data-value="favorites">${icon('heart')}<strong>${model.favorites.length}</strong><span>Favoritas</span></button><button data-action="open-history">${icon('history')}<strong>${model.history.length}</strong><span>Histórico</span></button></div>`;
     html += `<div class="section-heading"><h2>Playlists</h2><div class="section-tools"><div class="view-switch" role="group" aria-label="Visualização das playlists">${ib('layout-grid', 'playlist-view', 'Playlists em grade', 'data-value="grid"', model.settings.playlistView === 'grid' ? 'active' : '')}${ib('list', 'playlist-view', 'Playlists em lista', 'data-value="list"', model.settings.playlistView === 'list' ? 'active' : '')}</div>${ib('plus', 'new-playlist', 'Nova playlist')}</div></div>`;
     if (model.playlists.length) html += `<div class="row-tools playlist-tools"><label class="field">${icon('search')}<input id="playlist-search" type="search" aria-label="Buscar playlists" placeholder="Buscar playlists" value="${esc(playlistQuery)}"></label><select id="playlist-sort" aria-label="Ordenar playlists"><option value="recent">Sua ordem</option><option value="title" ${playlistSort === 'title' ? 'selected' : ''}>Nome</option></select></div>`;
     html += `<div id="playlist-grid-container">${playlistGrid()}</div>`;
-    html += `<div class="section-heading"><h2>Ouvidas recentemente</h2>${model.history.length ? ib('trash-2', 'clear-history', 'Limpar histórico') : ''}</div>`;
+    html += `<div class="section-heading"><h2>Ouvidas recentemente</h2>${model.history.length ? `<div class="section-tools">${ib('arrow-right', 'open-history', 'Ver histórico completo')}${ib('trash-2', 'clear-history', 'Limpar histórico')}</div>` : ''}</div>`;
     html += model.history.length ? list(model.history.slice(0, 8)) : empty('disc-3', 'Dê o primeiro play', '', button('folder-plus', 'import', 'Importar músicas'), true);
   } else {
     const tracks = librarySelection();
     if (libraryTab === 'downloads') html += downloadsOverview();
-    html += filterBar();
+    html += filterBar() + collectionTools(filterTracks(tracks, query, sort));
     html += `<div id="filtered-list">${tracks.length ? list(filterTracks(tracks, query, sort), libraryTab === 'downloads' ? 'downloads' : 'list') : empty(libraryTab === 'downloads' ? 'download' : libraryTab === 'saved' ? 'library' : 'heart', libraryTab === 'downloads' && downloadFilter !== 'all' ? 'Nenhuma música neste estado' : libraryTab === 'downloads' ? 'Nenhuma música baixada' : libraryTab === 'saved' ? 'Nenhuma música salva' : 'Nenhuma favorita ainda', '', libraryTab === 'downloads' ? button('folder-plus', 'import', 'Importar músicas') : button('search', 'go-search', 'Buscar músicas'))}</div>`;
   }
   return html;
@@ -163,7 +205,7 @@ function playlistPage() {
   html += `<div class="playlist-toolbar">${button('play', 'playlist-play', 'Reproduzir', p.tracks.length ? '' : 'disabled', 'primary')}${ib('shuffle', 'playlist-shuffle', 'Embaralhar playlist')}${ib('plus', 'playlist-add', 'Adicionar músicas')}</div>`;
   const localCount = p.tracks.filter(downloaded).length;
   if (p.tracks.length) html += `<div class="playlist-offline"><span>${icon(localCount === p.tracks.length ? 'circle-check' : 'cloud-download')}${localCount}/${p.tracks.length} offline · ${duration(p.tracks.reduce((sum, track) => sum + track.duration, 0))}</span>${localCount < p.tracks.length ? ib('download', 'playlist-download', 'Baixar esta playlist') : ''}<progress value="${localCount}" max="${p.tracks.length}" aria-label="Disponibilidade offline da playlist"></progress></div>`;
-  html += p.tracks.length ? filterBar() + `<div id="filtered-list">${list(filterTracks(p.tracks, query, sort), 'playlist')}</div>` : empty('list-music', 'Playlist vazia', '', button('plus', 'playlist-add', 'Adicionar músicas'));
+  html += p.tracks.length ? filterBar() + collectionTools(filterTracks(p.tracks, query, sort)) + `<div id="filtered-list">${list(filterTracks(p.tracks, query, sort), 'playlist')}</div>` : empty('list-music', 'Playlist vazia', '', button('plus', 'playlist-add', 'Adicionar músicas'));
   return html;
 }
 function searchPage() {
@@ -186,7 +228,7 @@ function localResults() {
   return `<div class="search-sources"><small>${matches.length} músicas${offline() ? ' offline' : ''}</small></div>${matches.length ? list(matches, 'local-search') : empty('search', 'Nenhuma música encontrada')}`;
 }
 function queuePage() {
-  return heading('Na sequência', `${current.queue.length} músicas${current.queue.length ? ` · ${duration(current.queue.reduce((n, t) => n + t.duration, 0))}` : ''}`, current.queue.length ? `<div class="section-tools">${ib('save', 'save-queue', 'Salvar fila como playlist')}${ib('trash-2', 'clear-queue', 'Limpar fila')}</div>` : '')
+  return heading('Na sequência', `${current.queue.length} músicas${current.queue.length ? ` · ${duration(current.queue.reduce((n, t) => n + (t.duration || 0), 0))}` : ''}`, current.queue.length ? `<div class="section-tools">${ib('save', 'save-queue', 'Salvar fila como playlist')}${ib('list-filter', 'queue-tools', 'Organizar fila')}${ib('trash-2', 'clear-queue', 'Limpar fila')}</div>` : '')
     + radioStrip()
     + (current.error ? `<div class="error-state"><p>${esc(current.error)}</p>${ib('rotate-cw', 'retry-play', 'Tentar reprodução novamente')}</div>` : '')
     + (current.queue.length ? `${current.index > 0 ? `<details class="queue-history"><summary>${icon('history')}${current.index} anteriores</summary>${list(current.queue.slice(0, current.index), 'queue')}</details>` : ''}<div class="section-heading queue-heading"><h2>Tocando agora</h2><small>${current.shuffle ? 'Aleatório' : 'Sua seleção'}</small></div>${list([current.queue[current.index]], 'queue', current.index)}<div class="section-heading queue-heading"><h2>A seguir</h2><small>${Math.max(0, current.queue.length - current.index - 1)}</small></div>${current.queue.length > current.index + 1 ? list(current.queue.slice(current.index + 1), 'queue', current.index + 1) : empty('list-end', 'Fim da sua seleção', '', '', true)}` : empty('list-music', 'A fila está vazia', '', button('library', 'go-library', 'Abrir biblioteca')));
@@ -214,7 +256,7 @@ function settingsPage() {
     audio: `<section class="settings-group"><h2>Reprodução</h2>${setting('wifi-off', 'Modo offline', '', toggle('offline', 'Modo offline'))}${actionSetting('volume-2', 'Volume do app', `${Math.round((current.volume ?? 1) * 100)}%`, 'volume')}${actionSetting('moon', 'Temporizador', current.sleepEnd ? 'Ao fim desta música' : current.sleepAt ? `${Math.max(1, Math.ceil((current.sleepAt - Date.now()) / 60000))} min restantes` : 'Desativado', 'sleep')}${actionSetting('gauge', 'Velocidade', `${current.speed || 1}×`, 'speed')}${actionSetting('radio', 'Preferências do rádio', `${model.radioExcluded.length} músicas não recomendadas`, 'radio-preferences')}${native ? actionSetting('audio-lines', 'Equalizador', ['Normal', 'Graves', 'Voz', 'Agudos'][current.eqPreset || 0], 'equalizer') : ''}</section>`,
     visual: `<section class="settings-group"><h2>Aparência</h2>${actionSetting('palette', 'Temas do Fluxo', `${themes.length} temas · ${themes.find(t => t.id === model.settings.theme)?.name || 'Fluxo Bug'}`, 'themes')}${actionSetting('paintbrush', 'Personalizar aparência', `${model.settings.density === 'compact' ? 'Compacto' : 'Confortável'} · ${model.settings.profiles.length} estilos salvos`, 'appearance')}</section>`,
     library: `<section class="settings-group"><h2>Biblioteca e downloads</h2>${setting('cloud-download', 'Download automático', '', toggle('autoDownload', 'Download automático'))}${setting('wifi', 'Baixar só no Wi-Fi', '', toggle('wifiOnly', 'Baixar só no Wi-Fi'))}${actionSetting('download', 'Central de downloads', `${downloadStats(downloads).pending} pendentes · ${downloadStats(downloads).failed} falhas`, 'downloads-center')}${actionSetting('hard-drive', 'Músicas no dispositivo', `${ready().length} arquivos · ${size(downloadStats(downloads).bytes)}`, 'go-downloads')}${actionSetting('folder-plus', 'Importar arquivos', '', 'import')}</section>`,
-    system: `<section class="settings-group"><h2>Dados e permissões</h2>${actionSetting('file-down', 'Exportar backup', 'Playlists, favoritos e preferências', 'export')}${actionSetting('file-up', 'Restaurar backup', '', 'restore')}${native ? actionSetting('shield-check', 'Tela apagada e notificações', '', 'background-settings') : ''}${actionSetting('info', 'Sobre o Fluxo Mobile', 'Versão 2.4.0', 'about')}</section>`
+    system: `<section class="settings-group"><h2>Dados e permissões</h2>${actionSetting('file-down', 'Exportar backup', 'Playlists, favoritos e preferências', 'export')}${actionSetting('file-up', 'Restaurar backup', '', 'restore')}${native ? actionSetting('shield-check', 'Tela apagada e notificações', '', 'background-settings') : ''}${actionSetting('info', 'Sobre o Fluxo Mobile', 'Versão 2.5.0', 'about')}</section>`
   };
   return heading('Ajustes') + `<div class="settings-tabs segmented" role="tablist" aria-label="Categorias de ajustes">${[['audio', 'headphones', 'Áudio'], ['library', 'hard-drive', 'Biblioteca'], ['visual', 'palette', 'Visual'], ['system', 'shield-check', 'Sistema']].map(([id, name, label]) => `<button role="tab" aria-selected="${settingsTab === id}" class="${settingsTab === id ? 'active' : ''}" data-action="settings-tab" data-value="${id}">${icon(name)}${label}</button>`).join('')}</div>` + sections[settingsTab];
 }
@@ -268,14 +310,14 @@ function render() {
   const focused = document.activeElement?.matches('#view input[type=search],#view input[type=text]') ? document.activeElement : null;
   const selection = focused ? { id: focused.id, start: focused.selectionStart, end: focused.selectionEnd } : null;
   $('#view').innerHTML = ({ library, search: searchPage, queue: queuePage, settings: settingsPage })[tab]();
+  renderedViewKey = viewKey();
   document.querySelectorAll('[data-tab]').forEach(a => { a.classList.toggle('active', a.dataset.tab === tab); a.setAttribute('aria-current', a.dataset.tab === tab ? 'page' : 'false'); });
   connection(); icons();
   if (selection && document.getElementById(selection.id)) { const input = document.getElementById(selection.id); input.focus({ preventScroll: true }); input.setSelectionRange(selection.start, selection.end); }
 }
 function route() {
   const next = location.hash.slice(1);
-  tab = ['library', 'search', 'queue', 'settings'].includes(next) ? next : 'library';
-  listLimit = 80; render(); window.scrollTo(0, 0);
+  navigate(() => { tab = ['library', 'search', 'queue', 'settings'].includes(next) ? next : 'library'; });
 }
 function modal(title, html) {
   const sheet = $('#sheet');
@@ -340,7 +382,7 @@ function trackMenu(track, index = -1, context = '') {
 function showPlayer() { if (!current.queue.length) return toast('Escolha uma música primeiro.'); renderPlayer(true); if (!$('#player').open) $('#player').showModal(); if (model.settings.visualizer !== 'off') startVisualizer(() => current, () => model.settings); }
 function renderPlayer(force = false) {
   const t = current.queue[current.index];
-  const key = JSON.stringify([t?.id, t?.title, t?.artist, t?.thumbnail, downloaded(t)?.thumbnail, current.index, current.queue.length, current.playing, current.playWhenReady, current.buffering, current.error, current.repeat, current.shuffle, favorite(t), current.speed, current.sleepAt, current.sleepEnd, current.radio, current.radioError, current.radioLoading, current.recovering, !!downloaded(t)]);
+  const key = JSON.stringify([t?.id, t?.title, t?.artist, t?.thumbnail, downloaded(t)?.thumbnail, current.index, current.queue.length, current.canNext, current.playing, current.playWhenReady, current.buffering, current.error, current.repeat, current.shuffle, favorite(t), current.speed, current.sleepAt, current.sleepEnd, current.radio, current.radioError, current.radioLoading, current.recovering, !!downloaded(t)]);
   if (!force && key === playerKey) return updateProgress();
   playerKey = key;
   const mini = $('#mini');
@@ -349,7 +391,7 @@ function renderPlayer(force = false) {
   const loading = current.buffering && current.playWhenReady !== false;
   const status = current.error ? 'Falha ao reproduzir' : loading ? 'Preparando áudio...' : t.artist;
   const toggleIcon = current.error ? 'rotate-cw' : loading ? 'loader-circle' : current.playing ? 'pause' : 'play';
-  const hasNext = current.radio || current.index < current.queue.length - 1 || current.repeat === 2 || (current.shuffle && current.queue.length > 1);
+  const hasNext = current.canNext ?? (current.radio || current.index < current.queue.length - 1 || current.repeat === 2 || (current.shuffle && current.queue.length > 1));
   mini.innerHTML = `<button class="track-main" data-action="open-player" aria-label="Abrir player">${art(t)}<span class="track-copy"><strong>${esc(t.title)}</strong><small>${esc(status)}</small></span></button>${ib(toggleIcon, 'toggle', current.playing ? 'Pausar' : 'Reproduzir', '', loading ? 'spin' : '')}${ib('skip-forward', 'next', 'Próxima música', hasNext ? '' : 'disabled')}<div class="mini-buffer"></div><div class="mini-progress"></div>`;
   if ($('#player').open || force) {
     $('#player').innerHTML = `<div class="player-header">${ib('chevron-down', 'close-player', 'Minimizar player')}<small>Reproduzindo agora</small>${ib('ellipsis', 'current-menu', 'Opções da música')}</div>${art(t, 'player-art')}<div class="player-info"><div><h2>${esc(t.title)}</h2><p>${esc(t.artist)}</p></div>${ib('heart', 'favorite-current', favorite(t) ? 'Desfavoritar' : 'Favoritar', '', favorite(t) ? 'active' : '')}</div><input class="seek" id="seek" type="range" min="0" max="${Math.max(1, current.duration)}" step="0.1" value="${current.position || 0}" aria-label="Posição da música"><div class="time-labels"><span id="elapsed">${duration(current.position)}</span><span id="total">${duration(current.duration)}</span></div><div class="player-controls">${ib('shuffle', 'shuffle', 'Reprodução aleatória', '', current.shuffle ? 'active' : '')}${ib('skip-back', 'previous', 'Música anterior')}${ib(toggleIcon, 'toggle', current.playing ? 'Pausar' : 'Reproduzir', '', `big-play ${current.buffering ? 'spin' : ''}`)}${ib('skip-forward', 'next', 'Próxima música')}${ib(current.repeat === 1 ? 'repeat-1' : 'repeat', 'repeat', current.repeat === 0 ? 'Repetição desativada' : current.repeat === 1 ? 'Repetir uma' : 'Repetir fila', '', current.repeat ? 'active' : '')}</div><div class="player-status">${esc(current.error || (current.buffering ? 'Preparando áudio...' : downloaded(t) ? 'Reprodução offline' : ''))}</div><div class="player-footer"><button data-action="current-download">${icon(downloaded(t) ? 'circle-check' : 'download')}<span>${downloaded(t) ? 'Baixada' : 'Baixar'}</span></button><button data-action="sleep">${icon('moon')}<span>Timer</span></button><button data-action="speed">${icon('gauge')}<span>${current.speed || 1}×</span></button><button data-action="player-queue">${icon('list-music')}<span>Fila</span></button></div>`;
@@ -364,6 +406,7 @@ function renderPlayer(force = false) {
     stage.insertAdjacentHTML('afterend', '<canvas id="audio-visual" class="audio-visual" aria-hidden="true"></canvas>');
     const statusLabel = $('#player .player-status');
     if (statusLabel) statusLabel.textContent = current.error || (current.recovering ? 'Reconectando áudio...' : loading ? 'Preparando áudio...' : current.sleepEnd ? 'Parar ao fim desta música' : current.radioError || (current.radio ? `Infinite Radio${current.radioOffline ? ' offline' : ''}` : downloaded(t) ? 'Reprodução offline' : ''));
+    $('#player .time-labels').insertAdjacentHTML('beforeend', `<div class="seek-steps">${ib('rotate-ccw', 'seek-back', 'Voltar 10 segundos', '', 'seek-step')}${ib('rotate-cw', 'seek-forward', 'Avançar 10 segundos', '', 'seek-step')}</div>`);
   }
   if (!loading) document.querySelectorAll('#mini .spin,#player .spin').forEach(button => button.classList.remove('spin'));
   if ($('#player [data-action=next]')) $('#player [data-action=next]').disabled = !hasNext;
@@ -374,6 +417,7 @@ function updateProgress() {
   const buffered = $('.mini-buffer'); if (buffered) buffered.style.width = `${Math.min(100, (current.buffered || current.position || 0) / (current.duration || 1) * 100)}%`;
   const seek = $('#seek'); if (seek && document.activeElement !== seek) { seek.max = Math.max(1, current.duration); seek.value = current.position || 0; }
   if (seek) { seek.disabled = !current.duration; seek.setAttribute('aria-valuetext', `${duration(seek.value)} de ${duration(current.duration)}`); }
+  document.querySelectorAll('.seek-step').forEach(button => button.disabled = !current.duration);
   if ($('#elapsed')) $('#elapsed').textContent = duration(current.position);
   if ($('#total')) $('#total').textContent = duration(current.duration);
 }
@@ -395,7 +439,7 @@ async function refreshDownloads() {
   if (changed) {
     const focused = document.activeElement?.id === 'library-filter';
     const selection = focused ? [document.activeElement.selectionStart, document.activeElement.selectionEnd] : null;
-    if (tab === 'library' || tab === 'settings') render();
+    if (tab === 'library' || tab === 'settings' || tab === 'search' && searchMode === 'local') render();
     if (focused && $('#library-filter')) { $('#library-filter').focus(); $('#library-filter').setSelectionRange(...selection); }
     renderPlayer();
   } else document.querySelectorAll('[data-row]').forEach(row => {
@@ -430,7 +474,7 @@ function openLink(value = '') {
   modal('Abrir link', `<form id="link-form"><label class="field">${icon('link')}<input type="url" name="url" value="${esc(value)}" placeholder="https://..." aria-label="Link da música" required></label><label class="field"><input type="text" name="title" placeholder="Nome da música" aria-label="Nome da música" maxlength="200"></label><button type="submit" class="text-button primary full">${icon('play')}Reproduzir</button></form>`);
 }
 async function toggleFavorite(track) {
-  model.favorites = favorite(track) ? model.favorites.filter(t => t.id !== track.id) : [cleanTrack(track), ...model.favorites]; save(); render(); renderPlayer(true);
+  model.favorites = favorite(track) ? model.favorites.filter(t => !sameTrack(t, track)) : [cleanTrack(track), ...model.favorites]; save(); render(); renderPlayer(true);
   if (favorite(track)) await permissions();
   await syncLibrary();
 }
@@ -448,14 +492,53 @@ async function action(name, el) {
   const index = Number(el?.dataset.index || 0);
   const cmd = (action, value = 0, index = 0) => commands.command({ action, value, index });
   switch (name) {
-    case 'undo': { const undo = undoAction; undoAction = null; clearTimeout(undoTimer); if (undo) { undo(); save(); render(); await syncLibrary(); toast('Alteração desfeita.'); } break; }
-    case 'settings-tab': settingsTab = el.dataset.value; render(); window.scrollTo(0, 0); break;
+    case 'undo': { const undo = undoAction; undoAction = null; clearTimeout(undoTimer); if (undo) { undo(); save(); render(); renderPlayer(true); await syncLibrary(); toast('Alteração desfeita.'); } break; }
+    case 'settings-tab': navigate(() => settingsTab = el.dataset.value); break;
+    case 'open-history': navigate(() => { libraryTab = 'history'; query = ''; }, true); break;
+    case 'back-collections': navigate(() => libraryTab = 'home'); break;
+    case 'start-selection': selectionMode = true; selectedIds.clear(); render(); break;
+    case 'end-selection': resetSelection(); render(); break;
+    case 'select-track': selectedIds.has(el.dataset.track) ? selectedIds.delete(el.dataset.track) : selectedIds.add(el.dataset.track); updateSelection(); break;
+    case 'play-collection': case 'bulk-play': {
+      const tracks = name === 'bulk-play' ? selectedTracks() : filterTracks(librarySelection(), query, sort);
+      const p = model.playlists.find(p => p.id === playlistId);
+      const playable = offline() || p?.offlineOnly ? tracks.filter(downloaded) : tracks;
+      if (!playable.length) throw new Error('Nenhuma música desta seleção está disponível para tocar.');
+      await play(playable, 0, !!p?.offlineOnly); await cmd('shuffle', 0); resetSelection(); render();
+      if (playable.length < tracks.length) toast(`${playable.length} músicas offline na fila.`); break;
+    }
+    case 'bulk-playlist': chooseBulkPlaylist(); break;
+    case 'bulk-new-playlist': newPlaylist(false, bulkTracks); break;
+    case 'bulk-add-playlist': { const p = model.playlists.find(p => p.id === el.dataset.id); if (!p) break; p.tracks = unique([...p.tracks, ...bulkTracks]); save(); closeSheet(); resetSelection(); render(); await permissions(); await syncLibrary(); toast('Seleção adicionada à playlist.'); break; }
+    case 'bulk-favorite': { const tracks = selectedTracks(); model.favorites = unique([...tracks.filter(track => !favorite(track)), ...model.favorites]); save(); resetSelection(); render(); renderPlayer(true); await permissions(); await syncLibrary(); toast(`${tracks.length} músicas favoritas.`); break; }
+    case 'bulk-download': { const tracks = selectedTracks().filter(track => !downloaded(track) && track.url.startsWith('https://')); if (!tracks.length) return toast('As músicas disponíveis já estão baixadas.'); await permissions(); await commands.downloadBatch(tracks, model.settings.wifiOnly); resetSelection(); await refreshDownloads(); render(); toast(`${tracks.length} downloads agendados.`); break; }
+    case 'bulk-menu': {
+      bulkTracks = selectedTracks(); bulkContext = playlistId ? `playlist:${playlistId}` : libraryTab;
+      const label = playlistId ? 'Remover da playlist' : libraryTab === 'favorites' ? 'Remover das favoritas' : libraryTab === 'history' ? 'Remover do histórico' : 'Remover da biblioteca';
+      modal(`${bulkTracks.length} músicas`, button('library', 'bulk-save', 'Salvar na biblioteca', '', 'full') + button('plus', 'bulk-new-playlist', 'Criar playlist com a seleção', '', 'full') + button('list-minus', 'bulk-remove', label, '', 'full danger') + (libraryTab === 'downloads' && !playlistId ? button('trash-2', 'bulk-remove-downloads', 'Remover arquivos baixados', '', 'full danger') : '')); break;
+    }
+    case 'bulk-save': model.library = unique([...bulkTracks, ...model.library]); save(); closeSheet(); resetSelection(); render(); await permissions(); await syncLibrary(); toast('Seleção salva na biblioteca.'); break;
+    case 'bulk-remove': confirm('Remover seleção?', `${bulkTracks.length} músicas serão removidas desta coleção. Os arquivos baixados serão mantidos.`, 'bulk-remove-confirm'); break;
+    case 'bulk-remove-confirm': {
+      let undo;
+      if (bulkContext === 'history' || bulkContext === 'favorites') {
+        const key = bulkContext; const removed = model[key].map((track, index) => ({ track, index })).filter(({ track }) => bulkTracks.some(item => sameTrack(item, track)));
+        model[key] = model[key].filter(track => !bulkTracks.some(item => sameTrack(item, track)));
+        undo = () => { for (const { track, index } of removed) if (!model[key].some(item => sameTrack(item, track))) model[key].splice(Math.min(index, model[key].length), 0, track); if (key === 'history') model.history = model.history.slice(0, 100); };
+      } else {
+        const target = bulkContext.startsWith('playlist:') ? { library: [], favorites: [], playlists: model.playlists.filter(p => p.id === bulkContext.slice(9)) } : model;
+        const snapshot = removeLibraryTracks(target, bulkTracks); undo = () => restoreLibraryTracks(model, snapshot);
+      }
+      save(); closeSheet(); resetSelection(); render(); renderPlayer(true); await syncLibrary(); toast('Seleção removida. Arquivos mantidos.', undo); break;
+    }
+    case 'bulk-remove-downloads': confirm('Remover arquivos?', `${bulkTracks.length} músicas ficarão indisponíveis offline. As playlists serão mantidas. Esta exclusão não pode ser desfeita.`, 'bulk-remove-downloads-confirm'); break;
+    case 'bulk-remove-downloads-confirm': { for (const track of bulkTracks) { const record = downloads.find(item => sameTrack(item, track)); if (record) await commands.removeDownload(record.id); } closeSheet(); resetSelection(); await refreshDownloads(); render(); toast('Arquivos removidos. Playlists mantidas.'); break; }
     case 'search-mode': searchMode = el.dataset.value; searchToken++; searching = false; listLimit = 80; render(); break;
     case 'resume-session': if (!current.playing) await cmd('play'); showPlayer(); break;
     case 'close-sheet': closeSheet(); break;
     case 'close-player': $('#player').close(); stopVisualizer(); break;
-    case 'appearance': appearanceOpen = true; appearanceTab = 'visual'; render(); window.scrollTo(0, 0); break;
-    case 'back-settings': appearanceOpen = false; render(); window.scrollTo(0, 0); break;
+    case 'appearance': navigate(() => { appearanceOpen = true; appearanceTab = 'visual'; }, true); break;
+    case 'back-settings': navigate(() => appearanceOpen = false); break;
     case 'appearance-tab': appearanceTab = el.dataset.value; render(); window.scrollTo(0, 0); break;
     case 'playlist-view': model.settings.playlistView = el.dataset.value; applyAppearance(); break;
     case 'reset-appearance': confirm('Restaurar aparência?', 'Seus estilos salvos, músicas e playlists serão mantidos.', 'reset-appearance-confirm'); break;
@@ -469,16 +552,17 @@ async function action(name, el) {
     case 'open-player': showPlayer(); break;
     case 'go-library': closeSheet(); location.hash = 'library'; break;
     case 'go-search': closeSheet(); location.hash = 'search'; break;
-    case 'go-downloads': case 'downloads-center': closeSheet(); playlistId = ''; libraryTab = 'downloads'; downloadFilter = 'all'; query = ''; location.hash = 'library'; tab = 'library'; render(); window.scrollTo(0, 0); break;
-    case 'library-tab': libraryTab = el.dataset.value; query = ''; listLimit = 80; render(); break;
-    case 'download-filter': downloadFilter = el.dataset.value; listLimit = 80; render(); break;
+    case 'go-downloads': case 'downloads-center': closeSheet(); navigate(() => { playlistId = ''; libraryTab = 'downloads'; downloadFilter = 'all'; query = ''; tab = 'library'; }, true); location.hash = 'library'; break;
+    case 'library-tab': navigate(() => { libraryTab = el.dataset.value; query = ''; }); break;
+    case 'download-filter': downloadFilter = el.dataset.value; resetSelection(); listLimit = 80; render(); break;
     case 'load-more-tracks': listLimit += 80; render(); break;
-    case 'open-playlist': playlistId = el.dataset.id; query = ''; listLimit = 80; render(); window.scrollTo(0, 0); break;
-    case 'back-library': playlistId = ''; query = ''; render(); break;
+    case 'open-playlist': navigate(() => { playlistId = el.dataset.id; query = ''; }, true); break;
+    case 'back-library': navigate(() => { playlistId = ''; query = ''; }); break;
     case 'new-playlist': newPlaylist(); break;
     case 'playlist-edit': newPlaylist(true); break;
     case 'playlist-add': playlistAdd(); break;
-    case 'playlist-menu': modal('Playlist', `${button('pencil', 'playlist-edit', 'Editar playlist', '', 'full')}${button('copy', 'playlist-duplicate', 'Duplicar playlist', '', 'full')}${button('download', 'playlist-download', 'Baixar músicas', '', 'full')}${button('trash-2', 'playlist-delete', 'Excluir playlist', '', 'full danger')}`); break;
+    case 'playlist-menu': { const p = model.playlists.find(p => p.id === playlistId); modal('Playlist', `${button('pencil', 'playlist-edit', 'Editar playlist', '', 'full')}${button(p.pinned ? 'pin-off' : 'pin', 'playlist-pin', p.pinned ? 'Desafixar playlist' : 'Fixar playlist', '', 'full')}${button('copy', 'playlist-duplicate', 'Duplicar playlist', '', 'full')}${button('download', 'playlist-download', 'Baixar músicas', '', 'full')}${button('trash-2', 'playlist-delete', 'Excluir playlist', '', 'full danger')}`); break; }
+    case 'playlist-pin': { const p = model.playlists.find(p => p.id === playlistId); p.pinned = !p.pinned; save(); closeSheet(); render(); toast(p.pinned ? 'Playlist fixada no topo.' : 'Playlist desafixada.'); break; }
     case 'playlist-duplicate': { const p = model.playlists.find(p => p.id === playlistId); const copy = { ...p, id: crypto.randomUUID(), title: `${p.title.slice(0, 91)} (cópia)`, tracks: unique(p.tracks) }; model.playlists.push(copy); playlistId = copy.id; save(); closeSheet(); render(); await syncLibrary(); toast('Playlist duplicada.'); break; }
     case 'playlist-delete': confirm('Excluir playlist?', 'Os arquivos baixados serão mantidos.', 'playlist-delete-confirm'); break;
     case 'playlist-delete-confirm': { const index = model.playlists.findIndex(p => p.id === playlistId); const removed = model.playlists[index]; model.playlists.splice(index, 1); playlistId = ''; libraryTab = 'home'; save(); closeSheet(); render(); await syncLibrary(); toast('Playlist excluída.', () => { if (!model.playlists.some(p => p.id === removed.id)) model.playlists.splice(index, 0, removed); }); break; }
@@ -494,8 +578,7 @@ async function action(name, el) {
       if (savedTrack(menuTrack)) confirm('Remover da biblioteca?', 'A música será removida das favoritas e playlists. O arquivo baixado será mantido.', 'remove-saved-confirm');
       else { model.library = unique([menuTrack, ...model.library]); save(); closeSheet(); render(); await permissions(); await syncLibrary(); toast('Música salva na biblioteca.'); } break;
     case 'remove-saved-confirm': {
-      const id = menuTrack.id; model.library = model.library.filter(t => t.id !== id); model.favorites = model.favorites.filter(t => t.id !== id);
-      model.playlists.forEach(p => p.tracks = p.tracks.filter(t => t.id !== id)); save(); closeSheet(); render(); await syncLibrary(); break;
+      const snapshot = removeLibraryTracks(model, [menuTrack]); save(); closeSheet(); render(); renderPlayer(true); await syncLibrary(); toast('Música removida. Arquivo mantido.', () => restoreLibraryTracks(model, snapshot)); break;
     }
     case 'track-radio': await startRadio(menuTrack); break;
     case 'radio-options': modal('Infinite Radio', `${current.radio ? button('square', 'radio-stop', 'Encerrar rádio', '', 'full') : button('radio', 'radio-start', 'Iniciar com esta música', '', 'full')}${button('hard-drive', 'radio-offline', 'Rádio das músicas baixadas', ready().length < 2 ? 'disabled' : '', 'full')}`); break;
@@ -518,6 +601,11 @@ async function action(name, el) {
     case 'queue-up': case 'queue-down': await cmd('move', menuIndex + (name === 'queue-up' ? -1 : 1), menuIndex); closeSheet(); break;
     case 'queue-remove': await cmd('remove', 0, menuIndex); closeSheet(); break;
     case 'save-queue': newPlaylist(false, current.queue, 'Minha fila'); break;
+    case 'queue-tools': modal('Organizar fila', button('list-start', 'queue-remove-played', 'Remover músicas anteriores', current.index ? '' : 'disabled', 'full') + button('copy-minus', 'queue-deduplicate', 'Remover repetidas a seguir', '', 'full') + button('list-minus', 'queue-clear-upcoming', 'Limpar próximas músicas', '', 'full')); break;
+    case 'queue-remove-played': await cmd('remove-played'); closeSheet(); render(); toast('Anteriores removidas. Reprodução mantida.'); break;
+    case 'queue-deduplicate': await cmd('deduplicate-upcoming'); closeSheet(); render(); toast('Repetidas a seguir removidas.'); break;
+    case 'queue-clear-upcoming': confirm('Limpar próximas músicas?', 'A música atual continuará. O Infinite Radio será encerrado.', 'queue-clear-upcoming-confirm'); break;
+    case 'queue-clear-upcoming-confirm': await cmd('clear-upcoming'); closeSheet(); render(); toast('Próximas removidas. Reprodução mantida.'); break;
     case 'clear-queue': confirm('Limpar a fila?', 'A reprodução será interrompida.', 'clear-queue-confirm'); break;
     case 'clear-queue-confirm': await cmd('clear'); closeSheet(); break;
     case 'download': await download(menuTrack); break;
@@ -528,11 +616,12 @@ async function action(name, el) {
     case 'cancel-pending-confirm': { const pending = filterDownloads(downloads, 'pending'); for (const track of pending) await commands.cancelDownload(track.id); closeSheet(); await refreshDownloads(); toast('Downloads pendentes cancelados.'); break; }
     case 'current-download': await download(current.queue[current.index]); break;
     case 'remove-download': confirm('Remover arquivo?', 'A música ficará indisponível offline. As playlists serão mantidas.', 'remove-download-confirm'); break;
-    case 'remove-download-confirm': await commands.removeDownload(menuTrack.id); await refreshDownloads(); closeSheet(); break;
+    case 'remove-download-confirm': { const record = downloads.find(track => sameTrack(track, menuTrack)); if (record) await commands.removeDownload(record.id); await refreshDownloads(); closeSheet(); break; }
     case 'import': { closeSheet(); toast('Selecione seus arquivos de áudio.'); const imported = await commands.importAudio(); await refreshDownloads(); if (imported.tracks?.length) { libraryTab = 'downloads'; playlistId = ''; query = ''; downloadFilter = 'all'; listLimit = 80; location.hash = 'library'; tab = 'library'; render(); toast(`${imported.tracks.length} músicas importadas.`); } break; }
     case 'toggle': await cmd(current.playing || (current.buffering && current.playWhenReady !== false) ? 'pause' : 'play'); break;
     case 'retry-play': await cmd('play'); break;
     case 'next': case 'previous': await cmd(name); break;
+    case 'seek-back': case 'seek-forward': if (current.duration) await cmd('seek', Math.max(0, Math.min(current.duration, current.position + (name === 'seek-back' ? -10 : 10)))); break;
     case 'shuffle': await cmd('shuffle', current.shuffle ? 0 : 1); break;
     case 'repeat': await cmd('repeat', ((current.repeat || 0) + 1) % 3); break;
     case 'player-queue': $('#player').close(); stopVisualizer(); location.hash = 'queue'; break;
@@ -556,7 +645,7 @@ async function action(name, el) {
     case 'export': await commands.exportBackup(JSON.stringify(publicBackup(model), null, 2)); break;
     case 'restore': { const value = await commands.importBackup(); if (!value) break; const backup = validateBackup(JSON.parse(value)); model.library = unique([...model.library, ...backup.library]); model.favorites = unique([...model.favorites, ...backup.favorites]); model.playlists = [...new Map([...model.playlists, ...backup.playlists].map(p => [p.id, p])).values()]; model.history = unique([...model.history, ...backup.history]).slice(0, 100); model.radioExcluded = unique([...model.radioExcluded, ...backup.radioExcluded]).slice(0, 500); model.settings = { ...model.settings, ...backup.settings }; applyAppearance(); await commands.radioExclusions(model.radioExcluded); await syncLibrary(); toast('Backup restaurado. Seus arquivos locais foram mantidos.'); break; }
     case 'clear-history': confirm('Limpar histórico?', 'A biblioteca e as playlists serão mantidas.', 'clear-history-confirm'); break;
-    case 'clear-history-confirm': model.history = []; save(); closeSheet(); render(); break;
+    case 'clear-history-confirm': { const removed = model.history; model.history = []; save(); closeSheet(); render(); toast('Histórico limpo.', () => { model.history = unique([...model.history, ...removed]).slice(0, 100); }); break; }
     case 'clear-searches': model.searches = []; save(); render(); break;
     case 'recent-search': await runSearch(model.searches[index]); break;
     case 'genre': await runSearch(el.dataset.value); break;
@@ -581,7 +670,7 @@ document.addEventListener('submit', event => {
       const p = form.dataset.edit === 'true' ? model.playlists.find(p => p.id === playlistId) : { id: crypto.randomUUID(), tracks: unique(draftPlaylistTracks) };
       p.title = title; p.offlineOnly = data.has('offline'); Object.assign(p, playlistAppearance(Object.fromEntries(data)));
       if (form.dataset.edit !== 'true') model.playlists.push(p);
-      playlistId = p.id; draftPlaylistTracks = []; query = ''; tab = 'library'; location.hash = 'library'; save(); closeSheet(); render(); await syncLibrary();
+      resetSelection(); playlistId = p.id; draftPlaylistTracks = []; query = ''; tab = 'library'; location.hash = 'library'; save(); closeSheet(); render(); window.scrollTo(0, 0); await syncLibrary();
     }
     if (form.id === 'playlist-tracks') {
       const p = model.playlists.find(p => p.id === playlistId); const tracks = data.getAll('tracks').map(find).filter(Boolean);
@@ -605,7 +694,7 @@ document.addEventListener('input', event => {
   if (el.id === 'playlist-search') { playlistQuery = el.value; $('#playlist-grid-container').innerHTML = playlistGrid(); icons(); }
   if (el.id === 'search-input' && searchMode === 'local') { localSearch = el.value; listLimit = 80; $('#local-search-results').innerHTML = localResults(); icons(); }
   if (el.id === 'volume-slider') { $('#volume-value').textContent = `${Math.round(el.value * 100)}%`; clearTimeout(volumeTimer); volumeTimer = setTimeout(() => commands.command({ action: 'volume', value: Number(el.value) }).catch(e => toast(e.message)), 60); }
-  if (el.id === 'library-filter') { query = el.value; listLimit = 80; $('#filtered-list').innerHTML = list(filterTracks(librarySelection(), query, sort), playlistId ? 'playlist' : libraryTab === 'downloads' ? 'downloads' : 'list'); icons(); }
+  if (el.id === 'library-filter') { query = el.value; listLimit = 80; const matches = filterTracks(librarySelection(), query, sort); $('#filtered-list').innerHTML = matches.length ? list(matches, playlistId ? 'playlist' : libraryTab === 'downloads' ? 'downloads' : 'list') : empty('search', 'Nenhuma música encontrada', '', '', true); updateSelection(); icons(); }
   if (el.id === 'playlist-filter') { const matches = new Set(filterTracks([...$('#playlist-tracks').querySelectorAll('.selection-row')].map(row => find(row.dataset.track)), el.value).map(track => track.id)); $('#playlist-tracks').querySelectorAll('.selection-row').forEach(row => row.hidden = !matches.has(row.dataset.track)); updatePlaylistSelection(); }
   if (el.id === 'theme-filter') { themeQuery = el.value; filterThemes(); }
   if (el.dataset.color) { model.settings[el.dataset.color] = el.value; save(); theme(); }
@@ -616,6 +705,8 @@ document.addEventListener('input', event => {
 document.addEventListener('change', event => {
   const el = event.target;
   (async () => {
+    if (el.dataset.selectTrack) { el.checked ? selectedIds.add(el.dataset.selectTrack) : selectedIds.delete(el.dataset.selectTrack); updateSelection(); }
+    if (el.id === 'select-all-tracks') { for (const track of filterTracks(librarySelection(), query, sort)) el.checked ? selectedIds.add(track.id) : selectedIds.delete(track.id); updateSelection(); }
     if (el.id === 'playlist-sort') { playlistSort = el.value; $('#playlist-grid-container').innerHTML = playlistGrid(); icons(); }
     if (el.id === 'volume-slider') { clearTimeout(volumeTimer); await commands.command({ action: 'volume', value: Number(el.value) }); }
     if (el.dataset.setting) {
@@ -637,9 +728,9 @@ document.addEventListener('change', event => {
 document.addEventListener('error', event => { if (event.target instanceof HTMLImageElement && !event.target.src.endsWith('/icon.ico')) event.target.src = './icon.ico'; }, true);
 $('#player').addEventListener('close', stopVisualizer);
 window.addEventListener('hashchange', route);
-window.addEventListener('online', connection); window.addEventListener('offline', connection);
-window.fluxoBack = () => { if ($('#sheet').open) closeSheet(); else if ($('#player').open) $('#player').close(); else if (appearanceOpen && tab === 'settings') { appearanceOpen = false; render(); } else if (playlistId && tab === 'library') { playlistId = ''; render(); } else if (tab !== 'library') location.hash = 'library'; else return false; return true; };
-$('#player').addEventListener('close', stopVisualizer);
+const connectionChanged = () => { render(); renderPlayer(); };
+window.addEventListener('online', connectionChanged); window.addEventListener('offline', connectionChanged);
+window.fluxoBack = () => { if ($('#sheet').open) closeSheet(); else if ($('#player').open) $('#player').close(); else if (selectionMode) { resetSelection(); render(); } else if (appearanceOpen && tab === 'settings') navigate(() => appearanceOpen = false); else if (playlistId && tab === 'library') navigate(() => playlistId = ''); else if (libraryTab === 'history' && tab === 'library') navigate(() => libraryTab = 'home'); else if (tab !== 'library') location.hash = 'library'; else return false; return true; };
 window.addEventListener('unhandledrejection', event => { toast(event.reason?.message || 'Ocorreu um erro inesperado.'); });
 theme(); route();
 await commands.init(data => {
@@ -653,7 +744,7 @@ await commands.init(data => {
   if (changed && tab === 'library' && libraryTab === 'home' && !playlistId) render();
   else if (playingChanged && $('#resume-slot')) { $('#resume-slot').innerHTML = resumeStrip(); icons(); }
   if (settingsChanged && tab === 'settings' && settingsTab === 'audio' && !appearanceOpen) render();
-  document.querySelectorAll('[data-row]').forEach(row => row.classList.toggle('playing', row.dataset.row === track?.id));
+  document.querySelectorAll('[data-row]').forEach(row => row.classList.toggle('playing', row.hasAttribute('data-queue-index') ? Number(row.dataset.queueIndex) === current.index : sameTrack({ id: row.dataset.row, url: row.dataset.rowUrl }, track)));
   renderPlayer();
 }).catch(e => toast(e.message));
 await commands.radioExclusions(model.radioExcluded).catch(e => toast(e.message));

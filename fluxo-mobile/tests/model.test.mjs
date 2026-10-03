@@ -1,8 +1,49 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cleanTrack, unique, libraryTracks, filterDownloads, downloadStats, size, duration, filterTracks, filterPlaylists, validateBackup, loadModel, publicBackup } from '../www/model.js';
+import { cleanTrack, unique, sameTrack, withDownload, removeLibraryTracks, restoreLibraryTracks, libraryTracks, filterDownloads, downloadStats, size, duration, filterTracks, filterPlaylists, validateBackup, loadModel, publicBackup } from '../www/model.js';
 import { normalizeSettings, normalizeAppearance, playlistAppearance, contrastText, surfacePalette } from '../www/appearance.js';
 const track = { id: 'one', title: 'Canção', artist: 'Álvaro', duration: 65, url: 'https://example.com/a.mp3' };
+
+test('offline records never replace the identity or source URL of playlist tracks', () => {
+  const record = { ...track, id: 'cached-other-id', title: 'Old title', localUri: 'file:///private/track', thumbnail: 'file:///private/cover', duration: 75 };
+  const playable = withDownload(track, record);
+  assert.equal(playable.id, 'one'); assert.equal(playable.url, track.url); assert.equal(playable.title, track.title);
+  assert.equal(playable.localUri, record.localUri); assert.equal(playable.thumbnail, record.thumbnail); assert.equal(playable.duration, 65);
+  assert.equal(withDownload({ ...track, duration: 0 }, record).duration, 75);
+});
+test('track matching handles cached aliases without matching missing identifiers', () => {
+  assert.equal(sameTrack(track, { ...track, id: 'alias' }), true);
+  assert.equal(sameTrack({ id: 'a', url: '' }, { id: 'b', url: '' }), false);
+  assert.equal(sameTrack({}, {}), false); assert.equal(sameTrack(null, track), false);
+});
+test('bulk removal and undo preserve positions and later unrelated additions', () => {
+  const second = { ...track, id: 'two', url: 'https://example.com/b.mp3' };
+  const later = { ...track, id: 'later', url: 'https://example.com/c.mp3' };
+  const model = { library: [track, second], favorites: [track], playlists: [{ id: 'p', tracks: [second, track] }] };
+  const snapshot = removeLibraryTracks(model, [{ ...track, id: 'download-alias' }]);
+  assert.deepEqual(model.library, [second]); assert.deepEqual(model.favorites, []); assert.deepEqual(model.playlists[0].tracks, [second]);
+  model.library.push(later); restoreLibraryTracks(model, snapshot); restoreLibraryTracks(model, snapshot);
+  assert.deepEqual(model.library.map(t => t.id), ['one', 'two', 'later']);
+  assert.deepEqual(model.playlists[0].tracks.map(t => t.id), ['two', 'one']);
+  assert.equal(model.favorites.length, 1);
+});
+test('undo does not recreate a playlist deleted after the removal', () => {
+  const model = { library: [], favorites: [], playlists: [{ id: 'p', tracks: [track] }] };
+  const snapshot = removeLibraryTracks(model, [track]); model.playlists = []; restoreLibraryTracks(model, snapshot);
+  assert.deepEqual(model.playlists, []);
+});
+test('pinned playlists lead both saved and alphabetical order', () => {
+  const rows = [{ title: 'Alfa' }, { title: 'Zebra', pinned: true }, { title: 'Beta', pinned: true }];
+  assert.deepEqual(filterPlaylists(rows).map(p => p.title), ['Zebra', 'Beta', 'Alfa']);
+  assert.deepEqual(filterPlaylists(rows, '', 'title').map(p => p.title), ['Beta', 'Zebra', 'Alfa']);
+  assert.equal(rows[0].title, 'Alfa');
+});
+test('pinned playlists round trip with backups and old ones default to unpinned', () => {
+  const backup = publicBackup({ library: [], favorites: [], history: [], playlists: [{ id: 'p', title: 'Pinned', pinned: true, tracks: [track] }], settings: {} });
+  assert.equal(validateBackup(backup).playlists[0].pinned, true);
+  const storage = { getItem: key => key === 'fluxo_mobile_v2' ? JSON.stringify({ playlists: [{ id: 'p', tracks: [] }] }) : null };
+  assert.equal(loadModel(storage).playlists[0].pinned, false);
+});
 
 test('partial or malformed stored models retain valid collections without breaking startup', () => {
   const value = { library: [track], favorites: 'invalid', history: null, playlists: [{ id: 'keep', title: 'Keep', tracks: [track] }, null], searches: [null, 'MPB', 42], settings: null };

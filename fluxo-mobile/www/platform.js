@@ -1,4 +1,4 @@
-import { cleanTrack } from './model.js';
+import { cleanTrack, sameTrack } from './model.js';
 export const native = !!window.Capacitor?.isNativePlatform();
 const plugin = native ? (window.Capacitor.Plugins.FluxoAudio || window.Capacitor.registerPlugin('FluxoAudio')) : null;
 let callback = () => {};
@@ -9,7 +9,7 @@ let timeout;
 let generation = 0;
 let radioExcluded = [];
 const excluded = track => radioExcluded.some(item => item.id === track.id || (item.url && item.url === track.url));
-const emit = () => callback({ ...state });
+const emit = () => callback({ ...state, queue: state.queue.map(track => ({ ...track })) });
 const openDB = () => new Promise((resolve, reject) => {
   const request = indexedDB.open('fluxo-mobile-offline', 1);
   request.onupgradeneeded = () => request.result.createObjectStore('downloads', { keyPath: 'id' });
@@ -31,7 +31,8 @@ async function browserPlay(play = true) {
   const track = state.queue[state.index];
   if (!track) { state.buffering = false; emit(); return; }
   try {
-    const record = await dbRequest('readonly', store => store.get(track.id));
+    let record = await dbRequest('readonly', store => store.get(track.id));
+    if (!record && track.url) record = (await dbRequest('readonly', store => store.getAll())).find(record => sameTrack(cleanTrack(record.meta || record), track));
     if (token !== generation) return;
     if (objectURL) URL.revokeObjectURL(objectURL);
     objectURL = record?.blob ? URL.createObjectURL(record.blob) : '';
@@ -59,21 +60,25 @@ audio.addEventListener('ended', () => {
 setInterval(() => { if (state.sleepAt && Date.now() >= state.sleepAt) { audio.pause(); state.playWhenReady = false; state.sleepAt = 0; emit(); } }, 1000);
 export const commands = {
   async migrateOldDownloads(onProgress) {
-    if (!native || localStorage.fluxo_audio_migrated === 'yes') return;
+    if (!native || localStorage.fluxo_audio_migration_version === '2') return;
+    const migratedBefore = localStorage.fluxo_audio_migrated === 'yes';
     const records = await dbRequest('readonly', store => store.getAll());
     const existing = (await plugin.downloads()).tracks;
     for (const record of records) {
       const track = cleanTrack(record.meta || record);
-      if (!track || !record.blob || existing.some(t => t.id === track.id)) continue;
+      const stored = existing.find(t => t.id === track?.id);
+      const repair = stored && Number(stored.downloadId ?? -1) < 0 && (stored.status !== 'ready' || Number(stored.bytes) !== record.blob?.size);
+      if (!track || !(record.blob instanceof Blob) || !record.blob.size || stored && !repair || migratedBefore && !stored) continue;
       onProgress?.(track.title);
       for (let offset = 0; offset < record.blob.size; offset += 262144) {
         const blob = record.blob.slice(offset, offset + 262144);
         const data = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result.split(',')[1]); reader.onerror = reject; reader.readAsDataURL(blob); });
-        await plugin.migrateAudio({ track, offset, data, complete: offset + blob.size >= record.blob.size });
+        await plugin.migrateAudio({ track, offset, data, complete: offset + blob.size >= record.blob.size, repair: !!repair });
       }
     }
     // Keep the old database as a recovery copy; never delete a user's previous audio.
     localStorage.fluxo_audio_migrated = 'yes';
+    localStorage.fluxo_audio_migration_version = '2';
   },
   async init(listener) {
     callback = listener;
@@ -125,14 +130,17 @@ export const commands = {
       }
       case 'previous': if (audio.currentTime > 3) audio.currentTime = 0; else { state.index = Math.max(0, state.index - 1); await browserPlay(state.playWhenReady); } break;
       case 'jump': state.index = index; await browserPlay(); break;
-      case 'seek': audio.currentTime = value; break;
-      case 'clear': generation++; clearTimeout(timeout); audio.pause(); audio.removeAttribute('src'); audio.load(); if (objectURL) URL.revokeObjectURL(objectURL); objectURL = ''; state.radio = false; state.queue = []; state.index = 0; state.playWhenReady = false; state.buffering = false; state.error = ''; state.sleepAt = 0; state.sleepEnd = false; break;
+      case 'seek': if (Number.isFinite(value) && Number.isFinite(audio.duration)) audio.currentTime = Math.max(0, Math.min(audio.duration, value)); break;
+      case 'clear': generation++; clearTimeout(timeout); audio.pause(); audio.removeAttribute('src'); audio.load(); if (objectURL) URL.revokeObjectURL(objectURL); objectURL = ''; state.radio = false; state.queue = []; state.index = 0; state.position = 0; state.duration = 0; state.buffered = 0; state.playWhenReady = false; state.buffering = false; state.error = ''; state.sleepAt = 0; state.sleepEnd = false; break;
       case 'radio-stop': state.radio = false; state.queue = state.queue.filter((track, i) => i <= state.index || !track.radioGenerated); break;
-      case 'remove': state.queue.splice(index, 1); if (index < state.index) state.index--; else if (index === state.index) { state.index = Math.min(state.index, state.queue.length - 1); await browserPlay(); } break;
-      case 'move': { const current = state.queue[state.index]; const [item] = state.queue.splice(index, 1); state.queue.splice(value, 0, item); state.index = state.queue.indexOf(current); break; }
+      case 'remove': if (index >= 0 && index < state.queue.length) { state.queue.splice(index, 1); if (!state.queue.length) return commands.command({ action: 'clear' }); if (index < state.index) state.index--; else if (index === state.index) { state.index = Math.min(state.index, state.queue.length - 1); await browserPlay(state.playWhenReady); } } break;
+      case 'move': { if (index < 0 || index >= state.queue.length || value < 0 || value >= state.queue.length) break; const current = state.queue[state.index]; const [item] = state.queue.splice(index, 1); state.queue.splice(value, 0, item); state.index = state.queue.indexOf(current); break; }
+      case 'remove-played': state.queue.splice(0, state.index); state.index = 0; break;
+      case 'clear-upcoming': state.radio = false; state.queue.splice(state.index + 1); break;
+      case 'deduplicate-upcoming': { const seen = [state.queue[state.index]]; state.queue = state.queue.filter((track, i) => { if (i <= state.index) return true; if (seen.some(item => sameTrack(item, track))) return false; seen.push(track); return true; }); break; }
       case 'repeat': state.repeat = value; break;
       case 'shuffle': state.shuffle = !!value; break;
-      case 'speed': state.speed = value; audio.playbackRate = value; break;
+      case 'speed': if (Number.isFinite(value)) { state.speed = Math.max(.5, Math.min(2, value)); audio.playbackRate = state.speed; } break;
       case 'volume': state.volume = Math.max(0, Math.min(1, Number(value) || 0)); audio.volume = state.volume; break;
       case 'sleep': state.sleepEnd = value === -1; state.sleepAt = value > 0 ? Date.now() + value * 60000 : 0; break;
     } emit();

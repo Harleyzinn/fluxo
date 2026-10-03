@@ -1,12 +1,12 @@
-# Fluxo Mobile 2.4
+# Fluxo Mobile 2.5
 
 App independente para **Android 7 ou superior**, reconstruido na pasta `fluxo-mobile`. Nao precisa do Fluxo de PC nem de um servidor seu para tocar. A interface usa HTML/CSS/JavaScript dentro do Capacitor; o audio, a sessao de midia, a extracao de streams e os arquivos sao tratados em Java no Android.
 
 ## Instalar e usar
 
-Download: [Fluxo Mobile 2.4.0 para Android](https://github.com/Harleyzinn/fluxo/releases/tag/mobile-v2.4.0). Baixe o arquivo `Fluxo-Mobile-2.4.0.apk`, nao os pacotes de codigo-fonte.
+Download: [Fluxo Mobile 2.5.0 para Android](https://github.com/Harleyzinn/fluxo/releases/tag/mobile-v2.5.0). Baixe o arquivo `Fluxo-Mobile-2.5.0.apk`, nao os pacotes de codigo-fonte.
 
-1. Abra o link de download no celular ou envie `dist/Fluxo-Mobile-2.4.0.apk` por USB.
+1. Abra o link de download no celular ou envie `dist/Fluxo-Mobile-2.5.0.apk` por USB.
 2. Abra o APK no celular. Quando o Android pedir, permita instalar apps dessa origem. Depois da instalacao, voce pode desativar essa permissao novamente.
 3. Abra o Fluxo. Procure uma musica na aba **Buscar** ou use o botao de pasta para importar seus arquivos.
 4. Ao iniciar a primeira reproducao ou download, o app pede notificacoes no Android 13 ou superior. Negar nao impede tocar. O seletor de arquivos concede acesso somente aos arquivos escolhidos, sem pedir acesso geral ao armazenamento.
@@ -16,6 +16,25 @@ Download: [Fluxo Mobile 2.4.0 para Android](https://github.com/Harleyzinn/fluxo/
 **Nao precisa upar um site para usar o aplicativo.** O APK ja contem o app. O endereco de pre-visualizacao no computador e apenas uma ferramenta de desenvolvimento, nao e o app Android.
 
 Este APK e uma compilacao de desenvolvimento assinada para instalacao pessoal. Para publicar na Play Store ou distribuir atualizacoes permanentes, gere uma chave de assinatura de producao no Android Studio em **Build > Generate Signed App Bundle / APK**. Guarde essa chave: uma atualizacao precisa da mesma assinatura. Nao envie senhas nem a chave ao GitHub. Uma assinatura diferente exige desinstalar o app anterior, apagando seus arquivos privados; exporte os dados antes e preserve os audios originais.
+
+## Novidades da 2.5.0
+
+- Selecao em lote nas musicas salvas, baixadas, favoritas, historico e playlists. Selecione por filtro ou em toda a colecao, inclusive alem das primeiras 80 linhas.
+- Acoes da selecao: tocar, favoritar, baixar, salvar na biblioteca, criar/adicionar a playlists e remover com confirmacao. Remover arquivos e uma acao separada, sem apagar playlists.
+- Remocoes da biblioteca, playlists e historico podem ser desfeitas por dez segundos. A exclusao de arquivos de audio nao pode ser desfeita.
+- Playlists fixadas no topo, com ordem respeitada tanto na lista normal quanto na ordenacao por nome. A fixacao acompanha o backup.
+- Historico completo com filtro, ordenacao, selecao e reproducao. Continuam sendo guardadas ate 100 musicas realmente iniciadas.
+- Reproducao da colecao filtrada. Em modo offline, somente as faixas disponiveis entram nessa selecao, com aviso quando outras ficam de fora.
+- Ferramentas da fila para remover anteriores, limpar apenas as proximas e eliminar repetidas a seguir. Preservam a musica atual e sua posicao; limpar proximas encerra o radio.
+- Atalhos para voltar/avancar dez segundos no player. Proxima segue a disponibilidade real do player Android, inclusive em ordem aleatoria.
+- Navegacao mantem rolagem, filtro, ordenacao e quantidade de linhas carregadas ao voltar para uma colecao. Voltar sai primeiro da selecao ou do historico.
+- Resumo visual da biblioteca reorganizado, capas de playlist sem espacos vazios com duas/tres imagens, acoes de selecao recolhidas fora desse modo e miniplayer com controle principal mais legivel.
+- Corrigida a troca involuntaria do identificador da musica ao usar um download antigo. Arquivos com outro identificador mas mesma URL tocam sem deslocar o indice da playlist.
+- Na previa, remover a faixa atual enquanto pausado nao inicia a seguinte; a fila atualiza ao adicionar faixas. Repetidas na fila nao aparecem todas como musica atual.
+- Corrigida a migracao de arquivos maiores que 256 KB, que podia truncar o audio. Ao atualizar, copias antigas truncadas/ausentes sao recuperadas do banco antigo quando ele ainda existe. O arquivo anterior e preservado; arquivos removidos pelo usuario e transferencias do DownloadManager nao sao recriados/substituidos por essa reparacao.
+- Atualizacoes de estado evitam reconstruir a biblioteca para cada linha do player. Busca local se atualiza quando um download termina, e as telas respondem ao perder/recuperar conexao.
+
+Os 68 temas, estilos pessoais, downloads automaticos, radio opcional e central de notificacoes foram mantidos. Atualize por cima da instalacao anterior para preservar os arquivos privados. Testes Android realizados em emulador; nao ha promessa de funcionamento perfeito em toda rede/aparelho.
 
 ## Novidades da 2.4.0
 

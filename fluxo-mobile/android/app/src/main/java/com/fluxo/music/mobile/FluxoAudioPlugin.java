@@ -131,8 +131,9 @@ public class FluxoAudioPlugin extends Plugin {
     }
     @PluginMethod public void migrateAudio(PluginCall call) {
         async(call, () -> {
-            library.migrate(call.getObject("track"), call.getLong("offset", 0L),
-                android.util.Base64.decode(call.getString("data", ""), android.util.Base64.DEFAULT), call.getBoolean("complete", false));
+            // Capacitor getLong ignores JSON Integer values, including normal chunk offsets.
+            library.migrate(call.getObject("track"), call.getData().optLong("offset", 0L),
+                android.util.Base64.decode(call.getString("data", ""), android.util.Base64.DEFAULT), call.getBoolean("complete", false), call.getBoolean("repair", false));
             call.resolve();
         });
     }

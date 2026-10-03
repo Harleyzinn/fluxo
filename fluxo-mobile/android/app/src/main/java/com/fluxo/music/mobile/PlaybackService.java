@@ -24,6 +24,8 @@ import androidx.media3.session.DefaultMediaNotificationProvider;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.LinkedHashSet;
 import java.util.Collections;
 
@@ -390,6 +392,7 @@ public class PlaybackService extends MediaSessionService {
             data.put("duration", Math.max(0, player.getDuration()) / 1000.0);
             data.put("buffered", Math.max(0, player.getBufferedPosition()) / 1000.0);
             data.put("shuffle", player.getShuffleModeEnabled()).put("repeat", player.getRepeatMode());
+            data.put("canNext", player.hasNextMediaItem() || radio);
             data.put("speed", player.getPlaybackParameters().speed).put("sleepAt", sleepAt).put("error", error);
             data.put("volume", player.getVolume());
             data.put("sleepEnd", sleepEnd).put("recovering", recovering).put("retries", retries);
@@ -409,11 +412,25 @@ public class PlaybackService extends MediaSessionService {
             case "pause": playbackGeneration++; recovering = false; player.pause(); break;
             case "next": player.seekToNextMediaItem(); if (radio) { radioRetryAt = 0; refillRadio(); } break;
             case "previous": player.seekToPrevious(); break;
-            case "seek": player.seekTo((long) (Math.max(0, value) * 1000)); break;
+            case "seek": if (Double.isFinite(value)) { long duration = player.getDuration(); long position = (long)(Math.max(0, value) * 1000); player.seekTo(duration > 0 ? Math.min(duration, position) : position); } break;
             case "jump": if (index >= 0 && index < player.getMediaItemCount()) { player.seekTo(index, 0); player.prepare(); player.play(); } break;
-            case "remove": if (index >= 0 && index < player.getMediaItemCount()) player.removeMediaItem(index); break;
+            case "remove": if (index >= 0 && index < player.getMediaItemCount()) { player.removeMediaItem(index); if (player.getMediaItemCount() == 0) { command("clear", 0, 0); return; } } break;
             case "move": if (index >= 0 && index < player.getMediaItemCount() && value >= 0 && value < player.getMediaItemCount()) player.moveMediaItem(index, (int)value); break;
-            case "clear": stopRadio(); playbackGeneration++; player.pause(); player.clearMediaItems(); sleepAt = 0; sleepEnd = false; player.setPauseAtEndOfMediaItems(false); break;
+            case "clear": stopRadio(); playbackGeneration++; recovering = false; retries = 0; error = ""; player.pause(); player.clearMediaItems(); sleepAt = 0; sleepEnd = false; player.setPauseAtEndOfMediaItems(false); break;
+            case "remove-played": player.removeMediaItems(0, player.getCurrentMediaItemIndex()); break;
+            case "clear-upcoming": stopRadio(); player.removeMediaItems(player.getCurrentMediaItemIndex() + 1, player.getMediaItemCount()); break;
+            case "deduplicate-upcoming": {
+                Set<String> ids = new HashSet<>(); Set<String> urls = new HashSet<>();
+                int currentIndex = player.getCurrentMediaItemIndex();
+                for (int i = currentIndex; i < player.getMediaItemCount(); i++) {
+                    JSONObject entry = track(player.getMediaItemAt(i));
+                    String id = entry.optString("id"), url = entry.optString("url");
+                    boolean duplicate = (!id.isEmpty() && ids.contains(id)) || (!url.isEmpty() && urls.contains(url));
+                    if (duplicate && i > currentIndex) { player.removeMediaItem(i--); continue; }
+                    if (!id.isEmpty()) ids.add(id); if (!url.isEmpty()) urls.add(url);
+                }
+                break;
+            }
             case "shuffle": player.setShuffleModeEnabled(value == 1); break;
             case "repeat": player.setRepeatMode(Math.max(0, Math.min(2, (int)value))); break;
             case "speed": player.setPlaybackSpeed((float)Math.max(0.5, Math.min(2, value))); break;
