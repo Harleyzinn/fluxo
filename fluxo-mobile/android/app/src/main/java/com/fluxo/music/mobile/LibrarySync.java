@@ -23,9 +23,11 @@ public final class LibrarySync {
         if (id == null || prefs(context).getBoolean("blocked_" + id, false)) return null;
         JSONArray manual = new JSONArray(prefs(context).getString("manual", "[]"));
         for (int i = 0; i < manual.length(); i++) if (manual.getJSONObject(i).optString("id").equals(id)) return manual.getJSONObject(i);
-        if (!prefs(context).getBoolean("enabled", true)) return null;
         JSONArray tracks = new JSONArray(prefs(context).getString("targets", "[]"));
-        for (int i = 0; i < tracks.length(); i++) if (tracks.getJSONObject(i).optString("id").equals(id)) return tracks.getJSONObject(i);
+        for (int i = 0; i < tracks.length(); i++) {
+            JSONObject track = tracks.getJSONObject(i);
+            if (track.optString("id").equals(id) && (prefs(context).getBoolean("enabled", true) || track.optBoolean("_autoDownload", false))) return track;
+        }
         return null;
     }
 
@@ -34,13 +36,14 @@ public final class LibrarySync {
         var preferences = prefs(context);
         JSONArray records = LibraryStore.get(context).list();
         java.util.Set<String> ready = new java.util.HashSet<>();
-        for (int i = 0; i < records.length(); i++) if (records.getJSONObject(i).optString("status").equals("ready")) ready.add(records.getJSONObject(i).optString("id"));
+        java.util.Set<String> readyUrls = new java.util.HashSet<>();
+        for (int i = 0; i < records.length(); i++) if (records.getJSONObject(i).optString("status").equals("ready")) { ready.add(records.getJSONObject(i).optString("id")); if (!records.getJSONObject(i).optString("url").isEmpty()) readyUrls.add(records.getJSONObject(i).optString("url")); }
         JSONArray manual = new JSONArray(preferences.getString("manual", "[]"));
         for (int i = 0; i < tracks.length(); i++) {
             JSONObject track = tracks.getJSONObject(i);
             String id = track.optString("id");
             if (id.isEmpty() || id.length() > 500 || !track.optString("url").startsWith("https://")) continue;
-            if (ready.contains(id)) continue;
+            if (ready.contains(id) || readyUrls.contains(track.optString("url"))) continue;
             JSONArray kept = new JSONArray();
             for (int j = 0; j < manual.length(); j++) if (!manual.getJSONObject(j).optString("id").equals(id)) kept.put(manual.getJSONObject(j));
             manual = kept.put(new JSONObject(track.toString()).put("_wifiOnly", wifiOnly));
@@ -58,7 +61,7 @@ public final class LibrarySync {
         if (!track.optString("url").startsWith("https://")) return;
         for (int i = 0; i < records.length(); i++) {
             JSONObject record = records.getJSONObject(i);
-            if (!record.optString("id").equals(id)) continue;
+            if (!sameTrack(record, track)) continue;
             if (!record.optString("status").equals("failed")) {
                 status(context, id, "done", "");
                 if (record.optString("status").equals("ready")) forgetManual(context, id);
@@ -101,9 +104,10 @@ public final class LibrarySync {
         }
         for (int i = 0; i < tracks.length(); i++) {
             JSONObject track = tracks.getJSONObject(i); String id = track.optString("id");
-            if (retry && enabled) preferences.edit().remove("blocked_" + id).remove("retries_" + id).commit();
+            boolean automatic = enabled || track.optBoolean("_autoDownload", false);
+            if (retry && automatic) preferences.edit().remove("blocked_" + id).remove("retries_" + id).commit();
             JSONObject desired = target(context, id);
-            if (desired != null) schedule(context, desired, retry && enabled, changedNetwork, records);
+            if (desired != null) schedule(context, desired, retry && automatic, changedNetwork, records);
         }
         JSONArray manual = new JSONArray(preferences.getString("manual", "[]"));
         if (changedNetwork) {
@@ -120,6 +124,25 @@ public final class LibrarySync {
         prefs(context).edit().putBoolean("blocked_" + id, true).commit();
         WorkManager.getInstance(context).cancelUniqueWork(name(id)); status(context, id, "done", "");
         forgetManual(context, id);
+    }
+    static boolean sameTrack(JSONObject a, JSONObject b) {
+        return !a.optString("id").isEmpty() && a.optString("id").equals(b.optString("id")) || !a.optString("url").isEmpty() && a.optString("url").equals(b.optString("url"));
+    }
+    static synchronized void blockEquivalent(Context context, String id, String url) throws Exception {
+        java.util.Set<String> ids = new java.util.HashSet<>(); ids.add(id);
+        JSONObject track = new JSONObject().put("id", id).put("url", url);
+        for (String key : new String[]{"targets", "manual", "pending"}) {
+            JSONArray rows = new JSONArray(prefs(context).getString(key, "[]"));
+            for (int i = 0; i < rows.length(); i++) if (sameTrack(rows.getJSONObject(i), track)) ids.add(rows.getJSONObject(i).optString("id"));
+        }
+        for (String alias : ids) block(context, alias);
+    }
+    static synchronized void updateMetadata(Context context, JSONObject track, String title, String artist) throws Exception {
+        for (String key : new String[]{"targets", "manual", "pending"}) {
+            JSONArray rows = new JSONArray(prefs(context).getString(key, "[]"));
+            for (int i = 0; i < rows.length(); i++) if (sameTrack(rows.getJSONObject(i), track)) rows.getJSONObject(i).put("title", title).put("artist", artist);
+            prefs(context).edit().putString(key, rows.toString()).commit();
+        }
     }
     private static void forgetManual(Context context, String id) throws Exception {
         JSONArray manual = new JSONArray(prefs(context).getString("manual", "[]"));

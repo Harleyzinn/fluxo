@@ -1,4 +1,26 @@
-# Verificacao da Versao 2.6.0
+# Verificacao da Versao 2.7.0
+
+Validacao em 3 de outubro de 2026, Android API 37 em emulador e Microsoft Edge. O POCO X5 5G fisico nao estava conectado.
+
+- 42 testes de dados passaram. Novos casos cobrem edicao por ID/URL, campos invalidos, preferencias de download por playlist, ordenacao numerica, desfazer preservando alteracoes posteriores e formato de exportacao sem caminhos privados.
+- Pela interface: descricao e download da playlist persistiram, ordenar e desfazer restauraram a sequencia, Reproduzir a partir daqui montou somente o restante da playlist, e editar nome/artista atualizou biblioteca, favoritas, historico e registro offline.
+- Exportacao individual gerou JSON valido. Importacao criou uma colecao com novo ID, preservou a original e nao alterou a configuracao global de downloads. O seletor nativo de exportacao e o compartilhamento Android abriram corretamente; a suite visual verificou o conteudo do JSON, nao apenas a abertura do seletor.
+- No Android, editar durante a reproducao preservou posicao, indice, IDs, URLs e estado tocando. Editar pausada manteve a pausa. SHA-256 do arquivo privado igual antes/depois: nenhuma regravacao do audio.
+- Download automatico por playlist agendado com a opcao geral desligada, sem agendar a faixa nao selecionada. Requisicoes equivalentes concorrentes resultaram em um arquivo pronto para a mesma URL; remover/cancelar bloqueou os aliases conhecidos e uma tentativa explicita liberou o item solicitado.
+- Cancelar usando o identificador pendente equivalente depois da conclusao retornou cancelled=false e manteve o arquivo pronto. Remover explicitamente pelo alias encontrou e removeu o registro nativo correto; a sincronizacao seguinte nao o recriou.
+- Consulta nativa de espaco retornou bytes livres/total coerentes. Informacoes de espera agora distinguem nova tentativa do Android de ausencia de conexao. Durante a verificacao, o emulador apresentou falhas TLS e o gerenciador Android retomou o arquivo; isso nao foi tratado como garantia de velocidade de download.
+- Nova suite visual em 320x640, 390x844 e 820x1180, incluindo formulario de descricao e playlists importadas, sem rolagem horizontal. Passaram tambem as 16 telas de navegacao, 24 combinacoes de personalizacao, biblioteca de 250 faixas, selecao de 183 faixas e migracao da previa.
+- Regressao Android: volume persistente, fila restaurada sem autoplay, aliases offline, reparacao com SHA-256 preservando copia anterior, limpeza parcial da fila e arquivos/playlists mantidos apos reiniciar o processo.
+- A busca real no YouTube retornou 17 faixas na verificacao desta versao. Consultar de novo pela interface reutilizou o cache; menus antigos da fila foram recusados sem alterar outra faixa.
+- No APK final, um stream ainda nao baixado iniciou em 2,8 segundos nesta execucao e avancou 180,3 segundos durante tres minutos com a tela realmente apagada. Servico em primeiro plano confirmado; Pausar, Continuar e Proxima acionados na notificacao.
+- Radio online retornou sete faixas sem IDs repetidos, encerrar removeu recomendacoes futuras, radio offline avancou sem internet e o temporizador Ao fim desta musica pausou. Tocar uma musica normalmente nao criou fila automatica.
+- APK atualizado sobre a instalacao anterior, com certificado SHA-256 `42dc5c2adbe56aefb20922bd7ba4392c0413f7948122530132474876ea874bbb`, igual ao das versoes anteriores.
+- APK publicado: `Fluxo-Mobile-2.7.0.apk`. SHA-256: `8cc6a34b099c01b0c1f1fb0a0d6bf83f5c0056712af157002b19dba0a09b5b22`.
+- Auditoria JavaScript de producao: nenhuma vulnerabilidade reportada nesta execucao. Nao e uma auditoria completa dos componentes Android nem dos provedores.
+
+Testes em emulador nao garantem comportamento identico no POCO/HyperOS, nem disponibilidade de qualquer fonte. Exportacao/importacao JSON nao transfere os arquivos de audio. Copias duplicadas antigas nao sao apagadas automaticamente para preservar os dados existentes.
+
+## Evidencias da Versao 2.6.0
 
 Validacao em 3 de outubro de 2026, Android API 37 em emulador e Microsoft Edge. O POCO X5 5G fisico nao estava conectado.
 

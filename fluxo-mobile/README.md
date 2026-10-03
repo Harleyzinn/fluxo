@@ -1,12 +1,12 @@
-# Fluxo Mobile 2.6
+# Fluxo Mobile 2.7
 
 App independente para **Android 7 ou superior**, reconstruido na pasta `fluxo-mobile`. Nao precisa do Fluxo de PC nem de um servidor seu para tocar. A interface usa HTML/CSS/JavaScript dentro do Capacitor; o audio, a sessao de midia, a extracao de streams e os arquivos sao tratados em Java no Android.
 
 ## Instalar e usar
 
-Download: [Fluxo Mobile 2.6.0 para Android](https://github.com/Harleyzinn/fluxo/releases/tag/mobile-v2.6.0). Baixe o arquivo `Fluxo-Mobile-2.6.0.apk`, nao os pacotes de codigo-fonte.
+Download: [Fluxo Mobile 2.7.0 para Android](https://github.com/Harleyzinn/fluxo/releases/tag/mobile-v2.7.0). Baixe o arquivo `Fluxo-Mobile-2.7.0.apk`, nao os pacotes de codigo-fonte.
 
-1. Abra o link de download no celular ou envie `dist/Fluxo-Mobile-2.6.0.apk` por USB.
+1. Abra o link de download no celular ou envie `dist/Fluxo-Mobile-2.7.0.apk` por USB.
 2. Abra o APK no celular. Quando o Android pedir, permita instalar apps dessa origem. Depois da instalacao, voce pode desativar essa permissao novamente.
 3. Abra o Fluxo. Procure uma musica na aba **Buscar** ou use o botao de pasta para importar seus arquivos.
 4. Ao iniciar a primeira reproducao ou download, o app pede notificacoes no Android 13 ou superior. Negar nao impede tocar. O seletor de arquivos concede acesso somente aos arquivos escolhidos, sem pedir acesso geral ao armazenamento.
@@ -16,6 +16,23 @@ Download: [Fluxo Mobile 2.6.0 para Android](https://github.com/Harleyzinn/fluxo/
 **Nao precisa upar um site para usar o aplicativo.** O APK ja contem o app. O endereco de pre-visualizacao no computador e apenas uma ferramenta de desenvolvimento, nao e o app Android.
 
 Este APK e uma compilacao de desenvolvimento assinada para instalacao pessoal. Para publicar na Play Store ou distribuir atualizacoes permanentes, gere uma chave de assinatura de producao no Android Studio em **Build > Generate Signed App Bundle / APK**. Guarde essa chave: uma atualizacao precisa da mesma assinatura. Nao envie senhas nem a chave ao GitHub. Uma assinatura diferente exige desinstalar o app anterior, apagando seus arquivos privados; exporte os dados antes e preserve os audios originais.
+
+## Novidades da 2.7.0
+
+- Editar nome e artista de musicas salvas/importadas. Atualiza biblioteca, favoritas, historico, playlists e metadata dos downloads; o arquivo de audio, link e identificador sao preservados.
+- A fila Android recebe a metadata atualizada sem recriar o audio. Editar uma faixa tocando preserva a posicao; editar uma faixa pausada nao inicia a reproducao.
+- Download automatico por playlist: ative na edicao para manter aquela colecao baixada mesmo com a opcao global desligada. Desmarcado, segue a configuracao global. A preferencia Wi-Fi continua valendo; arquivos ja concluidos nao sao removidos ao desligar.
+- Downloads reconhecem a mesma URL com identificadores diferentes. O armazenamento nativo verifica novamente antes de criar a transferencia, evitando dois arquivos em pedidos concorrentes.
+- Remover ou cancelar um download bloqueia os identificadores equivalentes atualmente conhecidos para aquela URL. Uma nova tentativa explicita libera o item solicitado. Copias antigas existentes nao sao apagadas automaticamente.
+- Descricao de ate 280 caracteres por playlist, com editor reorganizado e indicador de download automatico. Descricao e preferencia acompanham o backup.
+- Organizar musicas da playlist por nome, artista, duracao ou inverter a ordem. A ordem e salva e pode ser desfeita sem apagar adicoes posteriores nem recriar faixas removidas depois.
+- Exportar uma playlist em JSON e importar em Ajustes > Biblioteca. A importacao cria uma nova colecao, sem substituir outra com o mesmo identificador nem alterar os temas/preferencias gerais. O arquivo nao contem audios nem caminhos privados.
+- Reproduzir a partir daqui e uma acao explicita no menu da faixa da playlist. Enfileira daquela posicao ate o final; em modo offline, somente arquivos disponiveis. Tocar uma faixa normalmente continua tocando apenas ela.
+- Compartilhar o link de uma musica pelo seletor nativo Android, acessivel nas informacoes da faixa. Compartilhar nao envia o arquivo de audio.
+- Central de downloads mostra espaco livre informado pelo Android e ordenacao por maior arquivo; listas tambem podem ordenar por duracao. Na previa do navegador, o espaco e a cota do navegador, nao o armazenamento total do telefone.
+- Mensagens distinguem download agendado, espera por Wi-Fi, nova tentativa automatica do Android, falta de espaco e algumas recusas da fonte. A disponibilidade e a velocidade ainda dependem do servidor/rede.
+
+Atualize sem desinstalar. Os 68 temas, estilos pessoais, Infinite Radio opcional, player com tela apagada e central de midia foram mantidos. Esta entrega continua sendo um APK de desenvolvimento para uso pessoal, validado em emulador; o POCO/HyperOS fisico ainda precisa ser conferido.
 
 ## Novidades da 2.6.0
 
@@ -176,6 +193,8 @@ npm run dev
 Abra `http://127.0.0.1:5174`. Os testes de interface usam Playwright e Microsoft Edge; para outro navegador configure `BROWSER_CHANNEL`. Os testes Android em `tests/native*.mjs` exigem emulador/dispositivo de teste com depuracao, APK debug instalado e a busca de teste anterior. Eles alteram apenas os dados desse app de teste e alternam a rede do dispositivo de teste.
 
 `npm run test:professional` verifica artistas, informacoes das faixas, cache/filtros/cancelamento de busca, menus antigos e layouts. `npm run test:android:professional` confere a integracao nativa, os arquivos offline, o extrator real e os comandos da fila. Veja `VERIFICACAO.md` para as evidencias da versao publicada.
+
+`npm run test:library-tools` cobre descricao, preferencia da playlist, ordem/desfazer, edicao, exportacao/importacao e layout. `npm run test:android:library-tools` verifica edicao sem reiniciar o player, SHA-256 do audio preservado, downloads concorrentes equivalentes, cancelamento, compartilhamento e seletor de exportacao. Use somente um dispositivo de teste: as suites nativas alteram rede, fila e preferencias durante a verificacao.
 
 ## GitHub e Novas Compilacoes
 

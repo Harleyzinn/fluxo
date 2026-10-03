@@ -72,10 +72,22 @@ public class LibraryStore {
                     record.remove("statusDetail");
                     verifyFile(record);
                 } else if (status == DownloadManager.STATUS_FAILED) {
-                    record.put("status", "failed").put("statusDetail", reason == DownloadManager.ERROR_INSUFFICIENT_SPACE ? "Sem espaco no dispositivo" : "Falha no download. Tente novamente.");
+                    String detail = switch (reason) {
+                        case DownloadManager.ERROR_INSUFFICIENT_SPACE -> "Sem espaco no dispositivo";
+                        case DownloadManager.ERROR_CANNOT_RESUME -> "Nao foi possivel retomar. Tente baixar novamente.";
+                        case 401, 403 -> "A fonte recusou o download. Confira o link.";
+                        case 404, 410 -> "Audio indisponivel nesta fonte.";
+                        default -> "Falha no download. Tente novamente.";
+                    };
+                    record.put("status", "failed").put("statusDetail", detail);
                 } else {
-                    record.put("status", "downloading").put("statusDetail", status == DownloadManager.STATUS_PAUSED
-                        ? (reason == DownloadManager.PAUSED_QUEUED_FOR_WIFI ? "Aguardando Wi-Fi" : "Aguardando conexao") : "Baixando " + record.optInt("progress") + "%");
+                    String detail = status == DownloadManager.STATUS_PENDING ? "Download agendado" : status == DownloadManager.STATUS_PAUSED
+                        ? switch (reason) {
+                            case DownloadManager.PAUSED_QUEUED_FOR_WIFI -> "Aguardando Wi-Fi";
+                            case DownloadManager.PAUSED_WAITING_TO_RETRY -> "Aguardando nova tentativa do Android";
+                            default -> "Aguardando conexao";
+                        } : "Baixando " + record.optInt("progress") + "%";
+                    record.put("status", "downloading").put("statusDetail", detail);
                 }
             }
         }
@@ -109,7 +121,7 @@ public class LibraryStore {
         JSONArray records = list();
         for (int i = 0; i < records.length(); i++) {
             JSONObject existing = records.getJSONObject(i);
-            if (existing.optString("id").equals(track.optString("id")) && !existing.optString("status").equals("failed")) return existing;
+            if (LibrarySync.sameTrack(existing, track) && !existing.optString("status").equals("failed")) return existing;
         }
         remove(track.optString("id"));
         records = records();
@@ -132,6 +144,11 @@ public class LibraryStore {
         final String artworkUrl = record.optString("thumbnail");
         FluxoAudioPlugin.IO.execute(() -> cacheArtwork(artworkId, artworkUrl));
         return record;
+    }
+    public synchronized void updateMetadata(JSONObject track, String title, String artist) throws Exception {
+        JSONArray rows = records();
+        for (int i = 0; i < rows.length(); i++) if (LibrarySync.sameTrack(rows.getJSONObject(i), track)) rows.getJSONObject(i).put("title", title).put("artist", artist);
+        save(rows);
     }
     private void cacheArtwork(String id, String url) {
         if (!url.startsWith("https://")) return;

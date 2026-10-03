@@ -100,6 +100,34 @@ public class FluxoAudioPlugin extends Plugin {
             call.resolve();
         });
     }
+    @PluginMethod public void shareText(PluginCall call) {
+        main.post(() -> {
+            try {
+                String text = call.getString("text", ""); if (text.length() > 20000) throw new IllegalArgumentException();
+                Intent intent = new Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text).putExtra(Intent.EXTRA_SUBJECT, call.getString("title", "Fluxo Mobile"));
+                getActivity().startActivity(Intent.createChooser(intent, null)); call.resolve(new JSObject().put("launched", true));
+            } catch (Exception failure) { call.reject("Nao foi possivel abrir o compartilhamento."); }
+        });
+    }
+    @PluginMethod public void storage(PluginCall call) {
+        async(call, () -> {
+            java.io.File folder = getContext().getExternalFilesDir(android.os.Environment.DIRECTORY_MUSIC);
+            android.os.StatFs stats = new android.os.StatFs((folder == null ? getContext().getFilesDir() : folder).getAbsolutePath());
+            call.resolve(new JSObject().put("available", stats.getAvailableBytes()).put("total", stats.getTotalBytes()));
+        });
+    }
+    @PluginMethod public void updateTrack(PluginCall call) {
+        async(call, () -> {
+            JSONObject track = call.getObject("track"), fields = call.getObject("fields");
+            String title = fields == null || !(fields.opt("title") instanceof String) ? "" : fields.optString("title").trim(), artist = fields == null || !(fields.opt("artist") instanceof String) ? "" : fields.optString("artist").trim();
+            if (track == null || track.optString("id").isEmpty() || title.isEmpty() || artist.isEmpty() || title.length() > 500 || artist.length() > 500) throw new IllegalArgumentException("Informe nome e artista com ate 500 caracteres.");
+            synchronized (LibrarySync.class) { library.updateMetadata(track, title, artist); LibrarySync.updateMetadata(getContext(), track, title, artist); }
+            main.post(() -> {
+                try { if (PlaybackService.instance != null) PlaybackService.instance.updateMetadata(track, title, artist); call.resolve(); }
+                catch (Exception failure) { call.reject(StreamResolver.readable(failure), failure); }
+            });
+        });
+    }
     @PluginMethod public void search(PluginCall call) {
         async(call, () -> call.resolve(new JSObject().put("tracks", StreamResolver.search(call.getString("query", ""), call.getString("provider", "youtube")))));
     }
@@ -108,7 +136,7 @@ public class FluxoAudioPlugin extends Plugin {
             JSONArray tracks = library.list(); JSONArray pending = LibrarySync.pending(getContext());
             for (int i = 0; i < pending.length(); i++) {
                 JSONObject candidate = pending.getJSONObject(i); boolean found = false;
-                for (int j = 0; j < tracks.length(); j++) if (tracks.getJSONObject(j).optString("id").equals(candidate.optString("id"))) {
+                for (int j = 0; j < tracks.length(); j++) if (LibrarySync.sameTrack(tracks.getJSONObject(j), candidate)) {
                     if (tracks.getJSONObject(j).optString("status").equals("failed") && candidate.optString("status").equals("queued")) tracks.put(j, candidate);
                     found = true; break;
                 }
@@ -138,16 +166,17 @@ public class FluxoAudioPlugin extends Plugin {
         async(call, () -> {
             String id = call.getString("id", "");
             synchronized (LibrarySync.class) {
-                if (call.getBoolean("pendingOnly", false)) {
-                    JSONArray records = library.list();
-                    for (int i = 0; i < records.length(); i++) {
-                        JSONObject record = records.getJSONObject(i);
-                        if (record.optString("id").equals(id) && record.optString("status").equals("ready")) {
-                            call.resolve(new JSObject().put("cancelled", false)); return;
-                        }
-                    }
+                JSONObject matched = LibrarySync.target(getContext(), id);
+                JSONArray stored = library.list();
+                JSONObject actual = null;
+                for (int i = 0; i < stored.length(); i++) if (stored.getJSONObject(i).optString("id").equals(id)) { actual = stored.getJSONObject(i); break; }
+                // A pending alias can become a DownloadManager record under another ID.
+                if (actual == null && matched != null) for (int i = 0; i < stored.length(); i++) if (LibrarySync.sameTrack(stored.getJSONObject(i), matched)) { actual = stored.getJSONObject(i); break; }
+                if (actual != null) matched = actual;
+                if (call.getBoolean("pendingOnly", false) && actual != null && actual.optString("status").equals("ready")) {
+                    call.resolve(new JSObject().put("cancelled", false)); return;
                 }
-                LibrarySync.block(getContext(), id); library.remove(id);
+                LibrarySync.blockEquivalent(getContext(), id, matched == null ? "" : matched.optString("url")); library.remove(actual == null ? id : actual.optString("id"));
             }
             call.resolve(new JSObject().put("cancelled", true));
         });
@@ -201,8 +230,10 @@ public class FluxoAudioPlugin extends Plugin {
         });
     }
     @PluginMethod public void exportBackup(PluginCall call) {
+        String filename = call.getString("filename", "fluxo-backup.json");
+        if (!filename.matches("[a-zA-Z0-9_.-]{1,100}\\.json")) filename = "fluxo-backup.json";
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT).setType("application/json")
-            .addCategory(Intent.CATEGORY_OPENABLE).putExtra(Intent.EXTRA_TITLE, "fluxo-backup.json");
+            .addCategory(Intent.CATEGORY_OPENABLE).putExtra(Intent.EXTRA_TITLE, filename);
         startActivityForResult(call, intent, "backupDestination");
     }
     @ActivityCallback private void backupDestination(PluginCall call, ActivityResult result) {

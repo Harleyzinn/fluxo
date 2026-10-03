@@ -369,6 +369,18 @@ public class PlaybackService extends MediaSessionService {
         return new MediaItem.Builder().setMediaId(track.optString("id", url)).setUri(uri).setMediaMetadata(metadata.build()).build();
     }
 
+    void updateMetadata(JSONObject source, String title, String artist) throws Exception {
+        for (int i = 0; i < player.getMediaItemCount(); i++) {
+            MediaItem old = player.getMediaItemAt(i); JSONObject track = track(old);
+            if (!LibrarySync.sameTrack(track, source)) continue;
+            track.put("title", title).put("artist", artist); Bundle extras = new Bundle(old.mediaMetadata.extras);
+            extras.putString("track", track.toString());
+            player.replaceMediaItem(i, old.buildUpon().setMediaMetadata(old.mediaMetadata.buildUpon().setTitle(title).setArtist(artist).setExtras(extras).build()).build());
+        }
+        if (radioSeed != null && LibrarySync.sameTrack(radioSeed, source)) radioSeed.put("title", title).put("artist", artist);
+        persist(); publish();
+    }
+
     void setQueue(JSONArray queue, int index, boolean play) throws Exception {
         stopRadio(); playbackGeneration++; recovering = false; retries = 0;
         if (queue.length() == 0) { player.pause(); player.clearMediaItems(); persist(); return; }

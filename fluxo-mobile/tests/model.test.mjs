@@ -3,7 +3,42 @@ import assert from 'node:assert/strict';
 import { cleanTrack, unique, sameTrack, withDownload, removeLibraryTracks, restoreLibraryTracks, libraryTracks, filterDownloads, downloadStats, size, duration, filterTracks, filterPlaylists, validateBackup, loadModel, publicBackup } from '../www/model.js';
 import { normalizeSettings, normalizeAppearance, playlistAppearance, contrastText, surfacePalette } from '../www/appearance.js';
 import { mergeTracks, groupArtists, collectionDuration, SearchCache, ActionGate, filterSearchResults, sameOccurrence } from '../www/discovery.js';
+import { metadataFields, updateModelMetadata, syncTargets, restoreTrackOrder, playlistFile, validatePlaylistFile } from '../www/collection-tools.js';
 const track = { id: 'one', title: 'Canção', artist: 'Álvaro', duration: 65, url: 'https://example.com/a.mp3' };
+
+test('metadata edits update every matching collection without changing audio identity', () => {
+  const alias = { ...track, id: 'alias', localUri: 'private', bytes: 123 };
+  const model = { library: [{ ...track }], favorites: [{ ...alias }], history: [{ ...track }], radioExcluded: [{ ...track }], playlists: [{ tracks: [{ ...alias }, { ...track, id: 'other', url: '' }] }] };
+  updateModelMetadata(model, track, { title: ' Novo ', artist: ' Banda ' });
+  for (const key of ['library', 'favorites', 'history', 'radioExcluded']) { assert.equal(model[key][0].title, 'Novo'); assert.equal(model[key][0].artist, 'Banda'); }
+  assert.equal(model.playlists[0].tracks[0].id, 'alias'); assert.equal(model.playlists[0].tracks[0].localUri, 'private'); assert.equal(model.playlists[0].tracks[1].title, track.title);
+});
+test('metadata fields reject blank, oversize and nontext values', () => {
+  for (const fields of [{ title: '', artist: 'a' }, { title: 'x', artist: ' ' }, { title: 'a'.repeat(501), artist: 'a' }, { title: 42, artist: 'a' }]) assert.throws(() => metadataFields(fields));
+  assert.deepEqual(metadataFields({ title: ' ok ', artist: ' band ', id: 'danger' }), { title: 'ok', artist: 'band' });
+});
+test('per-playlist sync propagates to URL aliases but not unrelated local tracks', () => {
+  const model = { library: [{ ...track, id: 'alias' }, { ...track, id: 'local', url: '', _autoDownload: true }], favorites: [], playlists: [{ autoDownload: true, tracks: [track] }] };
+  const targets = syncTargets(model);
+  assert.equal(targets.find(t => t.id === 'alias')._autoDownload, true); assert.equal(targets.find(t => t.id === 'local')._autoDownload, false);
+  assert.equal(model.library[0]._autoDownload, undefined);
+});
+test('playlist order undo preserves later additions and does not resurrect removals', () => {
+  const tracks = ['b', 'new', 'a'].map(id => ({ id }));
+  assert.deepEqual(restoreTrackOrder(tracks, ['a', 'removed', 'b']).map(t => t.id), ['a', 'b', 'new']);
+});
+test('playlist exports omit device paths and round-trip description and download preference', () => {
+  const p = { id: 'p', title: 'Meus sons', description: ' Texto ', autoDownload: true, offlineOnly: true, tracks: [{ ...track, localUri: 'file://private', _autoDownload: true, downloadId: 52 }] };
+  const file = playlistFile(p), restored = validatePlaylistFile(file);
+  assert.equal(file.playlist.tracks[0].localUri, undefined); assert.equal(file.playlist.tracks[0]._autoDownload, undefined);
+  assert.equal(restored.description, 'Texto'); assert.equal(restored.autoDownload, true); assert.equal(restored.tracks[0].url, track.url);
+  assert.throws(() => validatePlaylistFile({ ...file, version: 2 })); assert.throws(() => validatePlaylistFile({ ...file, format: 'other' }));
+});
+test('numeric sorts place unknown values last and keep the input order intact', () => {
+  const rows = [{ id: 'unknown' }, { id: 'long', duration: 180, bytes: 100 }, { id: 'short', duration: 30, bytes: 200 }, { id: 'bad', duration: -1, bytes: Infinity }];
+  assert.deepEqual(filterTracks(rows, '', 'duration').map(t => t.id), ['short', 'long', 'unknown', 'bad']);
+  assert.deepEqual(filterTracks(rows, '', 'size').map(t => t.id), ['short', 'long', 'unknown', 'bad']); assert.equal(rows[0].id, 'unknown');
+});
 
 test('artist collections collapse cache aliases and normalize artist accents and spaces', () => {
   const rows = groupArtists([track, { ...track, id: 'alias' }, { ...track, id: 'two', url: '', artist: ' alvaro ' }, { ...track, id: 'three', url: '', artist: 'Outro' }]);

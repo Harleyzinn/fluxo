@@ -1,5 +1,6 @@
 import { cleanTrack, sameTrack } from './model.js';
 import { sameOccurrence } from './discovery.js';
+import { metadataFields, updateTrackCopies } from './collection-tools.js';
 export const native = !!window.Capacitor?.isNativePlatform();
 const plugin = native ? (window.Capacitor.Plugins.FluxoAudio || window.Capacitor.registerPlugin('FluxoAudio')) : null;
 let callback = () => {};
@@ -160,7 +161,7 @@ export const commands = {
   },
   async downloadBatch(tracks, wifiOnly) {
     if (native) return plugin.downloadBatch({ tracks, wifiOnly });
-    for (const track of tracks) if (track.url && !(await commands.downloads()).some(item => item.id === track.id)) await commands.download(track, wifiOnly);
+    for (const track of tracks) if (track.url && !(await commands.downloads()).some(item => sameTrack(item, track))) await commands.download(track, wifiOnly);
   },
   async removeDownload(id) { return native ? plugin.removeDownload({ id }) : dbRequest('readwrite', store => store.delete(id)); },
   async cancelDownload(id) { return native ? plugin.removeDownload({ id, pendingOnly: true }) : { cancelled: false }; },
@@ -172,12 +173,32 @@ export const commands = {
   },
   async notifications() { if (native) return plugin.notifications(); },
   async copyText(text) { if (native) return plugin.copyText({ text }); if (!navigator.clipboard) throw new Error('Não foi possível acessar a área de transferência.'); await navigator.clipboard.writeText(text); },
+  async shareText(options) {
+    if (native) return plugin.shareText(options);
+    if (navigator.share) { try { await navigator.share(options); return { copied: false }; } catch (error) { if (error.name === 'AbortError') return { cancelled: true }; throw error; } }
+    await commands.copyText(options.text); return { copied: true };
+  },
+  async updateTrack(track, fields) {
+    fields = metadataFields(fields);
+    if (native) return plugin.updateTrack({ track, fields });
+    await dbRequest('readwrite', store => {
+      const request = store.getAll();
+      request.onsuccess = () => { for (const record of request.result) if (sameTrack(cleanTrack(record.meta || record), track)) { record.meta = { ...(record.meta || record), ...fields }; store.put(record); } };
+      return request;
+    });
+    updateTrackCopies(state.queue, track, fields); emit();
+  },
+  async storage() {
+    if (native) return plugin.storage();
+    const estimate = await navigator.storage?.estimate();
+    return { available: Number.isFinite(estimate?.quota) ? Math.max(0, estimate.quota - (estimate.usage || 0)) : null };
+  },
   async diagnostics() { return native ? plugin.diagnostics() : { notifications: false, batteryUnrestricted: false, manufacturer: 'Prévia', model: '', android: '', foreground: false }; },
   async openSettings(page) { if (native) return plugin.openSettings({ page }); },
-  async exportBackup(data) {
-    if (native) return plugin.exportBackup({ data });
+  async exportBackup(data, filename = 'fluxo-backup.json') {
+    if (native) return plugin.exportBackup({ data, filename });
     const url = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
-    Object.assign(document.createElement('a'), { href: url, download: 'fluxo-backup.json' }).click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+    Object.assign(document.createElement('a'), { href: url, download: filename }).click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   },
   async importBackup() {
     if (native) { const result = await plugin.importBackup(); return result.cancelled ? null : result.data; }

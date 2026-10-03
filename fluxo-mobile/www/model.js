@@ -42,6 +42,10 @@ export function filterTracks(tracks, query = '', sort = 'recent') {
   const normalize = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   let result = tracks.filter(t => normalize(`${t.title} ${t.artist}`).includes(normalize(query.trim())));
   if (sort === 'title' || sort === 'artist') result = [...result].sort((a, b) => a[sort].localeCompare(b[sort], 'pt-BR'));
+  if (sort === 'duration' || sort === 'size') {
+    const number = track => { const value = Number(track[sort === 'size' ? 'bytes' : 'duration']); return Number.isFinite(value) && value > 0 ? value : null; };
+    result = [...result].sort((a, b) => { const x = number(a), y = number(b); return x === null ? y === null ? 0 : 1 : y === null ? -1 : sort === 'size' ? y - x : x - y; });
+  }
   return result;
 }
 export function filterPlaylists(playlists, query = '', sort = 'recent') {
@@ -65,8 +69,9 @@ export function validateBackup(input) {
   if (total > 100000 || (input.history?.length || 0) > 10000) throw new Error('Backup grande demais.');
   return { ...input, library: publicTracks(input.library || []), favorites: publicTracks(input.favorites), history: publicTracks(input.history || []).slice(0, 100), radioExcluded: publicTracks(input.radioExcluded || []),
     settings: normalizeSettings(input.settings),
-    playlists: input.playlists.filter(p => p && Array.isArray(p.tracks)).map(p => ({ id: String(p.id || crypto.randomUUID()).slice(0, 500), title: String(p.title || 'Playlist').slice(0, 100), offlineOnly: !!p.offlineOnly, pinned: p.pinned === true, ...playlistAppearance(p), tracks: publicTracks(p.tracks) })) };
+    playlists: input.playlists.filter(p => p && Array.isArray(p.tracks)).map(p => ({ id: String(p.id || crypto.randomUUID()).slice(0, 500), title: String(p.title || 'Playlist').slice(0, 100), offlineOnly: !!p.offlineOnly, pinned: p.pinned === true, ...playlistDetails(p), ...playlistAppearance(p), tracks: publicTracks(p.tracks) })) };
 }
+export const playlistDetails = p => ({ description: typeof p.description === 'string' ? p.description.trim().slice(0, 280) : '', autoDownload: p.autoDownload === true });
 export function loadModel(storage) {
   const read = (key, fallback) => { try { return JSON.parse(storage.getItem(key)) ?? fallback; } catch { return fallback; } };
   const current = read('fluxo_mobile_v2', null);
@@ -78,7 +83,7 @@ export function loadModel(storage) {
   return { ...value, library: unique(value.library), favorites: unique(value.favorites), history: unique(value.history).slice(0, 100),
     radioExcluded: unique(value.radioExcluded).slice(0, 500),
     playlists: (Array.isArray(value.playlists) ? value.playlists : []).filter(p => p && Array.isArray(p.tracks)).map(p => ({ ...p,
-      id: String(p.id || crypto.randomUUID()).slice(0, 500), title: String(p.title || 'Playlist').slice(0, 100), pinned: p.pinned === true, tracks: unique(p.tracks) })),
+      id: String(p.id || crypto.randomUUID()).slice(0, 500), title: String(p.title || 'Playlist').slice(0, 100), pinned: p.pinned === true, ...playlistDetails(p), tracks: unique(p.tracks) })),
     searches: (Array.isArray(value.searches) ? value.searches : []).filter(value => typeof value === 'string' && value.trim()).slice(0, 8),
     settings: normalizeSettings(value.settings) };
 }

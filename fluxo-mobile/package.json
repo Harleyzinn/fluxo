@@ -1,6 +1,6 @@
 {
   "name": "fluxo-mobile",
-  "version": "2.6.0",
+  "version": "2.7.0",
   "private": true,
   "license": "GPL-3.0-or-later",
   "description": "Fluxo Music Mobile - app independente em Capacitor",
@@ -13,6 +13,8 @@
     "test:refinements": "node tests/refinements-ui.mjs",
     "test:collections": "node tests/collections-ui.mjs",
     "test:professional": "node tests/professional-ui.mjs",
+    "test:library-tools": "node tests/library-tools-ui.mjs",
+    "test:android:library-tools": "node tests/native-library-tools.mjs",
     "test:android:professional": "node tests/native-professional.mjs",
     "test:migration": "node tests/migration-ui.mjs",
     "test:android:collections": "node tests/native-collections.mjs",

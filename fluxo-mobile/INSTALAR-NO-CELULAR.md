@@ -1,8 +1,8 @@
 # Instalar o Fluxo no Android
 
-Download: [Fluxo Mobile 2.6.0 no GitHub](https://github.com/Harleyzinn/fluxo/releases/tag/mobile-v2.6.0). Escolha o arquivo **Fluxo-Mobile-2.6.0.apk** em Assets.
+Download: [Fluxo Mobile 2.7.0 no GitHub](https://github.com/Harleyzinn/fluxo/releases/tag/mobile-v2.7.0). Escolha o arquivo **Fluxo-Mobile-2.7.0.apk** em Assets.
 
-1. Abra o link acima no celular e baixe o APK, ou envie **dist/Fluxo-Mobile-2.6.0.apk** por cabo USB.
+1. Abra o link acima no celular e baixe o APK, ou envie **dist/Fluxo-Mobile-2.7.0.apk** por cabo USB.
 2. No celular, abra o arquivo APK em Downloads ou no gerenciador de arquivos.
 3. Se aparecer o aviso de instalacao bloqueada, toque em Configuracoes e permita instalar apps dessa origem. Volte e toque em Instalar.
 4. Abra **Fluxo Mobile**. A busca fica na aba Buscar; seus arquivos e playlists ficam em Biblioteca.
@@ -10,6 +10,16 @@ Download: [Fluxo Mobile 2.6.0 no GitHub](https://github.com/Harleyzinn/fluxo/rel
 6. Salve na biblioteca, favorite ou adicione a uma playlist para baixar automaticamente. Aguarde o progresso terminar. Depois crie uma playlist com Somente musicas baixadas. Ative Ajustes > Baixar so no Wi-Fi para evitar downloads usando dados moveis.
 
 ## POCO X5 5G / HyperOS
+
+Na 2.7, edite nome e artista em Menu da musica > Biblioteca > Editar nome e artista. Isso nao regrava o audio e nao reinicia a faixa atual.
+
+No menu da playlist, Editar playlist permite adicionar descricao e ativar Download automatico desta playlist. Ativada, ela baixa mesmo com o automatico geral desligado; desativada, segue o ajuste geral. Baixar so no Wi-Fi continua valendo. Organizar musicas salva a ordem por nome, artista, duracao ou invertida, com opcao Desfazer.
+
+Exportar playlist gera um JSON apenas daquela colecao. Importe em Ajustes > Biblioteca > Importar playlist. Sao nomes, links e preferencias da playlist, nao arquivos de audio; musicas locais precisam estar importadas no mesmo aparelho para tocar offline.
+
+No menu da faixa de uma playlist, Reproducao > Reproduzir a partir daqui toca da posicao escolhida ate o final. O toque normal continua tocando apenas aquela musica. Compartilhar musica, nas informacoes da faixa, compartilha o link pelo Android.
+
+A central de downloads mostra espaco livre, permite ordenar pelo maior arquivo e informa quando o Android aguarda uma nova tentativa, em vez de tratar toda espera como falta de conexao.
 
 Na 2.6, Colecoes > Artistas organiza as faixas da biblioteca e do dispositivo. Abra um artista para tocar sua selecao, filtrar musicas ou criar uma playlist. A busca online agora tem filtros de duracao, favoritas e baixadas; Atualizar resultados renova uma busca recente.
 

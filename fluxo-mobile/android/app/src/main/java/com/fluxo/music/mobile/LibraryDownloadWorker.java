@@ -16,7 +16,7 @@ public class LibraryDownloadWorker extends Worker {
             var records = LibraryStore.get(context).list();
             for (int i = 0; i < records.length(); i++) {
                 var record = records.getJSONObject(i);
-                if (record.optString("id").equals(id) && !record.optString("status").equals("failed")) {
+                if (LibrarySync.sameTrack(record, track) && !record.optString("status").equals("failed")) {
                     LibrarySync.status(context, id, "done", ""); return Result.success();
                 }
             }
@@ -26,7 +26,7 @@ public class LibraryDownloadWorker extends Worker {
                 if (isStopped() || LibrarySync.target(context, id) == null) return Result.success();
                 var desired = LibrarySync.target(context, id);
                 boolean wifiOnly = desired.optBoolean("_wifiOnly", LibrarySync.wifiOnly(context));
-                var metadata = new org.json.JSONObject(desired.toString()); metadata.remove("_wifiOnly");
+                var metadata = new org.json.JSONObject(desired.toString()); metadata.remove("_wifiOnly"); metadata.remove("_autoDownload");
                 LibraryStore.get(context).download(metadata, url, wifiOnly);
                 LibrarySync.status(context, id, "done", "");
             }
