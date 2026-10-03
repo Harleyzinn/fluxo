@@ -79,7 +79,7 @@ try {
     for (const track of tracks) await call('removeDownload', { id: track.id }).catch(() => {});
     if (savedModel) await page.evaluate(value => localStorage.fluxo_mobile_v2 = value, savedModel);
     if (savedState) await call('command', { action: 'volume', value: savedState.volume ?? 1 }).catch(() => {});
-    await page.goto('https://localhost/#library').catch(() => {});
+    await page.goto('https://localhost/#library').catch(() => {}); await page.reload().catch(() => {});
   }
   await browser?.close();
 }

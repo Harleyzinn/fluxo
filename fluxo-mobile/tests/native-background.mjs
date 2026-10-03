@@ -71,7 +71,7 @@ try {
   assert.ok(localTracks.length >= 2, 'Import/download two tracks before this test');
   const radioFixture = localTracks.find(track => track.id === fixture.id);
   assert.ok(radioFixture?.localUri, 'The imported fixture must include its native file URI');
-  await page.goto('https://localhost/#library'); await delay(1200);
+  await page.goto('https://localhost/#library'); await page.reload(); await delay(1200);
   await page.getByRole('tab', { name: 'Baixadas', exact: true }).click();
   await page.locator('[data-action="track-play"]').first().click();
   await waitFor(s => s.playing);
