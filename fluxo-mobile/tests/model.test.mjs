@@ -2,7 +2,60 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cleanTrack, unique, sameTrack, withDownload, removeLibraryTracks, restoreLibraryTracks, libraryTracks, filterDownloads, downloadStats, size, duration, filterTracks, filterPlaylists, validateBackup, loadModel, publicBackup } from '../www/model.js';
 import { normalizeSettings, normalizeAppearance, playlistAppearance, contrastText, surfacePalette } from '../www/appearance.js';
+import { mergeTracks, groupArtists, collectionDuration, SearchCache, ActionGate, filterSearchResults, sameOccurrence } from '../www/discovery.js';
 const track = { id: 'one', title: 'Canção', artist: 'Álvaro', duration: 65, url: 'https://example.com/a.mp3' };
+
+test('artist collections collapse cache aliases and normalize artist accents and spaces', () => {
+  const rows = groupArtists([track, { ...track, id: 'alias' }, { ...track, id: 'two', url: '', artist: ' alvaro ' }, { ...track, id: 'three', url: '', artist: 'Outro' }]);
+  assert.equal(rows.length, 2); assert.equal(rows[0].tracks.length, 2);
+  assert.equal(groupArtists([track], 'ALVARO')[0].name, 'Álvaro');
+  assert.equal(mergeTracks([{ ...track, url: '' }, { ...track, id: 'two', url: '' }]).length, 2);
+});
+test('collection durations are readable and resist nonfinite or negative data', () => {
+  assert.equal(collectionDuration([{ duration: 3660 }]), '1 h 1 min');
+  assert.equal(collectionDuration([{ duration: 3600 }]), '1 h');
+  assert.equal(collectionDuration([{ duration: 30 }]), '< 1 min');
+  assert.equal(collectionDuration([{ duration: Infinity }, { duration: -50 }]), '0 min');
+});
+test('search cache is bounded, isolated by provider, cloned and expires', () => {
+  let now = 0; const cache = new SearchCache({ limit: 2, ttl: 100, now: () => now });
+  cache.put('Canção', 'youtube', [track]);
+  const first = cache.get(' canCAO ', 'youtube'); first[0].title = 'Mutated';
+  assert.equal(cache.get('Canção', 'youtube')[0].title, track.title);
+  assert.equal(cache.get('Canção', 'other'), null);
+  cache.put('b', 'youtube', []); cache.get('Canção', 'youtube'); cache.put('c', 'youtube', []);
+  assert.equal(cache.get('b', 'youtube'), null); assert.deepEqual(cache.get('c', 'youtube'), []);
+  now = 100; assert.equal(cache.get('Canção', 'youtube'), null);
+});
+test('search refinement excludes unknown durations without losing the original results', () => {
+  const rows = [track, { ...track, id: 'long', duration: 240 }, { ...track, id: 'unknown', duration: 0 }];
+  assert.equal(filterSearchResults(rows, 'short', () => false, () => false).length, 1);
+  assert.equal(filterSearchResults(rows, 'long', () => false, () => false)[0].id, 'long');
+  assert.equal(filterSearchResults(rows, 'downloaded', t => t.id === 'one', () => false).length, 1);
+  assert.equal(filterSearchResults(rows, 'favorites', () => false, t => t.id === 'long').length, 1);
+  assert.equal(rows.length, 3);
+});
+test('action gates prevent overlapping writes and release after failures', async () => {
+  const gate = new ActionGate(); let finish, calls = 0;
+  const pending = gate.run('save', () => new Promise(resolve => { calls++; finish = resolve; }));
+  assert.equal(await gate.run('save', () => calls++), false); assert.equal(calls, 1);
+  finish(); assert.equal(await pending, true);
+  await assert.rejects(gate.run('save', () => { throw new Error('fail'); }));
+  assert.equal(await gate.run('save', () => calls++), true);
+});
+test('stale occurrence checks detect reorder, insertion and repeated-track changes', () => {
+  const other = { ...track, id: 'two', url: '' }, rows = [track, other, track];
+  assert.equal(sameOccurrence(rows, rows.map(t => ({ ...t })), 2), true);
+  assert.equal(sameOccurrence([other, track, track], rows, 2), false);
+  assert.equal(sameOccurrence([...rows, other], rows, 2), false);
+  assert.equal(sameOccurrence(rows, rows, -1), false);
+});
+test('oversized nested backup lists are rejected before restoration', () => {
+  const backup = { format: 'fluxo-mobile', version: 2, favorites: [], playlists: [{ tracks: Array(20001).fill(track) }] };
+  assert.throws(() => validateBackup(backup), /grande demais/);
+  backup.playlists = Array.from({ length: 6 }, () => ({ tracks: Array(20000).fill(track) }));
+  assert.throws(() => validateBackup(backup), /grande demais/);
+});
 
 test('offline records never replace the identity or source URL of playlist tracks', () => {
   const record = { ...track, id: 'cached-other-id', title: 'Old title', localUri: 'file:///private/track', thumbnail: 'file:///private/cover', duration: 75 };

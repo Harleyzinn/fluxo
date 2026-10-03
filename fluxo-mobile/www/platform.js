@@ -1,4 +1,5 @@
 import { cleanTrack, sameTrack } from './model.js';
+import { sameOccurrence } from './discovery.js';
 export const native = !!window.Capacitor?.isNativePlatform();
 const plugin = native ? (window.Capacitor.Plugins.FluxoAudio || window.Capacitor.registerPlugin('FluxoAudio')) : null;
 let callback = () => {};
@@ -113,6 +114,7 @@ export const commands = {
   async command(options) {
     if (native) return plugin.command(options);
     const { action, value = 0, index = 0 } = options;
+    if (options.expectedQueue && !sameOccurrence(state.queue, options.expectedQueue, index)) throw new Error('A fila mudou. Abra as opções novamente.');
     switch (action) {
       case 'play': state.playWhenReady = true; if (!audio.src || state.error) await browserPlay(); else await audio.play(); break;
       case 'pause': generation++; audio.pause(); state.playWhenReady = false; state.buffering = false; clearTimeout(timeout); break;
@@ -129,7 +131,7 @@ export const commands = {
         await browserPlay(state.playWhenReady); break;
       }
       case 'previous': if (audio.currentTime > 3) audio.currentTime = 0; else { state.index = Math.max(0, state.index - 1); await browserPlay(state.playWhenReady); } break;
-      case 'jump': state.index = index; await browserPlay(); break;
+      case 'jump': if (index >= 0 && index < state.queue.length) { state.index = index; await browserPlay(); } break;
       case 'seek': if (Number.isFinite(value) && Number.isFinite(audio.duration)) audio.currentTime = Math.max(0, Math.min(audio.duration, value)); break;
       case 'clear': generation++; clearTimeout(timeout); audio.pause(); audio.removeAttribute('src'); audio.load(); if (objectURL) URL.revokeObjectURL(objectURL); objectURL = ''; state.radio = false; state.queue = []; state.index = 0; state.position = 0; state.duration = 0; state.buffered = 0; state.playWhenReady = false; state.buffering = false; state.error = ''; state.sleepAt = 0; state.sleepEnd = false; break;
       case 'radio-stop': state.radio = false; state.queue = state.queue.filter((track, i) => i <= state.index || !track.radioGenerated); break;
@@ -169,6 +171,7 @@ export const commands = {
     return { tracks: files };
   },
   async notifications() { if (native) return plugin.notifications(); },
+  async copyText(text) { if (native) return plugin.copyText({ text }); if (!navigator.clipboard) throw new Error('Não foi possível acessar a área de transferência.'); await navigator.clipboard.writeText(text); },
   async diagnostics() { return native ? plugin.diagnostics() : { notifications: false, batteryUnrestricted: false, manufacturer: 'Prévia', model: '', android: '', foreground: false }; },
   async openSettings(page) { if (native) return plugin.openSettings({ page }); },
   async exportBackup(data) {

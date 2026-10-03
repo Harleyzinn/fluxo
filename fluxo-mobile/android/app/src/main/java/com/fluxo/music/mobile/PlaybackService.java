@@ -418,7 +418,7 @@ public class PlaybackService extends MediaSessionService {
             case "move": if (index >= 0 && index < player.getMediaItemCount() && value >= 0 && value < player.getMediaItemCount()) player.moveMediaItem(index, (int)value); break;
             case "clear": stopRadio(); playbackGeneration++; recovering = false; retries = 0; error = ""; player.pause(); player.clearMediaItems(); sleepAt = 0; sleepEnd = false; player.setPauseAtEndOfMediaItems(false); break;
             case "remove-played": player.removeMediaItems(0, player.getCurrentMediaItemIndex()); break;
-            case "clear-upcoming": stopRadio(); player.removeMediaItems(player.getCurrentMediaItemIndex() + 1, player.getMediaItemCount()); break;
+            case "clear-upcoming": stopRadio(); if (player.getMediaItemCount() > 0) player.removeMediaItems(player.getCurrentMediaItemIndex() + 1, player.getMediaItemCount()); break;
             case "deduplicate-upcoming": {
                 Set<String> ids = new HashSet<>(); Set<String> urls = new HashSet<>();
                 int currentIndex = player.getCurrentMediaItemIndex();

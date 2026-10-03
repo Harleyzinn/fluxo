@@ -56,6 +56,13 @@ export function validateBackup(input) {
   if (input.library && (!Array.isArray(input.library) || input.library.length > 20000)) throw new Error('Biblioteca inválida.');
   if (input.radioExcluded && (!Array.isArray(input.radioExcluded) || input.radioExcluded.length > 500)) throw new Error('Preferências do rádio inválidas.');
   if (input.history && !Array.isArray(input.history)) throw new Error('Histórico inválido.');
+  let total = (input.library?.length || 0) + input.favorites.length + (input.history?.length || 0);
+  for (const playlist of input.playlists) {
+    if (!Array.isArray(playlist?.tracks)) continue;
+    if (playlist.tracks.length > 20000) throw new Error('Uma playlist do backup é grande demais.');
+    total += playlist.tracks.length;
+  }
+  if (total > 100000 || (input.history?.length || 0) > 10000) throw new Error('Backup grande demais.');
   return { ...input, library: publicTracks(input.library || []), favorites: publicTracks(input.favorites), history: publicTracks(input.history || []).slice(0, 100), radioExcluded: publicTracks(input.radioExcluded || []),
     settings: normalizeSettings(input.settings),
     playlists: input.playlists.filter(p => p && Array.isArray(p.tracks)).map(p => ({ id: String(p.id || crypto.randomUUID()).slice(0, 500), title: String(p.title || 'Playlist').slice(0, 100), offlineOnly: !!p.offlineOnly, pinned: p.pinned === true, ...playlistAppearance(p), tracks: publicTracks(p.tracks) })) };

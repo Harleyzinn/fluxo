@@ -72,6 +72,7 @@ try {
   assert.equal(await page.locator('#view .track').count(), 2);
   assert.equal(await page.locator('.playlist-offline progress').getAttribute('value'), '2');
   await page.getByRole('button', { name: 'Opções de Beta', exact: true }).click();
+  await page.locator('.menu-section summary').filter({ hasText: 'Reprodução' }).click();
   await page.getByRole('button', { name: 'Não recomendar no rádio', exact: true }).click();
   assert.equal(await page.evaluate(() => JSON.parse(localStorage.fluxo_mobile_v2).radioExcluded.length), 1);
   await page.locator('.navigation [data-tab=settings]').click();

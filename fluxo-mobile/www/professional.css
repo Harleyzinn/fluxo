@@ -1,0 +1,82 @@
+main:focus { outline:none; }
+.topbar > .icon-button { width:44px; height:44px; background:transparent; }
+.page-heading h1 { font-weight:700; }
+.section-heading h2 { font-size:16px; font-weight:650; }
+.segmented button { font-weight:600; }
+.navigation a.active::after { content:''; width:4px; height:4px; background:var(--cyan); border-radius:50%; position:absolute; bottom:6px; }
+.navigation a { position:relative; padding-bottom:12px; }
+.library-summary { margin-bottom:0; padding-block:8px; }
+.collection-access { display:flex; align-items:center; gap:14px; width:100%; text-align:left; min-height:68px; border-bottom:1px solid var(--line); margin-bottom:26px; }
+.collection-access > svg:first-child { width:21px; color:var(--pink); }
+.collection-access > svg:last-child { width:17px; color:var(--muted); }
+.collection-access > span { flex:1; min-width:0; }
+.collection-access strong { font-size:14px; display:block; }
+.collection-access small { display:block; font-size:11px; margin-top:4px; }
+.playlist-card strong { line-height:1.45; min-height:20px; overflow-wrap:anywhere; }
+.playlist-card small { font-size:11px; }
+.playlist-card .playlist-art { border-radius:var(--radius); }
+.playlist-grid { gap:22px 16px; }
+.playlist-availability { padding-top:8px; margin-top:6px; border-top:1px solid var(--line); }
+.collection-heading { margin-top:0; margin-bottom:20px; }
+.collection-heading h1 { flex:1; font-size:25px; }
+.artist-search { margin-bottom:18px; }
+.artist-row { display:flex; align-items:center; gap:14px; width:100%; text-align:left; border-bottom:1px solid var(--line); min-height:88px; padding:12px 0; }
+.artist-row > span:not(.artist-cover) { flex:1; min-width:0; }
+.artist-row strong { display:block; font-size:15px; overflow-wrap:anywhere; }
+.artist-row small { display:block; margin-top:6px; font-size:11px; }
+.artist-row > svg { width:17px; color:var(--muted); }
+.artist-cover { width:56px; height:56px; flex:none; border-radius:var(--radius); object-fit:cover; }
+.artist-heading { display:flex; align-items:center; gap:18px; padding-bottom:24px; margin-bottom:20px; border-bottom:1px solid var(--line); }
+.artist-heading .playlist-art { width:100px; height:100px; flex:none; }
+.artist-heading > div:last-child { min-width:0; }
+.artist-heading h1 { font-size:23px; line-height:1.35; overflow-wrap:anywhere; }
+.artist-heading p { color:var(--muted); font-size:12px; margin:8px 0 5px; }
+.artist-heading small { color:var(--cyan); font-size:11px; }
+.search-sources { align-items:center; min-height:46px; gap:12px; }
+.search-sources > small:first-child { flex:1; }
+.search-sources .icon-button { width:44px; height:44px; }
+.search-refine { display:flex; justify-content:flex-end; margin-bottom:12px; }
+.search-refine label { display:flex; align-items:center; gap:10px; font-size:11px; color:var(--muted); }
+.search-refine select { min-height:44px; max-width:175px; border:1px solid var(--line); border-radius:4px; background:var(--panel); color:var(--text); padding:0 10px; font-size:12px; }
+.loading { display:flex; align-items:center; gap:12px; }
+.loading > .icon-button { margin-left:auto; }
+.track-quick-actions { grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; }
+.track-quick-actions .icon-button { height:48px; }
+.menu-section { border-bottom:1px solid var(--line); }
+.menu-section summary { display:flex; justify-content:space-between; align-items:center; padding:0 4px; min-height:52px; font-size:12px; font-weight:650; cursor:pointer; list-style:none; }
+.menu-section summary::-webkit-details-marker { display:none; }
+.menu-section summary svg { width:16px; color:var(--muted); }
+.menu-section[open] summary svg { transform:rotate(180deg); }
+.menu-section[open] summary { color:var(--cyan); }
+.menu-section .menu-item { font-size:13px; padding-left:12px; }
+.track-facts { margin:0 0 20px; }
+.track-facts > div { display:grid; grid-template-columns:105px minmax(0,1fr); gap:14px; padding:16px 0; border-bottom:1px solid var(--line); font-size:12px; line-height:1.5; }
+.track-facts dt { color:var(--muted); }
+.track-facts dd { margin:0; overflow-wrap:anywhere; }
+.player-header { margin-bottom:6px; }
+.player-context { display:flex; justify-content:space-between; align-items:center; gap:12px; min-height:34px; padding:0 2px; margin-bottom:16px; color:var(--muted); font-size:10px; font-variant-numeric:tabular-nums; }
+.player-context span { display:flex; align-items:center; gap:6px; min-width:0; }
+.player-context span:first-child { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.player-context span:last-child { flex:none; }
+.player-context svg { width:13px; height:13px; }
+#player .player-art { width:min(340px,max(96px,calc(100dvh - 555px))); }
+body[data-player-layout=compact] #player { max-height:min(94dvh,700px); }
+.player-footer button.active { color:var(--cyan); }
+.player-footer button { min-width:0; flex:1; }
+.player-footer button span { white-space:nowrap; font-size:9px; font-variant-numeric:tabular-nums; }
+.time-labels { min-height:44px; }
+.seek-step { width:44px; height:44px; }
+.seek-steps { gap:6px; }
+button[aria-busy=true],form[aria-busy=true] button[type=submit] { opacity:.6; cursor:progress; }
+.sheet-track .track-copy strong { white-space:normal; overflow-wrap:anywhere; -webkit-line-clamp:2; display:-webkit-box; -webkit-box-orient:vertical; }
+@media(max-width:360px) {
+  body[data-playlist-view=grid] .playlist-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px 12px; }
+  .playlist-card strong { font-size:12px; }
+  .playlist-card small { font-size:10px; }
+  .artist-heading .playlist-art { width:78px; height:78px; }
+  .artist-heading { gap:12px; }
+  .artist-heading h1 { font-size:20px; }
+  .track-facts > div { grid-template-columns:88px minmax(0,1fr); gap:10px; }
+}
+@media(max-height:720px) { #player .player-art { max-width:220px; } #player .player-context { margin-bottom:10px; } }
+@media(min-width:700px) { #player .player-art { width:min(340px,max(96px,calc(min(90dvh,840px) - 555px))); } .artist-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0 28px; } .artist-heading .playlist-art { width:140px; height:140px; } .artist-heading h1 { font-size:28px; } }

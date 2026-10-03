@@ -1,8 +1,8 @@
 # Instalar o Fluxo no Android
 
-Download: [Fluxo Mobile 2.5.0 no GitHub](https://github.com/Harleyzinn/fluxo/releases/tag/mobile-v2.5.0). Escolha o arquivo **Fluxo-Mobile-2.5.0.apk** em Assets.
+Download: [Fluxo Mobile 2.6.0 no GitHub](https://github.com/Harleyzinn/fluxo/releases/tag/mobile-v2.6.0). Escolha o arquivo **Fluxo-Mobile-2.6.0.apk** em Assets.
 
-1. Abra o link acima no celular e baixe o APK, ou envie **dist/Fluxo-Mobile-2.5.0.apk** por cabo USB.
+1. Abra o link acima no celular e baixe o APK, ou envie **dist/Fluxo-Mobile-2.6.0.apk** por cabo USB.
 2. No celular, abra o arquivo APK em Downloads ou no gerenciador de arquivos.
 3. Se aparecer o aviso de instalacao bloqueada, toque em Configuracoes e permita instalar apps dessa origem. Volte e toque em Instalar.
 4. Abra **Fluxo Mobile**. A busca fica na aba Buscar; seus arquivos e playlists ficam em Biblioteca.
@@ -11,13 +11,17 @@ Download: [Fluxo Mobile 2.5.0 no GitHub](https://github.com/Harleyzinn/fluxo/rel
 
 ## POCO X5 5G / HyperOS
 
+Na 2.6, Colecoes > Artistas organiza as faixas da biblioteca e do dispositivo. Abra um artista para tocar sua selecao, filtrar musicas ou criar uma playlist. A busca online agora tem filtros de duracao, favoritas e baixadas; Atualizar resultados renova uma busca recente.
+
+O menu da musica tem secoes recolhiveis. Abra Reproducao para encontrar Tocar a seguir e Infinite Radio. O icone de informacoes mostra origem, tamanho e disponibilidade; Copiar link usa a area de transferencia do telefone. No player, o timer mostra quanto tempo falta.
+
 Os ajustes agora tem as abas Audio, Biblioteca, Visual e Sistema. Notificacoes e bateria ficam em Sistema > Tela apagada e notificacoes. Volume e temporizador ficam em Audio. Use Buscar > Na biblioteca para pesquisar seus arquivos offline; em Colecoes, o campo Buscar playlists encontra suas colecoes.
 
 Na lista de musicas, o icone de selecao abre as acoes em lote. O filtro nao apaga a selecao; Todas seleciona a colecao filtrada inteira, nao apenas as linhas visiveis. No menu da playlist, Fixar playlist a coloca no topo. O historico completo abre pelo resumo Historico em Colecoes.
 
 Em Fila, Organizar fila permite remover anteriores, repetidas a seguir ou somente as proximas, sem interromper a faixa atual. Os atalhos de dez segundos ficam junto ao tempo da musica no player.
 
-Ao atualizar para 2.5, aguarde eventual aviso Recuperando download. A migracao antiga de audios maiores que 256 KB foi corrigida. Arquivos truncados podem ser recuperados se a copia antiga ainda estiver no app. Nao desinstale para fazer essa atualizacao: isso apaga tanto os arquivos privados quanto o banco antigo usado na recuperacao.
+Ao atualizar de uma versao anterior a 2.5, aguarde eventual aviso Recuperando download. A migracao antiga de audios maiores que 256 KB foi corrigida. Arquivos truncados podem ser recuperados se a copia antiga ainda estiver no app. Nao desinstale para fazer essa atualizacao: isso apaga tanto os arquivos privados quanto o banco antigo usado na recuperacao.
 
 Abra **Ajustes > Sistema > Tela apagada e notificacoes** dentro do Fluxo. Permita notificacoes e abra **Ajustes do HyperOS**. Nos ajustes do telefone para o Fluxo, escolha bateria **Sem restricoes**, quando essa opcao existir. Se ainda houver interrupcoes, permita o Fluxo em **Configuracoes > Apps > Inicializacao automatica em segundo plano**. Os nomes podem mudar entre versoes do HyperOS. Essas preferencias sao escolhidas por voce; o aplicativo nao as altera escondido.
 

@@ -3,6 +3,9 @@ package com.fluxo.music.mobile;
 import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
@@ -69,13 +72,33 @@ public class FluxoAudioPlugin extends Plugin {
     @PluginMethod public void append(PluginCall call) {
         player(call, () -> {
             PlaybackService service = PlaybackService.instance;
-            int index = call.getBoolean("next", false) ? service.player.getCurrentMediaItemIndex() + 1 : service.player.getMediaItemCount();
+            int count = service.player.getMediaItemCount();
+            int index = call.getBoolean("next", false) ? Math.min(count, service.player.getCurrentMediaItemIndex() + 1) : count;
             service.player.addMediaItem(index, PlaybackService.item(call.getObject("track")));
             service.persist();
         });
     }
     @PluginMethod public void command(PluginCall call) {
-        player(call, () -> PlaybackService.instance.command(call.getString("action", ""), call.getDouble("value", 0.0), call.getInt("index", 0)));
+        player(call, () -> {
+            JSONArray expected = call.getArray("expectedQueue");
+            if (expected != null) {
+                JSONArray actual = PlaybackService.instance.state().getJSONArray("queue");
+                if (actual.length() != expected.length()) throw new IllegalStateException("A fila mudou. Abra as opcoes novamente.");
+                for (int i = 0; i < actual.length(); i++) {
+                    JSONObject a = actual.getJSONObject(i), b = expected.getJSONObject(i);
+                    if (!a.optString("id").equals(b.optString("id")) || !a.optString("url").equals(b.optString("url"))) throw new IllegalStateException("A fila mudou. Abra as opcoes novamente.");
+                }
+            }
+            PlaybackService.instance.command(call.getString("action", ""), call.getDouble("value", 0.0), call.getInt("index", 0));
+        });
+    }
+    @PluginMethod public void copyText(PluginCall call) {
+        main.post(() -> {
+            ClipboardManager clipboard = (ClipboardManager)getContext().getSystemService(Context.CLIPBOARD_SERVICE);
+            if (clipboard == null) { call.reject("Area de transferencia indisponivel."); return; }
+            clipboard.setPrimaryClip(ClipData.newPlainText("Fluxo Mobile", call.getString("text", "")));
+            call.resolve();
+        });
     }
     @PluginMethod public void search(PluginCall call) {
         async(call, () -> call.resolve(new JSObject().put("tracks", StreamResolver.search(call.getString("query", ""), call.getString("provider", "youtube")))));

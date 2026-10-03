@@ -1,4 +1,26 @@
-# Verificacao da Versao 2.5.0
+# Verificacao da Versao 2.6.0
+
+Validacao em 3 de outubro de 2026, Android API 37 em emulador e Microsoft Edge. O POCO X5 5G fisico nao estava conectado.
+
+- 36 testes de dados passaram: agrupamento por artista, aliases de download, cache limitado/expiracao, filtros de busca, protecao contra operacoes sobrepostas, menus antigos e limites de backups, alem das verificacoes anteriores.
+- Paginas de artistas com filtro sem diferenciar acentos, contagem offline e criacao/reproducao de playlist passaram. A busca local e a colecao de artistas nao duplicaram um arquivo com dois identificadores para a mesma URL.
+- Busca com respostas controladas: consulta repetida reutilizou o cache, Atualizar consultou de novo, os filtros de duracao funcionaram e uma resposta atrasada da busca cancelada nao substituiu a consulta seguinte. Rascunho mantido ao atualizar a tela.
+- Informacoes da faixa mostraram tamanho, origem e disponibilidade. Copiar link funcionou no navegador e pela ponte nativa Android.
+- Menu aberto antes de alterar a fila recusou remover outra faixa. No Android, uma requisicao enviada com a fotografia antiga da fila tambem foi rejeitada; uma requisicao atual removeu a faixa sem iniciar o player pausado.
+- Tocar a seguir com a fila vazia e limpar proximas em uma sessao vazia passaram no Android. Nenhuma dessas acoes iniciou automaticamente o audio.
+- No Android, a colecao de um artista iniciou os arquivos privados com Wi-Fi/dados desligados, mantendo os identificadores da biblioteca. Criar a playlist e mostrar o timer regressivo funcionaram pela interface.
+- Busca real no YouTube retornou 16 faixas na verificacao do APK final. Repetir a consulta pela interface nao chamou novamente o extrator nativo, conferindo a integracao do cache.
+- Suite visual nova em 320x640, 390x844 e 820x1180. As 16 telas de navegacao, 24 combinacoes de personalizacao (incluindo texto maior), biblioteca de 250 faixas e selecao de 183 faixas tambem passaram.
+- Regressao Android: volume sobreviveu ao reinicio, fila restaurada nao tocou sozinha, caminho de arquivo antigo usou a copia atual e arquivo ausente terminou com erro legivel, sem carregar para sempre.
+- Migracao/reparacao verificadas novamente no Android com SHA-256, preservando a copia anterior. Playlists, fixacao, audios offline, atalhos de dez segundos e limpeza parcial da fila passaram, inclusive apos reiniciar o processo.
+- Stream online nao baixado iniciou em 2,7 segundos nesta execucao e avancou 180,3 segundos durante tres minutos com a tela realmente apagada. Servico em primeiro plano confirmado. Pausa, continuar e proxima foram acionados na notificacao Android.
+- Radio online trouxe sete faixas sem IDs repetidos; encerrar removeu as recomendacoes futuras. Radio offline avancou sem internet e o temporizador Ao fim desta musica pausou.
+- APK compilado e atualizado sobre a instalacao anterior. Certificado SHA-256: `42dc5c2adbe56aefb20922bd7ba4392c0413f7948122530132474876ea874bbb`, igual ao das versoes anteriores.
+- Auditoria das dependencias JavaScript de producao: nenhuma vulnerabilidade reportada nesta execucao. Isso nao e uma auditoria completa dos componentes Android nem dos servicos externos.
+
+Resultados em emulador nao garantem comportamento identico no HyperOS. Tempos de inicio e disponibilidade dependem da rede e do provedor; a verificacao da interface de busca com respostas controladas nao foi usada como prova de streaming real.
+
+## Evidencias da Versao 2.5.0
 
 Validacao em 3 de outubro de 2026, Android API 37 em emulador e Microsoft Edge. O POCO X5 5G fisico nao estava conectado.
 

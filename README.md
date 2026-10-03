@@ -6,7 +6,7 @@ Seu player, do seu jeito. O Fluxo Music para Windows e o Fluxo Mobile para Andro
 
 ## Fluxo Mobile para Android
 
-**Versao mobile 2.5.0** | [Baixar o APK Android](https://github.com/Harleyzinn/fluxo/releases/download/mobile-v2.5.0/Fluxo-Mobile-2.5.0.apk) | [Release mobile](https://github.com/Harleyzinn/fluxo/releases/tag/mobile-v2.5.0) | [Guia de instalacao](fluxo-mobile/INSTALAR-NO-CELULAR.md)
+**Versao mobile 2.6.0** | [Baixar o APK Android](https://github.com/Harleyzinn/fluxo/releases/download/mobile-v2.6.0/Fluxo-Mobile-2.6.0.apk) | [Release mobile](https://github.com/Harleyzinn/fluxo/releases/tag/mobile-v2.6.0) | [Guia de instalacao](fluxo-mobile/INSTALAR-NO-CELULAR.md)
 
 App independente para **Android 7 ou superior**. Nao e um controle remoto: toca no proprio celular e nao precisa do computador ligado nem de um site hospedado.
 
@@ -21,6 +21,9 @@ App independente para **Android 7 ou superior**. Nao e um controle remoto: toca 
 - Player usa o arquivo offline atual, identifica arquivos ausentes e permite desfazer remocoes de playlists.
 - Selecao em lote, playlists fixadas, historico completo pesquisavel, retorno a rolagem anterior e atalhos de dez segundos.
 - Limpeza parcial da fila sem interromper a musica e reparacao de downloads truncados na migracao antiga, preservando a copia anterior.
+- Colecoes por artista, reproducao/criacao de playlists do artista e informacoes de origem, tamanho e disponibilidade das faixas.
+- Busca com filtros e cache recente, menus recolhiveis, contagem regressiva no player e protecao contra acoes duplicadas ou menus desatualizados.
+- Visual revisado para telas pequenas/texto ampliado, biblioteca com consultas mais leves e correcao de Tocar a seguir em fila vazia.
 - 68 paletas adaptadas do desktop, favoritos, historico, fila editavel, temporizador, velocidade e equalizador.
 - Permissao de notificacoes quando necessaria; importacao pelo seletor de arquivos, sem acesso geral ao armazenamento.
 

@@ -1,12 +1,12 @@
-# Fluxo Mobile 2.5
+# Fluxo Mobile 2.6
 
 App independente para **Android 7 ou superior**, reconstruido na pasta `fluxo-mobile`. Nao precisa do Fluxo de PC nem de um servidor seu para tocar. A interface usa HTML/CSS/JavaScript dentro do Capacitor; o audio, a sessao de midia, a extracao de streams e os arquivos sao tratados em Java no Android.
 
 ## Instalar e usar
 
-Download: [Fluxo Mobile 2.5.0 para Android](https://github.com/Harleyzinn/fluxo/releases/tag/mobile-v2.5.0). Baixe o arquivo `Fluxo-Mobile-2.5.0.apk`, nao os pacotes de codigo-fonte.
+Download: [Fluxo Mobile 2.6.0 para Android](https://github.com/Harleyzinn/fluxo/releases/tag/mobile-v2.6.0). Baixe o arquivo `Fluxo-Mobile-2.6.0.apk`, nao os pacotes de codigo-fonte.
 
-1. Abra o link de download no celular ou envie `dist/Fluxo-Mobile-2.5.0.apk` por USB.
+1. Abra o link de download no celular ou envie `dist/Fluxo-Mobile-2.6.0.apk` por USB.
 2. Abra o APK no celular. Quando o Android pedir, permita instalar apps dessa origem. Depois da instalacao, voce pode desativar essa permissao novamente.
 3. Abra o Fluxo. Procure uma musica na aba **Buscar** ou use o botao de pasta para importar seus arquivos.
 4. Ao iniciar a primeira reproducao ou download, o app pede notificacoes no Android 13 ou superior. Negar nao impede tocar. O seletor de arquivos concede acesso somente aos arquivos escolhidos, sem pedir acesso geral ao armazenamento.
@@ -16,6 +16,23 @@ Download: [Fluxo Mobile 2.5.0 para Android](https://github.com/Harleyzinn/fluxo/
 **Nao precisa upar um site para usar o aplicativo.** O APK ja contem o app. O endereco de pre-visualizacao no computador e apenas uma ferramenta de desenvolvimento, nao e o app Android.
 
 Este APK e uma compilacao de desenvolvimento assinada para instalacao pessoal. Para publicar na Play Store ou distribuir atualizacoes permanentes, gere uma chave de assinatura de producao no Android Studio em **Build > Generate Signed App Bundle / APK**. Guarde essa chave: uma atualizacao precisa da mesma assinatura. Nao envie senhas nem a chave ao GitHub. Uma assinatura diferente exige desinstalar o app anterior, apagando seus arquivos privados; exporte os dados antes e preserve os audios originais.
+
+## Novidades da 2.6.0
+
+- Biblioteca por artistas, agrupada a partir dos nomes informados nas faixas. Busca sem diferenciar acentos, contagem offline, pagina com capa, filtro, selecao em lote e reproducao. Criar playlist do artista inclui as suas faixas.
+- Arquivos baixados com outro identificador, mas a mesma URL, nao aparecem em duplicidade nas colecoes de artistas nem na busca local. Playlists tambem evitam adicionar novamente a mesma URL.
+- Busca online com filtros de duracao, favoritas e baixadas. Resultados das ultimas oito consultas ficam em memoria por cinco minutos; repetir a consulta reaproveita os resultados. Atualizar resultados consulta novamente o provedor.
+- Cancelar a busca libera a interface e ignora respostas atrasadas; nao interrompe uma extracao ja enviada ao provedor. Outra consulta pode ser iniciada imediatamente. O texto ainda nao enviado e mantido quando a tela atualiza.
+- Menu de musica com Biblioteca, Reproducao e Organizar recolhiveis. A secao de organizacao abre diretamente quando o menu vem da fila ou playlist.
+- Informacoes da musica: origem, artista, duracao, disponibilidade offline, tamanho do arquivo quando informado e playlists que a incluem. Copiar link funciona pela area de transferencia nativa, sem permissao geral de armazenamento.
+- Player mostra origem do audio, posicao na fila e contagem regressiva do temporizador. Controles de dez segundos com area de toque maior, estados acessiveis de favorita/aleatorio/repeticao e layout revisto para texto ampliado.
+- Acabamento visual da biblioteca, playlists, artistas, menus e navegacao. Layouts compacto/capa e os 68 temas continuam disponiveis.
+- Protecao contra envios duplicados durante operacoes pendentes. Navegacao e fechamento de menus recuperam o foco para melhorar o uso com leitor de tela/teclado.
+- Menus antigos nao removem/movem outro item quando a fila muda. A verificacao tambem acontece no servico Android, no momento de executar o comando.
+- Corrigidos Tocar a seguir com fila vazia e limpar proximas em sessao vazia. Adicionar uma faixa continua sendo manual e nao inicia automaticamente o audio.
+- Consultas de downloads, favoritas e musicas salvas usam indices em memoria para reduzir buscas repetidas ao renderizar listas. Totais de colecoes usam horas/minutos, e backups excessivamente grandes sao rejeitados antes da restauracao.
+
+Atualize sem desinstalar para preservar seus arquivos privados. O APK continua sendo uma compilacao de desenvolvimento para uso pessoal; a verificacao em emulador nao substitui teste no POCO/HyperOS fisico.
 
 ## Novidades da 2.5.0
 
@@ -157,6 +174,8 @@ npm run dev
 ```
 
 Abra `http://127.0.0.1:5174`. Os testes de interface usam Playwright e Microsoft Edge; para outro navegador configure `BROWSER_CHANNEL`. Os testes Android em `tests/native*.mjs` exigem emulador/dispositivo de teste com depuracao, APK debug instalado e a busca de teste anterior. Eles alteram apenas os dados desse app de teste e alternam a rede do dispositivo de teste.
+
+`npm run test:professional` verifica artistas, informacoes das faixas, cache/filtros/cancelamento de busca, menus antigos e layouts. `npm run test:android:professional` confere a integracao nativa, os arquivos offline, o extrator real e os comandos da fila. Veja `VERIFICACAO.md` para as evidencias da versao publicada.
 
 ## GitHub e Novas Compilacoes
 
