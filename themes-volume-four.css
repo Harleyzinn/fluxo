@@ -1,0 +1,172 @@
+/* Stage Select: a hardware rail and a nine-sector mission index. */
+body.theme-megaman { --bg-base:#c9dbe6; --bg-panel:#e1edf3; --text-main:#183948; --text-muted:#4f6570; --neon-cyan:#155e9a; --neon-pink:#a72e42; --neon-purple:#28695e; --theme-line:#7797ac; --global-font:'Chakra Petch',Arial,sans-serif; --collection-label:'LIGHT LAB / STAGE SELECT'; --item-radius:0px; }
+body.theme-megaman .sidebar { width:192px; border-right:8px solid #155e9a; }
+body.theme-megaman .brand { border-bottom:8px solid #155e9a; font-weight:900; }
+body.theme-megaman .sidebar-menu { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-content:start; gap:4px; padding:6px; }
+body.theme-megaman .sidebar-btn { flex-direction:column; min-height:72px; padding:8px 4px; text-align:center; border:2px solid #7797ac; font-size:.66rem; }
+body.theme-megaman .sidebar-btn.active { background:#155e9a; color:#fff; border-color:#183948; }
+body.theme-megaman .sidebar-donate { width:100%; margin:0; }
+body.theme-megaman .player-deck { border-top:8px solid #155e9a; background:#c9dbe6; }
+body.theme-megaman .deck-media-center { border:3px solid #155e9a; border-radius:0; background:#e1edf3; }
+body.theme-megaman .panel-header { background:#155e9a; color:#fff; }
+body.theme-megaman .eq-band { border:2px solid #155e9a; border-top:8px solid #155e9a; }
+body.theme-megaman .eq-band:nth-child(3n) { border-top-color:#a72e42; }
+body.theme-megaman .eq-card { border-left:6px solid #28695e; }
+
+/* Missing Signal: a narrow file index, spaced incident ledger and a radio dial. */
+body.theme-silenthill { --bg-base:#b9c2bc; --bg-panel:#d4d9d4; --text-main:#303a36; --text-muted:#56625c; --neon-cyan:#3c5b51; --neon-pink:#7f353a; --neon-purple:#4d596a; --theme-line:#8a9990; --global-font:Georgia,serif; --collection-label:'SILENT HILL / MISSING SIGNAL'; --item-radius:0px; }
+body.theme-silenthill .sidebar { width:174px; border-right:1px dashed #56625c; }
+body.theme-silenthill .brand { font-size:1.3rem; border-bottom:3px double #56625c; }
+body.theme-silenthill .sidebar-btn { font-family:'Space Mono',monospace; font-size:.71rem; border-bottom:1px dotted #8a9990; }
+body.theme-silenthill .sidebar-btn.active { background:#303a36; color:#d4d9d4; border-left:5px solid #7f353a; }
+body.theme-silenthill .results-area { border:0; border-top:7px double #56625c; }
+body.theme-silenthill .result-item { border-bottom:1px dashed #8a9990; padding-block:24px; }
+body.theme-silenthill .result-title { font-family:Georgia,serif; font-size:1.1rem; }
+body.theme-silenthill .panel-header { font-family:'Space Mono',monospace; border-bottom:1px dashed #56625c; }
+body.theme-silenthill .player-deck { border-top:3px double #56625c; }
+body.theme-silenthill .np-cover:not(.video-active) { filter:saturate(.25); border:5px solid #b9c2bc; }
+body.theme-silenthill .deck-media-center { border-radius:0; background:transparent; border-block:1px dashed #56625c; }
+body.theme-silenthill .eq-band { background:transparent; border:0; border-left:1px dashed #8a9990; }
+body.theme-silenthill .eq-profile-grid { border-block:3px double #56625c; padding-block:12px; }
+body.theme-silenthill .eq-card { border:0; border-bottom:1px dashed #8a9990; background:transparent; }
+
+/* Moon Prism: an observatory index across the top and framed lunar readings. */
+body.theme-sailormoon { --bg-base:#dce3f2; --bg-panel:#eef1f9; --text-main:#493958; --text-muted:#70627c; --neon-cyan:#62426e; --neon-pink:#a9325f; --neon-purple:#305e87; --theme-line:#a5acc9; --global-font:'Outfit',Arial,sans-serif; --collection-label:'MOON PRISM / OBSERVATORY'; --item-radius:8px; }
+body.theme-sailormoon:not(.party-mode):not(.mini-mode) .app-layout { flex-direction:column; }
+body.theme-sailormoon .sidebar { width:100%; height:146px; flex-direction:row; border-right:0; border-bottom:4px double #62426e; }
+body.theme-sailormoon .brand { width:174px; flex-shrink:0; align-self:center; font-family:Georgia,serif; font-size:1.4rem; }
+body.theme-sailormoon .sidebar-menu { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); align-content:start; gap:4px; padding:8px; }
+body.theme-sailormoon .sidebar-btn { min-height:34px; padding:6px; border:0; font-size:.67rem; border-radius:8px 0 8px 0; }
+body.theme-sailormoon .sidebar-btn.active { background:#62426e; color:#fff; }
+body.theme-sailormoon .sidebar-donate { margin:0; width:100%; }
+body.theme-sailormoon .sidebar-bottom { width:138px; flex-shrink:0; padding:10px; border:0; align-self:center; }
+body.theme-sailormoon .sidebar-bottom button { font-size:.65rem; }
+body.theme-sailormoon .panel-header { border-bottom:3px double #a5acc9; }
+body.theme-sailormoon .result-item { border-left:4px solid #a5acc9; margin-left:10px; }
+body.theme-sailormoon .player-deck { border-top:4px double #62426e; }
+body.theme-sailormoon .np-cover:not(.video-active) { border-radius:50%; border:3px double #62426e; }
+body.theme-sailormoon .deck-media-center { border:2px solid #a5acc9; border-radius:8px; background:#dce3f2; }
+body.theme-sailormoon .eq-band { border-radius:28px 28px 4px 4px; border:1px solid #a5acc9; border-top:4px solid #62426e; }
+body.theme-sailormoon .eq-card { border:0; border-left:3px double #a9325f; }
+
+/* Neo Tokyo: bold registration strips, right-side archive, split red/white deck. */
+body.theme-akira { --bg-base:#d8d7d3; --bg-panel:#eeeae7; --text-main:#21262b; --text-muted:#5e6568; --neon-cyan:#b52330; --neon-pink:#245b65; --neon-purple:#77373f; --theme-line:#a6a9a5; --global-font:'Chakra Petch',Arial,sans-serif; --collection-label:'NEO TOKYO / 2019'; --item-radius:0px; }
+body.theme-akira .sidebar { order:2; width:204px; border-left:12px solid #b52330; border-right:0; }
+body.theme-akira .brand { font-size:1.9rem; font-weight:900; border-bottom:12px solid #21262b; }
+body.theme-akira .sidebar-btn { border-bottom:1px solid #a6a9a5; text-transform:uppercase; font-size:.76rem; }
+body.theme-akira .sidebar-btn.active { background:#b52330; color:#fff; border-left:0; }
+body.theme-akira .panel-header { background:#21262b; color:#eeeae7; border-left:14px solid #b52330; }
+body.theme-akira .result-item { border-left:7px solid #a6a9a5; }
+body.theme-akira .result-item:nth-child(3n) { border-left-color:#b52330; }
+body.theme-akira .player-deck { border-top:10px solid #21262b; }
+body.theme-akira .deck-media-center { background:#b52330; border-radius:0; }
+body.theme-akira .deck-media-center .btn { color:#fff; }
+body.theme-akira .eq-hero { border-bottom:12px solid #b52330; }
+body.theme-akira .eq-band { background:#21262b; color:#eeeae7; border-radius:0; border-bottom:8px solid #b52330; }
+body.theme-akira .eq-band-value { color:#fff; }
+body.theme-akira .eq-card { border:0; border-top:5px solid #21262b; }
+
+/* Arrakis: a heraldic spine and an inset archive, not a desert wallpaper. */
+body.theme-dune { --bg-base:#131f1e; --bg-panel:#202b2a; --text-main:#e6e9dc; --text-muted:#a5b6ad; --neon-cyan:#89c6c6; --neon-pink:#dcc786; --neon-purple:#b59dad; --theme-line:#596c66; --global-font:Georgia,serif; --collection-label:'HOUSE ATREIDES / SOUND ARCHIVES'; --item-radius:0px; }
+body.theme-dune .sidebar { width:212px; border-right:6px double #89c6c6; }
+body.theme-dune .brand { padding-block:30px; border-bottom:1px solid #596c66; text-align:center; font-family:Georgia,serif; font-weight:400; }
+body.theme-dune .sidebar-btn { justify-content:center; text-align:center; font-size:.83rem; border:0; border-bottom:1px solid #596c66; }
+body.theme-dune .sidebar-btn.active { background:#89c6c6; color:#131f1e; }
+body.theme-dune .results-area { border-inline:6px double #596c66; border-block:0; }
+body.theme-dune .panel-header { text-align:center; border-block:1px solid #596c66; }
+body.theme-dune .result-item { padding-block:22px; border-bottom:1px solid #596c66; }
+body.theme-dune .player-deck { border-top:6px double #89c6c6; }
+body.theme-dune .deck-media-center { border-radius:0; border-inline:4px double #dcc786; background:transparent; }
+body.theme-dune .eq-band { background:transparent; border:0; border-inline:1px solid #596c66; }
+body.theme-dune .eq-card { border:0; border-block:3px double #dcc786; }
+body.theme-dune .dsp-profile-btn { font-family:Georgia,serif; border-radius:0; }
+
+/* Flight Deck: wide lower switch bank, instrument readout and checklists. */
+body.theme-aviation { --bg-base:#11191c; --bg-panel:#202628; --text-main:#eff1df; --text-muted:#b1beb8; --neon-cyan:#b7d9ce; --neon-pink:#d6bc65; --neon-purple:#df8e7a; --theme-line:#60716b; --global-font:'Space Mono',monospace; --collection-label:'AIRBAND / FLIGHT DECK'; --item-radius:3px; }
+body.theme-aviation:not(.party-mode):not(.mini-mode) .app-layout { flex-direction:column-reverse; }
+body.theme-aviation .sidebar { width:100%; height:138px; flex-direction:row; border-right:0; border-top:6px solid #60716b; }
+body.theme-aviation .brand { width:166px; flex-shrink:0; align-self:center; font-size:1.2rem; }
+body.theme-aviation .sidebar-menu { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); align-content:start; gap:4px; padding:6px; }
+body.theme-aviation .sidebar-btn { min-height:34px; padding:6px; font-size:.63rem; border:1px solid #60716b; }
+body.theme-aviation .sidebar-btn.active { background:#d6bc65; color:#11191c; }
+body.theme-aviation .sidebar-donate { margin:0; width:100%; }
+body.theme-aviation .sidebar-bottom { width:142px; flex-shrink:0; align-self:center; padding:10px; border:0; }
+body.theme-aviation .sidebar-bottom button { font-size:.64rem; }
+body.theme-aviation .panel-header { color:#11191c; background:#b7d9ce; }
+body.theme-aviation .result-item { border-left:3px solid #60716b; border-bottom:1px dashed #60716b; }
+body.theme-aviation .player-deck { border-top:6px solid #60716b; background:#11191c; }
+body.theme-aviation .deck-media-center { border:2px inset #60716b; border-radius:3px; background:#202628; }
+body.theme-aviation .np-cover { border:4px inset #60716b; }
+body.theme-aviation .eq-band { border:1px solid #60716b; border-top:6px solid #d6bc65; }
+body.theme-aviation .eq-band-value { background:#11191c; color:#b7d9ce; padding:4px; }
+body.theme-aviation .eq-card { border:2px inset #60716b; }
+
+/* Swiss Studio: editorial index, oversized sequence numbers and a top transport. */
+body.theme-swiss { --bg-base:#dfe3de; --bg-panel:#f3f4ef; --text-main:#1d2526; --text-muted:#586566; --neon-cyan:#bc333d; --neon-pink:#216a70; --neon-purple:#404c58; --theme-line:#a8b5b3; --global-font:Arial,sans-serif; --collection-label:'SWISS STUDIO / EDITION 07'; --item-radius:0px; }
+body.theme-swiss .sidebar { width:178px; border-right:1px solid #1d2526; }
+body.theme-swiss .brand { font-size:1.65rem; font-weight:900; padding-top:28px; border-top:12px solid #bc333d; }
+body.theme-swiss .sidebar-menu { counter-reset: swiss; }
+body.theme-swiss .sidebar-btn { counter-increment:swiss; border:0; border-bottom:1px solid #a8b5b3; font-size:.73rem; padding:9px; }
+body.theme-swiss .sidebar-btn::before { content:counter(swiss,decimal-leading-zero); font-weight:900; font-size:1.2rem; min-width:27px; }
+body.theme-swiss .sidebar-btn i { display:none; }
+body.theme-swiss .sidebar-btn.active { color:#fff; background:#bc333d; }
+body.theme-swiss .result-item { border-bottom:1px solid #1d2526; }
+body.theme-swiss .result-title { font-weight:800; }
+body.theme-swiss .panel-header { border-top:10px solid #1d2526; font-weight:800; }
+body.theme-swiss .player-deck { border-block:1px solid #1d2526; background:#f3f4ef; }
+body.theme-swiss .deck-media-center { background:#1d2526; border-radius:0; }
+body.theme-swiss .deck-media-center .btn { color:#f3f4ef; }
+body.theme-swiss .eq-band { border:0; border-top:10px solid #1d2526; border-radius:0; }
+body.theme-swiss .eq-band:nth-child(2n) { border-top-color:#bc333d; }
+body.theme-swiss .eq-card { border:0; border-top:3px solid #216a70; }
+@media (min-width:1100px) {
+    body.theme-swiss:not(.party-mode):not(.mini-mode) { display:grid; grid-template-columns:178px minmax(0,1fr); grid-template-rows:32px 132px minmax(0,1fr); }
+    body.theme-swiss:not(.party-mode):not(.mini-mode) #customTitleBar { grid-column:1/-1; }
+    body.theme-swiss:not(.party-mode):not(.mini-mode) .app-layout { display:contents; }
+    body.theme-swiss:not(.party-mode):not(.mini-mode) .sidebar { grid-column:1; grid-row:2/4; min-height:0; }
+    body.theme-swiss:not(.party-mode):not(.mini-mode) .player-deck { grid-column:2; grid-row:2; height:132px; padding:14px 18px; gap:16px; }
+    body.theme-swiss:not(.party-mode):not(.mini-mode) .now-playing { width:180px; min-width:0; }
+    body.theme-swiss:not(.party-mode):not(.mini-mode) .volume-container { width:90px; }
+    body.theme-swiss:not(.party-mode):not(.mini-mode) .content-wrapper { grid-column:2; grid-row:3; min-height:0; }
+}
+
+/* Party scenes reuse the actual cover/video, never a second playback element. */
+body.theme-megaman.party-mode .np-cover:not(.video-active) { border:14px solid #155e9a !important; border-radius:0 !important; box-shadow:8px 8px 0 #7797ac !important; }
+body.theme-megaman.party-mode .np-info { border-bottom:8px solid #a72e42; padding-bottom:14px; }
+body.theme-silenthill.party-mode .now-playing { flex-direction:row-reverse !important; gap:36px !important; text-align:left !important; }
+body.theme-silenthill.party-mode .np-cover:not(.video-active) { border:12px solid #b9c2bc !important; border-radius:0 !important; filter:grayscale(1); }
+body.theme-silenthill.party-mode .np-info { border-block:1px dashed #56625c; padding-block:20px; align-items:flex-start !important; }
+body.theme-sailormoon.party-mode .np-cover:not(.video-active) { border:12px double #62426e !important; border-radius:50% !important; box-shadow:0 0 0 6px #a5acc9 !important; }
+body.theme-sailormoon.party-mode .np-title { font-family:Georgia,serif; font-weight:400; }
+body.theme-sailormoon.party-mode .np-info { padding-block:16px; border-bottom:3px double #a9325f; }
+body.theme-akira.party-mode .now-playing { flex-direction:row !important; gap:36px !important; text-align:left !important; }
+body.theme-akira.party-mode .np-cover:not(.video-active) { border-radius:0 !important; border:12px solid #b52330 !important; }
+body.theme-akira.party-mode .np-info { border-top:12px solid #21262b; padding-top:20px; align-items:flex-start !important; }
+body.theme-dune.party-mode .now-playing { flex-direction:row !important; gap:40px !important; }
+body.theme-dune.party-mode .np-cover:not(.video-active) { border:12px double #89c6c6 !important; border-radius:45% 45% 0 0 !important; }
+body.theme-dune.party-mode .np-info { border-block:3px double #dcc786; padding-block:20px; }
+body.theme-dune.party-mode .np-title { font-family:Georgia,serif; font-weight:400; }
+body.theme-aviation.party-mode .now-playing { flex-direction:row !important; gap:32px !important; text-align:left !important; }
+body.theme-aviation.party-mode .np-cover:not(.video-active) { border:12px inset #60716b !important; border-radius:4px !important; }
+body.theme-aviation.party-mode .np-info { padding:18px; border:2px solid #60716b; background:#11191c; align-items:flex-start !important; }
+body.theme-swiss.party-mode .now-playing { flex-direction:row !important; gap:40px !important; text-align:left !important; }
+body.theme-swiss.party-mode .np-cover:not(.video-active) { border:0 !important; border-radius:0 !important; box-shadow:12px 12px 0 #bc333d !important; }
+body.theme-swiss.party-mode .np-info { border-top:12px solid #1d2526; padding-top:20px; align-items:flex-start !important; }
+body.volume-four-theme.party-mode .now-playing:has(.video-active) { flex-direction:column !important; }
+body.volume-four-theme.party-mode .now-playing:has(.video-active) .np-info { border:0; padding:0; background:none; align-items:center !important; }
+@media (max-width:1100px) {
+    body.theme-sailormoon .brand, body.theme-aviation .brand { width:124px; font-size:1rem; }
+    body.theme-sailormoon .sidebar-menu, body.theme-aviation .sidebar-menu { grid-template-columns:repeat(4,minmax(0,1fr)); }
+    body.theme-sailormoon .sidebar-btn, body.theme-aviation .sidebar-btn { min-height:30px; font-size:.60rem; }
+    body.theme-sailormoon .sidebar-bottom, body.theme-aviation .sidebar-bottom { width:120px; padding:8px; }
+    body.theme-aviation .sidebar { height:146px; }
+}
+@media (max-width:850px) {
+    body.volume-four-theme.party-mode .np-title { font-size:1.4rem !important; }
+    body.volume-four-theme.party-mode .now-playing { gap:22px !important; }
+    body.theme-aviation.party-mode .np-info { padding:10px; }
+}
+body.volume-four-theme.mini-mode .np-cover { filter:none; }
+body.theme-sailormoon.mini-mode .np-cover { border-radius:50% !important; }
+body.theme-aviation.mini-mode .player-deck { border-top:3px solid #d6bc65 !important; }
+body.theme-akira.mini-mode .player-deck { border-left:7px solid #b52330 !important; }

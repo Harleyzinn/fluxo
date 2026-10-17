@@ -1,6 +1,6 @@
 {
   "name": "fluxo-music",
-  "version": "3.9.33",
+  "version": "3.9.35",
   "description": "Fluxo Music - Player",
   "main": "main.js",
   "author": "Adrian",
@@ -19,6 +19,7 @@
     "build": "electron-builder --win --x64"
   },
   "dependencies": {
+    "@phosphor-icons/web": "2.1.2",
     "cors": "^2.8.5",
     "discord-rpc": "^4.0.1",
     "electron-updater": "^6.1.1",
@@ -49,6 +50,9 @@
       "index.html",
       "style.css",
       "themes-collection.css",
+      "themes-volume-two.css",
+      "themes-volume-three.css",
+      "themes-volume-four.css",
       "icon.ico",
       "README.md",
       "node_modules/**/*",

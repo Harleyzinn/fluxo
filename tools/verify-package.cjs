@@ -11,9 +11,12 @@ const files = asar.listPackage(archive).map(file => file.replace(/\\/g, '/'));
 for (const forbidden of ['/MAPA_MENTAL_FLUXO.canvas', '/MAPA_MENTAL_OBSIDIAN_FLUXO.md', '/.obsidian', '/.env', '/backups', '/tests', '/tools', '/vendor', '/.git']) {
     assert.equal(files.some(file => file === forbidden || file.startsWith(`${forbidden}/`)), false, `Private/development file in package: ${forbidden}`);
 }
-for (const file of ['/main.js', '/preload.js', '/script.js', '/index.html', '/style.css', '/themes-collection.css']) {
+for (const file of ['/main.js', '/preload.js', '/script.js', '/index.html', '/style.css', '/themes-collection.css', '/themes-volume-two.css', '/themes-volume-three.css', '/themes-volume-four.css']) {
     assert.ok(files.includes(file), `Missing ${file}`);
     assert.deepEqual(asar.extractFile(archive, file.slice(1)), fs.readFileSync(path.join(root, file.slice(1))), `Stale packaged file: ${file}`);
+}
+for (const file of ['/node_modules/@phosphor-icons/web/src/regular/style.css', '/node_modules/@phosphor-icons/web/src/regular/Phosphor.woff2', '/node_modules/@phosphor-icons/web/src/fill/style.css', '/node_modules/@phosphor-icons/web/src/fill/Phosphor-Fill.woff2']) {
+    assert.ok(files.includes(file), `Missing local icon asset: ${file}`);
 }
 const packedConfig = JSON.parse(asar.extractFile(archive, 'package.json').toString());
 assert.equal(packedConfig.version, version);

@@ -2,7 +2,9 @@
 
 Seu player, do seu jeito. O Fluxo Music para Windows e o Fluxo Mobile para Android compartilham a identidade do projeto, com aplicativos independentes para cada plataforma.
 
-**Versao 3.9.33** | [Baixar o Fluxo](https://github.com/Harleyzinn/fluxo/releases/latest) | [Todas as releases](https://github.com/Harleyzinn/fluxo/releases) | [Apoiar no LivePix](https://livepix.gg/devpotato)
+**Versao 3.9.35** | [Baixar o Fluxo](https://github.com/Harleyzinn/fluxo/releases/latest) | [Todas as releases](https://github.com/Harleyzinn/fluxo/releases) | [Apoiar no LivePix](https://livepix.gg/devpotato)
+
+Windows: [release 3.9.35](https://github.com/Harleyzinn/fluxo/releases/tag/v3.9.35), com 82 temas e importacao Spotify revisada.
 
 ## Fluxo Mobile para Android
 
@@ -57,6 +59,27 @@ O aplicativo e destinado a **Windows 10/11 de 64 bits**. Se o Windows mostrar um
 O Fluxo verifica atualizacoes publicadas no GitHub. Quando uma atualizacao estiver pronta, o aplicativo avisa e reinicia para concluir a instalacao.
 
 Para atualizar manualmente, feche o Fluxo, baixe o novo `.exe` em [Releases](https://github.com/Harleyzinn/fluxo/releases/latest) e execute-o. Nao desinstale nem apague os dados do aplicativo. Voce tambem pode exportar um backup pela Biblioteca antes de atualizar.
+
+## Novidades da 3.9.35
+
+- Sete novas identidades: **Mega Man, Silent Hill, Sailor Moon, Akira, Dune, Airband e Swiss Studio**, totalizando **82 temas desktop**. Incluem navegacao em setores, arquivo editorial, observatorio superior e painel de voo inferior, com festa e equalizador proprios.
+- Spotify importa **musica individual, album e playlist publica**, incluindo links `intl-pt` e URIs `spotify:track:...`.
+- Selecione as faixas antes de importar ou salve a selecao na biblioteca. Artista, duracao e capa sao preservados.
+- O Spotify fornece os metadados e o Fluxo localiza a gravacao no YouTube. Nao e reproducao direta nem login na conta Spotify. Listas privadas nao sao acessiveis e a lista publica pode ser parcial; o aplicativo nao promete importar faixas que o servico nao forneceu.
+
+### Tambem incluido da 3.9.34
+
+- A nova colecao inclui **Hades, Metroid, Animal Crossing, Castlevania, Chainsaw Man, Dragon Ball, Cowboy Bebop, Studio Ghibli, Interstellar e Cassette Deck**.
+- Mais sete temas: **Pokemon/Pokedex, NieR Automata, Splatoon, Alien/Nostromo, Sonic, Disco Elysium e Windows 98**, totalizando **75 temas desktop**. Incluem player acima da lista, menu superior, painéis laterais e novas composicoes para festa e equalizador.
+- Composicoes de interface com menu inferior, telemetria a direita, player central, correspondencias em grade e faceplate de equipamento de audio. Os novos temas incluem modo festa, equalizador, mini-player e paletas para widget e OBS.
+- Favoritos de temas e filtros por jogos, animes, cinema, design e novidades. Os favoritos acompanham o backup da biblioteca.
+- Icones incluidos no aplicativo, disponiveis mesmo sem acesso ao servidor externo de icones.
+- Permissoes individuais da sala corrigidas, protecao contra aceitar o mesmo pedido duas vezes e descarte de pedidos de uma sala que ja foi encerrada localmente.
+- Barra de progresso protegida contra cliques antes do carregamento da duracao.
+- Trocas de tema deixam de animar larguras que cortavam a interface. Os controles de saida do mini-player ficam dentro da janela.
+- Foco e Ambiente preservam a area do player nos novos layouts e podem ser encerrados pelo botao de retorno ou Escape.
+- Previas da busca e do Deck B descartam carregamentos antigos. Sair do DJ restaura o volume principal e a velocidade normal da previa.
+- Selecionar outra faixa encerra a conexao anterior antes da nova resolucao, evitando que um erro antigo provoque um carregamento duplicado.
 
 ## Novidades da 3.9.33
 

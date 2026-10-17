@@ -341,10 +341,9 @@ function getDefaultRoomSettings() {
 
 function normalizeRoomSettings(settings = {}) {
     const normalized = { ...getDefaultRoomSettings(), ...(settings || {}) };
-    if (settings?.controlsEnabled) {
-        normalized.allowGuestPlayPause = true;
-        normalized.allowGuestSeek = true;
-        normalized.allowGuestSkip = true;
+    for (const key of ['allowGuestPlayPause', 'allowGuestSeek', 'allowGuestSkip']) {
+        normalized[key] = Object.prototype.hasOwnProperty.call(settings || {}, key)
+            ? Boolean(settings[key]) : Boolean(settings?.controlsEnabled);
     }
     normalized.controlsEnabled = Boolean(normalized.allowGuestPlayPause && normalized.allowGuestSeek && normalized.allowGuestSkip);
     return normalized;
@@ -1026,10 +1025,7 @@ function handleTabSwitch(clickedBtn) {
     if (btnClearQueue) btnClearQueue.style.display = 'none';
 
     // 3. Pausa prévias de áudio que ficaram tocando esquecidas em outra aba
-    if (!previewPlayer.paused) {
-        previewPlayer.pause();
-        document.querySelectorAll('.btn-preview').forEach(b => b.classList.replace('ph-pause-circle', 'ph-play-circle'));
-    }
+    stopPreviewPlayback();
 
     // 4. Lógica Específica para alguns botões da Sidebar
     if (clickedBtn.id === 'btnMultiplayer') {
@@ -1048,6 +1044,36 @@ menuButtons.forEach(btn => {
 // ========================================================
 // SISTEMA DE TEMAS
 // ========================================================
+const VOLUME_FOUR_THEMES = [
+    { id: 'megaman', name: 'Mega Man / Stage Select', desc: 'Laboratorio Light. Selecione sua proxima fase.', icon: 'ph-cpu', category: 'games', colors: ['#e1edf3', '#155e9a', '#a72e42'] },
+    { id: 'silenthill', name: 'Silent Hill / Missing Signal', desc: 'Uma frequencia perdida na neblina.', icon: 'ph-radio', category: 'games', colors: ['#d4d9d4', '#303a36', '#7f353a'] },
+    { id: 'sailormoon', name: 'Sailor Moon / Moon Prism', desc: 'Radio do observatorio lunar.', icon: 'ph-moon-stars', category: 'anime', colors: ['#eef1f9', '#62426e', '#a9325f'] },
+    { id: 'akira', name: 'Akira / Neo Tokyo 2019', desc: 'Arquivo de transmissao de Neo Tokyo.', icon: 'ph-lightning', category: 'anime', colors: ['#eeeae7', '#b52330', '#21262b'] },
+    { id: 'dune', name: 'Dune / Arrakis Archives', desc: 'Arquivo sonoro da Casa Atreides.', icon: 'ph-compass', category: 'cinema', colors: ['#202b2a', '#e6e9dc', '#89c6c6'] },
+    { id: 'aviation', name: 'Airband / Flight Deck', desc: 'Canal aberto. Frequencia de cruzeiro.', icon: 'ph-airplane', category: 'design', colors: ['#202628', '#eff1df', '#d6bc65'] },
+    { id: 'swiss', name: 'Swiss Studio / Edition 07', desc: 'Arquivo de escuta. Zurique, 1957.', icon: 'ph-layout', category: 'design', colors: ['#f3f4ef', '#1d2526', '#bc333d'] }
+];
+const VOLUME_THREE_THEMES = [
+    { id: 'pokedex', name: 'Pokemon / Pokedex', desc: 'Registro de campo. Uma nova descoberta em cada faixa.', icon: 'ph-circles-three', category: 'games', colors: ['#a72e3b', '#f3f6f2', '#216b77'] },
+    { id: 'nier', name: 'NieR Automata / YoRHa', desc: 'Registro operacional da unidade YoRHa.', icon: 'ph-crosshair', category: 'games', colors: ['#e3e5df', '#353b37', '#8b3945'] },
+    { id: 'splatoon', name: 'Splatoon / Turf Radio', desc: 'Transmissao ao vivo de Inkopolis.', icon: 'ph-paint-brush', category: 'games', colors: ['#172124', '#67dfd7', '#ffb765'] },
+    { id: 'nostromo', name: 'Alien / Nostromo', desc: 'USCSS Nostromo. Canal de comunicacao da tripulacao.', icon: 'ph-hard-drives', category: 'cinema', colors: ['#242b25', '#e5e8d9', '#e9b568'] },
+    { id: 'sonic', name: 'Sonic / Green Hill FM', desc: 'Sintonizado na velocidade do som.', icon: 'ph-lightning', category: 'games', colors: ['#f5f9fd', '#175aba', '#ac3439'] },
+    { id: 'discoelysium', name: 'Disco Elysium / Revachol', desc: 'Radio Revachol. Casos abertos, discos esquecidos.', icon: 'ph-detective', category: 'games', colors: ['#e6ebeb', '#a33f3f', '#316d70'] },
+    { id: 'win98', name: 'Windows 98 / Desktop Radio', desc: 'Meu computador. Minha colecao de musica.', icon: 'ph-desktop', category: 'design', colors: ['#277e7e', '#d8dbd8', '#172b7c'] }
+];
+const VOLUME_TWO_THEMES = [
+    { id: 'hades', name: 'Hades / House of Hades', desc: 'Uma nova noite na Casa de Hades.', icon: 'ph-skull', category: 'games', colors: ['#18352f', '#e7ddbc', '#bc443e'] },
+    { id: 'metroid', name: 'Metroid / Chozo Frequency', desc: 'Transmissao da caçadora. Setor Chozo.', icon: 'ph-target', category: 'games', colors: ['#24252a', '#f3b44c', '#73d6d0'] },
+    { id: 'animalcrossing', name: 'Animal Crossing / Island Mail', desc: 'Correio da ilha. Uma carta para cada musica.', icon: 'ph-envelope-simple', category: 'games', colors: ['#e5f3ee', '#246b5c', '#b74652'] },
+    { id: 'castlevania', name: 'Castlevania / Nocturne', desc: 'O castelo desperta ao cair da noite.', icon: 'ph-castle-turret', category: 'games', colors: ['#19171f', '#e2d4ba', '#c06e83'] },
+    { id: 'chainsawman', name: 'Chainsaw Man / Public Safety', desc: 'Divisao especial. Frequencia de seguranca publica.', icon: 'ph-warning', category: 'anime', colors: ['#f2ece0', '#171a18', '#b8292d'] },
+    { id: 'dragonball', name: 'Dragon Ball / Tenkaichi', desc: 'Direto da arena do Torneio de Artes Marciais.', icon: 'ph-sun', category: 'anime', colors: ['#f7fbfd', '#176696', '#b84420'] },
+    { id: 'bebop', name: 'Cowboy Bebop / Red Tail', desc: 'See you, space cowboy.', icon: 'ph-music-notes', category: 'anime', colors: ['#16181b', '#ede5cc', '#db504b'] },
+    { id: 'ghibli', name: 'Studio Ghibli / Forest Station', desc: 'Proxima parada: a estacao da floresta.', icon: 'ph-train', category: 'anime', colors: ['#edf5ed', '#285c50', '#a64242'] },
+    { id: 'interstellar', name: 'Interstellar / Endurance', desc: 'Registro de bordo. Frequencia da Endurance.', icon: 'ph-planet', category: 'cinema', colors: ['#15191b', '#e9edf0', '#d3b775'] },
+    { id: 'cassette', name: 'Cassette Deck / Side A', desc: 'Lado A. Gravado para ouvir de novo.', icon: 'ph-cassette-tape', category: 'design', colors: ['#dedfd8', '#202a2b', '#9d4930'] }
+];
 const COLLECTION_THEMES = [
     { id: 'portal', name: 'Portal / Aperture', desc: 'Centro de enriquecimento. Camara de testes 07.', icon: 'ph-aperture' },
     { id: 'residentevil', name: 'Resident Evil / Save Room', desc: 'Raccoon City. Arquivo de sobrevivencia.', icon: 'ph-first-aid-kit' },
@@ -1056,7 +1082,10 @@ const COLLECTION_THEMES = [
     { id: 'deathnote', name: 'Death Note / Case Files', desc: 'Investigacao Kira. Acesso restrito.', icon: 'ph-notebook' },
     { id: 'dandadan', name: 'Dandadan / Occult FM', desc: 'Frequencia paranormal. Sintonize o inexplicavel.', icon: 'ph-broadcast' },
     { id: 'artdeco', name: 'Art Deco / Grand Salon', desc: 'Salao 1925. Programacao da noite.', icon: 'ph-buildings' },
-    { id: 'bauhaus', name: 'Bauhaus / Form & Sound', desc: 'Dessau, 1926. Estudos de forma e ritmo.', icon: 'ph-shapes' }
+    { id: 'bauhaus', name: 'Bauhaus / Form & Sound', desc: 'Dessau, 1926. Estudos de forma e ritmo.', icon: 'ph-shapes' },
+    ...VOLUME_TWO_THEMES,
+    ...VOLUME_THREE_THEMES,
+    ...VOLUME_FOUR_THEMES
 ];
 
 function applyThemeClass(themeId) {
@@ -1068,6 +1097,9 @@ function applyThemeClass(themeId) {
         document.body.classList.add(`theme-${themeId}`);
     }
     document.body.classList.toggle('collection-theme', COLLECTION_THEMES.some(theme => theme.id === themeId));
+    document.body.classList.toggle('volume-two-theme', VOLUME_TWO_THEMES.some(theme => theme.id === themeId));
+    document.body.classList.toggle('volume-three-theme', VOLUME_THREE_THEMES.some(theme => theme.id === themeId));
+    document.body.classList.toggle('volume-four-theme', VOLUME_FOUR_THEMES.some(theme => theme.id === themeId));
 }
 
 const savedTheme = localStorage.getItem('fluxo_theme') || 'default';
@@ -1085,10 +1117,44 @@ document.getElementById('btnDonations')?.addEventListener('click', renderDonatio
 
 const FLUXO_CHANGELOG = [
     {
+        version: '3.9.35', date: '17/10/2026', title: 'Novas identidades e importacao Spotify revisada', badge: 'Atual',
+        items: [
+            'Sete novos temas: Mega Man, Silent Hill, Sailor Moon, Akira, Dune, Airband e Swiss Studio. Sao 82 temas desktop.',
+            'Novos layouts de navegacao, listas e player, com skins para festa, equalizador, mini-player, widget e OBS.',
+            'Spotify agora importa musica individual, album e playlist publica, incluindo links localizados e URIs.',
+            'Importacao preserva artista, duracao e capa; permite selecionar faixas e salvar diretamente na biblioteca.',
+            'Erros do Spotify mostram a causa; colecoes avisam que a lista publica pode ser parcial. O audio continua resolvido no YouTube.',
+            'Links curtos do Spotify validam cada redirecionamento e as consultas tem tempo limite.'
+        ]
+    },
+    {
+        version: '3.9.34',
+        date: '30/09/2026',
+        title: 'Novos mundos, temas favoritos e ajustes do player',
+        badge: 'Anterior',
+        items: [
+            'Novos temas: Hades, Metroid, Animal Crossing, Castlevania, Chainsaw Man, Dragon Ball, Cowboy Bebop, Studio Ghibli, Interstellar e Cassette Deck.',
+            'Mais sete temas: Pokemon/Pokedex, NieR Automata, Splatoon, Alien/Nostromo, Sonic, Disco Elysium e Windows 98. O catalogo passa a ter 75 temas.',
+            'Novas composicoes incluem navegacao inferior, painel lateral de telemetria, correspondencias em grade e player no centro do registro de missao.',
+            'Pagina de temas ganha favoritos, filtros por origem, filtro de novidades, amostras de cores e botao para limpar a busca.',
+            'Favoritos de temas sao salvos no perfil e acompanham o backup da biblioteca.',
+            'Icones agora sao incluidos no instalador, sem depender de um servidor externo para aparecer.',
+            'Permissoes individuais de convidados nao sao mais reativadas pela opcao geral de controles livres.',
+            'Aceitar o mesmo pedido repetidamente nao duplica a faixa nem reinicia a musica atual; respostas de uma sala anterior sao descartadas.',
+            'Barra de progresso ignora cliques antes de carregar a duracao e limita o avanco aos limites da faixa.',
+            'Trocas de layout nao animam mais larguras que cortavam a interface; o mini-player mantem o botao de sair dentro da janela.',
+            'Modos Foco e Ambiente respeitam a janela mesmo nos temas com player lateral ou superior, com botao de saida e retorno por Escape.',
+            'Previas cancelam carregamentos antigos ao trocar de musica ou sair da busca, sem iniciar audio atrasado.',
+            'Ao selecionar outra faixa, a conexao anterior e encerrada antes da resolucao para evitar erros antigos provocando uma segunda tentativa de carregamento.',
+            'Deck B cancela carregamentos ao trocar a selecao; sair do DJ restaura volume e velocidade normais da previa.',
+            'Widgets e overlay OBS recebem a paleta e a identificacao correta dos novos temas.'
+        ]
+    },
+    {
         version: '3.9.33',
         date: '30/09/2026',
         title: 'Oito novas identidades e revisao do player',
-        badge: 'Atual',
+        badge: 'Anterior',
         items: [
             'Novos temas: Portal, Resident Evil, DOOM, Ace Attorney, Death Note, Dandadan, Art Deco e Bauhaus.',
             'Novos layouts incluem navegacao superior, menu a direita, player lateral e inventario em grade, com modos festa e equalizadores proprios.',
@@ -1692,14 +1758,14 @@ function renderDonationsPanel() {
 
 function renderChangelog() {
     panelTitle.innerText = 'CHANGELOG DO FLUXO';
-    queueCounter.innerText = 'v3.9.33';
+    queueCounter.innerText = 'v3.9.35';
     resultsList.innerHTML = `
         <li class="changelog-root">
             <section class="changelog-hero">
                 <div class="changelog-hero-icon"><i class="ph ph-scroll"></i></div>
                 <div>
                     <span class="changelog-kicker">Historico de mudancas</span>
-                    <h2>Fluxo Music 3.9.33</h2>
+                    <h2>Fluxo Music 3.9.35</h2>
                     <p>Resumo das mudancas recentes do player, interface, updater, Discord RPC, busca, temas e recursos principais.</p>
                 </div>
                 <button class="btn-confirm changelog-copy" id="btnCopyChangelog"><i class="ph ph-copy"></i> COPIAR</button>
@@ -1764,13 +1830,24 @@ function renderThemes() {
     panelTitle.innerText = "SISTEMA OS: SELEÇÃO DE INTERFACE";
     queueCounter.innerText = "";
     const previousFilter = document.getElementById('themeSearchInput')?.value || '';
+    const previousCategory = document.getElementById('themeCategory')?.value || localStorage.getItem('fluxo_theme_filter') || 'all';
     resultsList.innerHTML = `
         <li class="theme-search-row">
             <div class="theme-search-box">
                 <i class="ph ph-magnifying-glass"></i>
                 <input id="themeSearchInput" class="inline-input theme-search-input" value="${escapeHtml(previousFilter)}" placeholder="Buscar tema por nome, obra, estilo ou cor...">
                 <span id="themeSearchCount" class="theme-search-count"></span>
+                <button class="theme-clear-search" id="btnClearThemeSearch" title="Limpar busca" aria-label="Limpar busca"><i class="ph ph-x"></i></button>
             </div>
+            <select id="themeCategory" class="inline-input" aria-label="Filtrar temas">
+                <option value="all">Todos os temas</option>
+                <option value="favorites">Favoritos</option>
+                <option value="new">Novos na 3.9.35</option>
+                <option value="games">Jogos</option>
+                <option value="anime">Animes e mangas</option>
+                <option value="cinema">Cinema</option>
+                <option value="design">Design e musica</option>
+            </select>
         </li>
     `;
 
@@ -1833,15 +1910,23 @@ function renderThemes() {
         .replace(/[\u0300-\u036f]/g, '')
         .toLowerCase()
         .trim();
+    const gameThemes = new Set(['pipboy', 'blood', 'gold', 'nightcity', 'raiden', 'sam', 'armstrong', 'darkbrotherhood', 'orokin', 'excalibur', 'minecraft', 'terraria', 'eldenring', 'persona5', 'hollowknight', 'zelda', 'undertale', 'portal', 'residentevil', 'doom', 'aceattorney']);
+    const animeThemes = new Set(['tensura', 'halinhu', 'manga', 'morioh', 'souleater', 'adolla', 'onepiece', 'naruto', 'jujutsu', 'aot', 'evangelion', 'deathnote', 'dandadan']);
+    const themeCategory = document.getElementById('themeCategory');
+    if ([...themeCategory.options].some(option => option.value === previousCategory)) themeCategory.value = previousCategory;
 
     const renderThemeResults = () => {
         const query = normalizeThemeFilter(document.getElementById('themeSearchInput')?.value || '');
         const activeTheme = localStorage.getItem('fluxo_theme') || 'default';
+        const favorites = new Set(readStoredArray('fluxo_theme_favorites').filter(id => typeof id === 'string'));
+        const category = themeCategory.value;
 
         resultsList.querySelectorAll('.theme-result-item, .theme-empty-result').forEach(item => item.remove());
         const filteredThemes = themes.filter(theme => {
             const haystack = normalizeThemeFilter(`${theme.id} ${theme.name} ${theme.desc}`);
-            return !query || haystack.includes(query);
+            const group = theme.category || (gameThemes.has(theme.id) ? 'games' : animeThemes.has(theme.id) ? 'anime' : theme.id === 'tron' ? 'cinema' : 'design');
+            const inCategory = category === 'all' || (category === 'favorites' ? favorites.has(theme.id) : category === 'new' ? VOLUME_FOUR_THEMES.some(item => item.id === theme.id) : group === category);
+            return inCategory && (!query || haystack.includes(query));
         });
 
         const counter = document.getElementById('themeSearchCount');
@@ -1850,7 +1935,7 @@ function renderThemes() {
         if (!filteredThemes.length) {
             const emptyLi = document.createElement('li');
             emptyLi.className = 'theme-empty-result';
-            emptyLi.innerHTML = '<span>Nenhum tema encontrado.</span>';
+            emptyLi.innerHTML = `<span>${category === 'favorites' ? 'Nenhum favorito nesta busca.' : 'Nenhum tema encontrado.'}</span>`;
             resultsList.appendChild(emptyLi);
             return;
         }
@@ -1861,18 +1946,26 @@ function renderThemes() {
             li.dataset.themeId = theme.id;
             const isActive = activeTheme === theme.id;
             li.innerHTML = `
-                <div class="result-thumb" style="background-color: var(--bg-panel); color: var(--neon-cyan); border: var(--border-tech); font-size: 1.5rem;">
-                    <i class="ph ${isActive ? 'ph-star' : (theme.icon || 'ph-palette')}"></i>
-                </div>
-                <div class="result-info" style="flex: 1;">
-                    <span class="result-title" style="color: var(--neon-cyan);">${escapeHtml(theme.name)}</span>
-                    <span class="result-artist">${escapeHtml(theme.desc)}</span>
-                </div>
+                <button class="theme-select-button" aria-pressed="${isActive}" aria-label="Aplicar ${escapeHtml(theme.name)}">
+                    <span class="theme-emblem"><i class="ph ${isActive ? 'ph-check-circle' : (theme.icon || 'ph-palette')}"></i></span>
+                    <span class="result-info">
+                        <span class="result-title">${escapeHtml(theme.name)}</span>
+                        <span class="result-artist">${escapeHtml(theme.desc)}</span>
+                        ${theme.colors ? `<span class="theme-palette" aria-hidden="true">${theme.colors.map(color => `<span style="background:${color}"></span>`).join('')}</span>` : ''}
+                    </span>
+                </button>
+                <button class="btn theme-favorite-button ${favorites.has(theme.id) ? 'active' : ''}" title="${favorites.has(theme.id) ? 'Remover tema dos favoritos' : 'Favoritar tema'}" aria-label="${favorites.has(theme.id) ? 'Remover' : 'Favoritar'} ${escapeHtml(theme.name)}" aria-pressed="${favorites.has(theme.id)}"><i class="ph ph-star"></i></button>
             `;
-            li.addEventListener('click', () => {
+            li.querySelector('.theme-select-button').addEventListener('click', () => {
                 applyThemeClass(theme.id);
                 localStorage.setItem('fluxo_theme', theme.id);
                 updateNowPlayingWidget();
+                renderThemeResults();
+            });
+            li.querySelector('.theme-favorite-button').addEventListener('click', () => {
+                if (favorites.has(theme.id)) favorites.delete(theme.id);
+                else favorites.add(theme.id);
+                localStorage.setItem('fluxo_theme_favorites', JSON.stringify([...favorites]));
                 renderThemeResults();
             });
             resultsList.appendChild(li);
@@ -1882,6 +1975,15 @@ function renderThemes() {
     const themeSearchInput = document.getElementById('themeSearchInput');
     themeSearchInput?.addEventListener('input', renderThemeResults);
     themeSearchInput?.addEventListener('keydown', (event) => event.stopPropagation());
+    themeCategory.addEventListener('change', () => {
+        localStorage.setItem('fluxo_theme_filter', themeCategory.value);
+        renderThemeResults();
+    });
+    document.getElementById('btnClearThemeSearch').onclick = () => {
+        themeSearchInput.value = '';
+        renderThemeResults();
+        themeSearchInput.focus();
+    };
     renderThemeResults();
 }
 
@@ -1904,6 +2006,7 @@ previewPlayer.preload = 'auto';
 let mainHlsController = null;
 let previewHlsController = null;
 let currentStreamChangeGeneration = 0;
+let previewLoadGeneration = 0;
 
 function isHlsStreamUrl(url) {
     return /\.m3u8(?:$|[?#])/i.test(String(url || ''));
@@ -1954,6 +2057,50 @@ function clearMediaElementSource(mediaElement, slot = 'main') {
     delete mediaElement.dataset.streamUrl;
     mediaElement.removeAttribute('src');
     mediaElement.load();
+}
+
+function stopPreviewPlayback() {
+    ++previewLoadGeneration;
+    const crossfader = document.getElementById('djCrossfader');
+    if (crossfader) {
+        audioPlayer.volume = getTargetVolume();
+        crossfader.value = '0';
+    }
+    clearMediaElementSource(previewPlayer, 'preview');
+    previewPlayer.dataset.id = '';
+    previewPlayer.dataset.djId = '';
+    previewPlayer.playbackRate = 1;
+    previewPlayer.volume = getTargetVolume();
+    document.querySelectorAll('.btn-preview').forEach(button => {
+        button.classList.remove('ph-pause-circle', 'ph-spinner-gap', 'ph-spin', 'ph-warning-circle');
+        button.classList.add('ph-play-circle');
+    });
+}
+
+async function playTrackPreview(track, button) {
+    if (!previewPlayer.paused && previewPlayer.dataset.id === track.id) {
+        stopPreviewPlayback();
+        return;
+    }
+    stopPreviewPlayback();
+    const generation = previewLoadGeneration;
+    button.classList.replace('ph-play-circle', 'ph-spinner-gap');
+    button.classList.add('ph-spin');
+    try {
+        const resolved = await resolvePlayableStreamForTrack(track, 'audio');
+        if (generation !== previewLoadGeneration || !button.isConnected) return;
+        setMediaElementSource(previewPlayer, resolved.url, 'preview');
+        previewPlayer.dataset.id = track.id;
+        await previewPlayer.play();
+        if (generation !== previewLoadGeneration) return;
+        button.classList.remove('ph-spinner-gap', 'ph-spin');
+        button.classList.add('ph-pause-circle');
+    } catch (error) {
+        if (generation !== previewLoadGeneration) return;
+        stopPreviewPlayback();
+        button.classList.replace('ph-play-circle', 'ph-warning-circle');
+        button.title = classifyMediaError(error, 'Previa indisponivel.');
+    }
 }
 
 function stopMainPlayback() {
@@ -2267,6 +2414,13 @@ function setAmbientMode(enabled) {
     localStorage.setItem('fluxo_ambient_mode', String(isAmbientMode));
 }
 
+function exitImmersiveLayoutModes() {
+    setAmbientMode(false);
+    document.body.classList.remove('focus-mode');
+    localStorage.setItem('fluxo_focus_mode', 'false');
+}
+document.getElementById('btnExitLayoutMode')?.addEventListener('click', exitImmersiveLayoutModes);
+
 function setPodcastMode(enabled, persist = true) {
     isPodcastMode = Boolean(enabled);
     document.body.classList.toggle('podcast-mode', isPodcastMode);
@@ -2507,7 +2661,7 @@ function toggleFavoriteTrack(track) {
 
 function getFavoriteButtonHtml(track) {
     const active = isFavoriteTrack(track);
-    return `<button class="btn-action btn-favorite ${active ? 'active' : ''}" title="${active ? 'Remover dos favoritos' : 'Favoritar'}" style="margin-left: 10px; padding: 10px;"><i class="ph ${active ? 'ph-heart-fill' : 'ph-heart'}"></i></button>`;
+    return `<button class="btn-action btn-favorite ${active ? 'active' : ''}" title="${active ? 'Remover dos favoritos' : 'Favoritar'}" style="margin-left: 10px; padding: 10px;"><i class="${active ? 'ph-fill' : 'ph'} ph-heart"></i></button>`;
 }
 
 function bindFavoriteButton(root, track) {
@@ -2519,7 +2673,7 @@ function bindFavoriteButton(root, track) {
         const active = toggleFavoriteTrack(track);
         button.classList.toggle('active', active);
         button.title = active ? 'Remover dos favoritos' : 'Favoritar';
-        button.innerHTML = `<i class="ph ${active ? 'ph-heart-fill' : 'ph-heart'}"></i>`;
+        button.innerHTML = `<i class="${active ? 'ph-fill' : 'ph'} ph-heart"></i>`;
     };
 }
 
@@ -3620,6 +3774,8 @@ function renderMultiplayerPanel() {
                 if (!input) return;
                 input.onchange = async (e) => {
                     roomSettings = normalizeRoomSettings({ ...roomSettings, [key]: e.target.checked });
+                    const allControls = document.getElementById('cbControls');
+                    if (allControls) allControls.checked = roomSettings.controlsEnabled;
                     publishRoomState({ settings: roomSettings });
                     if (afterChange) await afterChange(e.target.checked);
                 };
@@ -3820,7 +3976,7 @@ async function applyRemoteSessionPlayback(data) {
         const index = findTrackIndexByIdentity(queue, track);
         if (index >= 0) currentIndex = index;
         else { queue = [track]; originalQueue = [...queue]; currentIndex = 0; }
-        previewPlayer.pause();
+        stopPreviewPlayback();
         await withRemotePlaybackGuard(() => clearMediaElementSource(audioPlayer));
         if (!isCurrent()) return;
         titleEl.innerText = `SINCRO: ${track.title}`;
@@ -4042,20 +4198,31 @@ window.kickUser = (uid) => trackMultiplayerPromise(
     'remover membro'
 );
 
-window.acceptMusic = (rid) => {
-    db.ref(`rooms/${currentRoom}/musicRequests/${rid}`).once('value', s => {
-        const r = s.val();
-        if(r) { 
-            const acceptedTrack = normalizeTrack(r.track);
-            enqueueTrack({ ...acceptedTrack, requestedBy: r.sender || 'Convidado', requestedAt: Date.now() }, 'next');
+const acceptingMusicRequests = new Set();
+window.acceptMusic = async (rid) => {
+    if (!db || !currentRoom || !isHost) return;
+    const room = currentRoom;
+    const key = `${room}/${rid}`;
+    if (acceptingMusicRequests.has(key)) return;
+    acceptingMusicRequests.add(key);
+    try {
+        const requestRef = db.ref(`rooms/${room}/musicRequests/${rid}`);
+        const snapshot = await requestRef.once('value');
+        const request = snapshot.val();
+        if (currentRoom !== room || !isHost || !request || request.status !== 'pending') return;
+        const track = normalizeTrack(request.track);
+        if (!track || !getTrackStreamId(track)) return;
+        if (!queue.some(item => item.sessionRequestId === key)) {
+            enqueueTrack({ ...track, sessionRequestId: key, requestedBy: request.sender || 'Convidado', requestedAt: Date.now() }, 'next');
             sortSessionQueueByPriority();
-            sendSessionSystemMessage(`${r.sender || 'Convidado'} teve "${acceptedTrack.title}" adicionada pelo host.`);
+            sendSessionSystemMessage(`${request.sender || 'Convidado'} teve "${track.title}" adicionada pelo host.`);
         }
-        return trackMultiplayerPromise(
-            db.ref(`rooms/${currentRoom}/musicRequests/${rid}`).update({status:'accepted'}),
-            'aceitar sugestao de musica'
-        );
-    }).catch(error => handleMultiplayerFirebaseError(error, 'ler sugestao de musica'));
+        await requestRef.update({ status: 'accepted' });
+    } catch (error) {
+        handleMultiplayerFirebaseError(error, 'aceitar sugestao de musica');
+    } finally {
+        acceptingMusicRequests.delete(key);
+    }
 };
 window.rejectMusic = (rid) => trackMultiplayerPromise(
     db.ref(`rooms/${currentRoom}/musicRequests/${rid}`).update({status:'rejected'}),
@@ -4142,7 +4309,8 @@ function getUniquePlaylistTitle(baseTitle, existing = new Set(savedPlaylists.map
 function renderYouTubePlaylistImportSelector(collection) {
     const tracks = (collection?.tracks || []).map(normalizeTrack).filter(Boolean);
     const title = collection?.title || 'Playlist do YouTube';
-    panelTitle.innerText = 'IMPORTAR PLAYLIST DO YOUTUBE';
+    const source = collection?.source || 'YouTube';
+    panelTitle.innerText = `IMPORTAR DO ${source.toUpperCase()}`;
     queueCounter.innerText = `${tracks.length} faixas`;
 
     if (!tracks.length) {
@@ -4156,9 +4324,9 @@ function renderYouTubePlaylistImportSelector(collection) {
         <li class="yt-import-root">
             <section class="yt-import-head">
                 <div class="yt-import-titlebox">
-                    <span class="changelog-kicker">YouTube playlist</span>
+                    <span class="changelog-kicker">${escapeHtml(source)}</span>
                     <h2>${escapeHtml(title)}</h2>
-                    <p>Escolha exatamente o que entra no Fluxo. Playlists grandes agora podem vir completas, sem corte artificial em 200 faixas.</p>
+                    ${collection.warning ? `<p role="status">${escapeHtml(collection.warning)}</p>` : ''}
                 </div>
                 <div class="yt-import-meter">
                     <strong id="ytImportSelectedCount">${tracks.length}</strong>
@@ -4181,7 +4349,7 @@ function renderYouTubePlaylistImportSelector(collection) {
                         <span class="yt-import-index">${index + 1}</span>
                         <span class="yt-import-info">
                             <strong>${escapeHtml(track.title)}</strong>
-                            <small>${escapeHtml(track.artist || 'YouTube')}${track.duration ? ` - ${escapeHtml(track.duration)}` : ''}</small>
+                            <small>${escapeHtml(track.artist || source)}${track.duration ? ` - ${escapeHtml(track.duration)}` : ''}</small>
                         </span>
                     </label>
                 `).join('')}
@@ -4267,6 +4435,7 @@ async function executeSearch() {
         return;
     }
     const requestId = ++searchGeneration;
+    stopPreviewPlayback();
 
     if (!window.electronAPI?.searchAudio) {
         resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: var(--neon-pink);">A busca precisa ser executada dentro do Fluxo Music.</li>';
@@ -4281,36 +4450,21 @@ async function executeSearch() {
         let query = rawQuery;
 
         // SE DETECTAR LINK DO SPOTIFY
-        if (query.includes('spotify.com') || query.includes('spotify.link')) {
-            resultsList.innerHTML = '<li style="padding: 20px; text-align: center;"><i class="ph ph-spinner-gap ph-spin" style="font-size:2rem; color:var(--neon-cyan)"></i><br>Clonando base de dados do Spotify...</li>';
+        if (/^spotify:(?:track|album|playlist):/i.test(query) || /^https:\/\/(?:open\.spotify\.com|spotify\.link)(?:\/|$)/i.test(query)) {
+            resultsList.innerHTML = '<li class="search-status"><i class="ph ph-spinner-gap ph-spin"></i> Importando do Spotify...</li>';
 
             try {
                 const spData = await window.electronAPI.getSpotifyInfo(query);
                 if (requestId !== searchGeneration) return;
 
-                if (spData && spData.searchQueries && spData.searchQueries.length > 0) {
-                    if (spData.searchQueries.length > 1) {
-                        let ghostTracks = spData.searchQueries.map((q, index) => ({
-                            id: 'ghost_' + Math.random().toString(36).substr(2, 9),
-                            title: q,
-                            artist: "Importado do Spotify",
-                            thumbnail: "https://storage.googleapis.com/pr-newsroom-wp/1/2018/11/Spotify_Logo_RGB_Green.png",
-                            isGhost: true,
-                            query: q 
-                        }));
-                        renderPlaylistPreview({ title: spData.title, tracks: ghostTracks });
-                        return; 
-                    } else {
-                        query = spData.searchQueries[0]; 
-                    }
-                } else {
-                    resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: var(--neon-pink);">Falha ao ler as faixas. A playlist é privada?</li>';
-                    return;
-                }
+                if (spData?.error) throw new Error(spData.error);
+                if (!spData?.tracks?.length) throw new Error('O Spotify nao disponibilizou faixas publicas neste link.');
+                renderYouTubePlaylistImportSelector(spData);
+                return;
             } catch (err) {
                 if (requestId !== searchGeneration) return;
                 console.error("Erro no Spotify:", err);
-                resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: var(--neon-pink);">Erro de conexão com a API do Spotify.</li>';
+                resultsList.innerHTML = `<li class="search-status" role="alert">${escapeHtml(err.message || 'Nao foi possivel acessar o Spotify.')}</li>`;
                 return;
             }
         }
@@ -4395,21 +4549,8 @@ async function executeSearch() {
                 bindFavoriteButton(li, t);
                 
                 thumb.onclick = async (ev) => {
-                    ev.stopPropagation(); 
-                    if (previewPlayer.src && !previewPlayer.paused && previewPlayer.dataset.id === t.id) {
-                        previewPlayer.pause(); previewBtn.classList.replace('ph-pause-circle', 'ph-play-circle');
-                    } else {
-                        document.querySelectorAll('.btn-preview').forEach(b => b.classList.replace('ph-pause-circle', 'ph-play-circle'));
-                        previewBtn.classList.replace('ph-play-circle', 'ph-spinner-gap'); previewBtn.classList.add('ph-spin');
-                        const resolvedPreview = await resolvePlayableStreamForTrack(t, 'audio');
-                        const url = resolvedPreview?.url;
-                        if(url) {
-                            setMediaElementSource(previewPlayer, url, 'preview');
-                            previewPlayer.dataset.id = t.id;
-                            previewPlayer.play();
-                        }
-                        previewBtn.classList.remove('ph-spinner-gap', 'ph-spin'); previewBtn.classList.add('ph-pause-circle');
-                    }
+                    ev.stopPropagation();
+                    await playTrackPreview(t, previewBtn);
                 };
 
                 // Evento de Download
@@ -4720,6 +4861,11 @@ document.addEventListener('keydown', event => {
             document.getElementById('btnExitParty')?.click();
             return;
         }
+        if (document.body.classList.contains('ambient-mode') || document.body.classList.contains('focus-mode')) {
+            event.preventDefault();
+            exitImmersiveLayoutModes();
+            return;
+        }
     }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
@@ -4843,8 +4989,11 @@ async function loadAndPlayTrack(index, options = {}) {
     const isCurrentLoad = () => generation === playbackLoadGeneration && queue[index] === selectedTrack;
     currentStreamRetryKey = '';
     clearMediaFailureAction();
-    if (previewPlayer && !previewPlayer.paused) { previewPlayer.pause(); document.querySelectorAll('.btn-preview').forEach(b => b.classList.replace('ph-pause-circle', 'ph-play-circle')); }
+    stopPreviewPlayback();
     initEQ(); 
+    currentIndex = index;
+    // Imported tracks also need to release the previous stream before searching.
+    clearMediaElementSource(audioPlayer);
     
     let t = normalizeTrack(queue[index]);
 
@@ -4885,7 +5034,6 @@ async function loadAndPlayTrack(index, options = {}) {
     coverIcon.style.display = t.thumbnail ? 'none' : 'block';
     audioPlayer.dataset.id = t.id; 
 
-    audioPlayer.pause();
     const playbackMode = isVideoMode ? 'video' : 'audio';
     let url = '';
     let resolvedStream = null;
@@ -5496,7 +5644,7 @@ async function refreshDiagnosticsPanel() {
 
 function getReleaseAssistantText() {
     const selected = [
-        'Fluxo Music 3.9.33 traz oito temas com novos layouts, extracao de video mais enxuta e correcoes de fila, transicao, sincronizacao e biblioteca.',
+        'Fluxo Music 3.9.35 traz sete novos temas e importacao revisada do Spotify com selecao de faixas, capas e artistas.',
         'Busca cancelavel e diagnostico real dos servicos, sem apagar suas playlists ao limpar o cache.',
         'Importacao seletiva para playlists do YouTube com marcar tudo, limpar, inverter, importar selecionadas, importar tudo e salvar selecionadas.',
         'Playlists do YouTube deixaram de ter limite artificial de 200 musicas e agora usam yt-dlp completo antes do fallback parcial.',
@@ -5587,7 +5735,7 @@ function getReleaseAssistantText() {
         'Tocar a seguir, playlist por duracao, modo foco, modo DJ experimental e transicao por BPM estimado.',
         'Discord RPC revisado com teste manual e estado de conexao.'
     ];
-    return `Fluxo Music 3.9.33\n\nNovidades:\n${selected.map(item => `- ${item}`).join('\n')}\n\nChangelog base:\n${flattenChangelogText()}`;
+    return `Fluxo Music 3.9.35\n\nNovidades:\n${selected.map(item => `- ${item}`).join('\n')}\n\nChangelog base:\n${flattenChangelogText()}`;
 }
 
 function renderPlaylistTrashPanel() {
@@ -5687,12 +5835,11 @@ function renderDjPanel() {
             </section>
         </li>
     `;
-    document.getElementById('btnBackLabFromDj').onclick = renderFluxoLab;
+    document.getElementById('btnBackLabFromDj').onclick = () => { stopPreviewPlayback(); renderFluxoLab(); };
     document.getElementById('djDeckBSelect').onchange = (event) => {
         djDeckBIndex = Number(event.target.value);
         localStorage.setItem('fluxo_dj_deck_b_index', String(djDeckBIndex));
-        previewPlayer.pause();
-        previewPlayer.dataset.djId = '';
+        stopPreviewPlayback();
         renderDjPanel();
     };
     document.getElementById('btnPreviewDeckB').onclick = async () => {
@@ -5702,16 +5849,20 @@ function renderDjPanel() {
         const key = getTrackKey(next);
 
         if (previewPlayer.dataset.djId === key && !previewPlayer.paused) {
-            previewPlayer.pause();
+            stopPreviewPlayback();
             btn.innerHTML = '<i class="ph ph-headphones"></i> PREVIEW B';
             status.innerText = 'Deck B pausado.';
             return;
         }
 
+        stopPreviewPlayback();
+        const generation = previewLoadGeneration;
+        btn.disabled = true;
         btn.innerHTML = '<i class="ph ph-spinner-gap ph-spin"></i> CARREGANDO';
         status.innerText = 'Resolvendo stream do Deck B...';
         try {
             const resolvedPreview = await resolvePlayableStreamForTrack(next, 'audio');
+            if (generation !== previewLoadGeneration || !btn.isConnected) return;
             const url = resolvedPreview?.url;
             if (!url) throw new Error('Deck B nao gerou stream. Pode ser DRM, bloqueio regional ou video indisponivel.');
             setMediaElementSource(previewPlayer, url, 'preview');
@@ -5719,28 +5870,32 @@ function renderDjPanel() {
             previewPlayer.volume = djPreviewVolume;
             previewPlayer.playbackRate = 1;
             await previewPlayer.play();
+            if (generation !== previewLoadGeneration || !btn.isConnected) return;
             btn.innerHTML = '<i class="ph ph-pause"></i> PAUSAR B';
             status.innerText = 'Deck B tocando em preview.';
         } catch (error) {
+            if (generation !== previewLoadGeneration || !btn.isConnected) return;
+            stopPreviewPlayback();
             console.warn('Preview DJ falhou:', error);
             btn.innerHTML = '<i class="ph ph-headphones"></i> PREVIEW B';
             status.innerText = error.message || 'Falha ao abrir preview do Deck B.';
+        } finally {
+            if (btn.isConnected) btn.disabled = false;
         }
     };
     document.getElementById('btnStopDeckB').onclick = () => {
-        previewPlayer.pause();
-        previewPlayer.removeAttribute('src');
-        previewPlayer.dataset.djId = '';
-        previewPlayer.load();
+        stopPreviewPlayback();
         document.getElementById('btnPreviewDeckB').innerHTML = '<i class="ph ph-headphones"></i> PREVIEW B';
         document.getElementById('djStatus').innerText = 'Deck B parado.';
     };
     document.getElementById('btnTakeDeckB').onclick = async () => {
-        if (!next) return;
+        if (!next || !canControl('skip')) return;
         const previewTime = previewPlayer.dataset.djId === getTrackKey(next) ? previewPlayer.currentTime : 0;
-        previewPlayer.pause();
+        const room = currentRoom;
+        stopPreviewPlayback();
         document.getElementById('djStatus').innerText = 'Assumindo Deck B...';
         await transitionToTrack(djDeckBIndex, true);
+        if (currentRoom !== room || getTrackKey(queue[currentIndex]) !== getTrackKey(next) || !document.getElementById('djStatus')) return;
         if (previewTime > 1 && Number.isFinite(audioPlayer.duration) && audioPlayer.duration > previewTime + 1) {
             audioPlayer.currentTime = previewTime;
         }
@@ -6829,8 +6984,10 @@ document.getElementById('btnFluxoLab')?.addEventListener('click', renderFluxoLab
 
 document.getElementById('progressBar').onclick = function(e) { 
     if(!canControl('seek')) return;
+    const bounds = this.getBoundingClientRect();
+    if (!Number.isFinite(audioPlayer.duration) || audioPlayer.duration <= 0 || bounds.width <= 0) return;
     noteManualPlaybackControl('seek');
-    const newTime = audioPlayer.duration * ((e.clientX - this.getBoundingClientRect().left) / this.getBoundingClientRect().width);
+    const newTime = audioPlayer.duration * Math.max(0, Math.min(1, (e.clientX - bounds.left) / bounds.width));
     audioPlayer.currentTime = newTime;
     updateDiscordNowPlaying(audioPlayer.paused ? 'paused' : 'playing');
     
@@ -7524,7 +7681,7 @@ const FLUXO_LIBRARY_BACKUP_KEYS = [
     'fluxo_playback_rate', 'fluxo_reverb_mix', 'fluxo_preserve_pitch',
     'fluxo_master_gain', 'fluxo_stereo_pan', 'fluxo_compressor_enabled',
     'fluxo_compressor_threshold', 'fluxo_compressor_ratio', 'fluxo_compressor_attack',
-    'fluxo_compressor_release', 'fluxo_hotkeys', 'fluxo_focus_mode',
+    'fluxo_compressor_release', 'fluxo_hotkeys', 'fluxo_focus_mode', 'fluxo_theme_favorites', 'fluxo_theme_filter',
     'fluxo_ambient_mode', 'fluxo_podcast_mode', 'fluxo_mini_variant'
 ];
 
@@ -7591,7 +7748,7 @@ async function restoreLibraryBackupJson(file) {
 
     const keys = Object.keys(snapshot).filter(key => FLUXO_LIBRARY_BACKUP_KEYS.includes(key));
     if (!keys.length) throw new Error('Backup sem dados restauraveis.');
-    const arrayKeys = new Set(['fluxo_playlists', 'fluxo_playlist_trash', 'fluxo_favorites', 'fluxo_history', 'fluxo_music_inbox', 'fluxo_media_issues', 'fluxo_queue_tabs', 'fluxo_eq_gains']);
+    const arrayKeys = new Set(['fluxo_playlists', 'fluxo_playlist_trash', 'fluxo_favorites', 'fluxo_history', 'fluxo_music_inbox', 'fluxo_media_issues', 'fluxo_queue_tabs', 'fluxo_eq_gains', 'fluxo_theme_favorites']);
     const objectKeys = new Set(['fluxo_track_comments', 'fluxo_track_analysis', 'fluxo_achievements', 'fluxo_stats', 'fluxo_hotkeys']);
     for (const key of keys) {
         if (typeof snapshot[key] !== 'string') throw new Error(`Dado invalido no backup: ${key}`);

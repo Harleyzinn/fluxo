@@ -1546,15 +1546,42 @@ async function resolveTrackStreamUrl(payload, quality = 'audio', options = {}) {
 
 async function resolveSpotifyUrl(input) {
     const raw = String(input || '').trim();
-    if (!/spotify\.link/i.test(raw)) return raw;
-
-    try {
-        const res = await fetch(raw, { method: 'HEAD', redirect: 'follow' });
-        return res.url || raw;
-    } catch {
-        const res = await fetch(raw, { redirect: 'follow' });
-        return res.url || raw;
+    const uri = raw.match(/^spotify:(track|album|playlist):([a-zA-Z0-9]{22})$/i);
+    if (uri) return `https://open.spotify.com/${uri[1].toLowerCase()}/${uri[2]}`;
+    let url = new URL(raw);
+    const signal = AbortSignal.timeout(15000);
+    for (let hop = 0; hop < 6; hop++) {
+        if (url.protocol !== 'https:' || url.username || url.password || url.port || !['open.spotify.com', 'spotify.link'].includes(url.hostname)) {
+            throw new Error('Use um link publico do Spotify.');
+        }
+        if (url.hostname === 'open.spotify.com') return url.href;
+        const res = await fetch(url.href, { method: 'HEAD', redirect: 'manual', signal });
+        const location = res.headers.get('location');
+        if (res.status < 300 || res.status >= 400 || !location) throw new Error('Link curto do Spotify indisponivel.');
+        url = new URL(location, url);
     }
+    throw new Error('O link do Spotify tem redirecionamentos demais.');
+}
+
+function parseSpotifyEmbed(html, type) {
+    const script = html.match(/<script\b(?=[^>]*\bid=["']__NEXT_DATA__["'])[^>]*>([\s\S]*?)<\/script>/i);
+    const entity = script && JSON.parse(script[1]).props?.pageProps?.state?.data?.entity;
+    if (!entity) throw new Error('O Spotify nao disponibilizou essa colecao. Confira se ela e publica.');
+    const images = entity.visualIdentity?.image || entity.coverArt?.sources || [];
+    const cover = [...images].sort((a, b) => (b.maxWidth || b.width || 0) - (a.maxWidth || a.width || 0))[0]?.url || '';
+    const rows = type === 'track' ? [entity] : entity.trackList || [];
+    const tracks = rows.filter(t => t && typeof t.title === 'string' && t.title.trim() && (!t.entityType || t.entityType === 'track')).map((t, index) => {
+        const artist = t.artists?.map(a => a.name).filter(Boolean).join(', ') || t.subtitle || (type === 'album' ? entity.subtitle : '') || '';
+        const seconds = Math.max(0, Math.round(Number(t.duration || 0) / 1000));
+        const spotifyId = String(t.uri || '').match(/^spotify:track:([a-zA-Z0-9]{22})$/)?.[1];
+        return { id: `ghost_spotify_${spotifyId || `${entity.id}_${index}`}`, title: t.title.trim(), artist,
+            thumbnail: cover, duration: `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`,
+            isGhost: true, query: `${t.title} ${artist}`.trim(), source: 'Spotify',
+            spotifyUrl: spotifyId ? `https://open.spotify.com/track/${spotifyId}` : '' };
+    });
+    if (!tracks.length) throw new Error('Nenhuma musica publica foi encontrada neste link do Spotify.');
+    return { title: entity.name || entity.title || 'Spotify', tracks, searchQueries: tracks.map(t => t.query),
+        source: 'Spotify', warning: type === 'track' ? '' : 'Faixas disponibilizadas pelo Spotify. A lista publica pode ser parcial; colecoes privadas nao sao acessiveis.' };
 }
 
 function setupAutoUpdater() {
@@ -2519,43 +2546,22 @@ ipcMain.handle('resolve-track-stream', async (event, track, quality = 'audio', o
 });
 
 // ========================================================
-// EXTRATOR DE PLAYLISTS DO SPOTIFY (SEM LIMITES E OFICIAL)
+// Public Spotify metadata; audio is resolved separately by the player.
 // ========================================================
 
 ipcMain.handle('get-spotify-info', async (event, url) => {
     try {
         url = await resolveSpotifyUrl(url);
-        // Extrai o ID real do link do Spotify
-        const match = url.match(/(?:playlist|album|track)\/([a-zA-Z0-9]+)/);
-        if (!match) return null;
-
-        const id = match[1];
-        const type = url.includes('album') ? 'album' : url.includes('track') ? 'track' : 'playlist';
-
-        // Acessa o Embed Oficial do Spotify (Livre de tokens)
-        const res = await fetch(`https://open.spotify.com/embed/${type}/${id}`);
+        const match = new URL(url).pathname.match(/^\/(?:intl-[a-z-]+\/)?(?:embed\/)?(playlist|album|track)\/([a-zA-Z0-9]{22})\/?$/i);
+        if (!match) throw new Error('Cole um link de musica, album ou playlist publica do Spotify.');
+        const [, type, id] = match;
+        const res = await fetch(`https://open.spotify.com/embed/${type}/${id}`, { signal: AbortSignal.timeout(20000) });
+        if (!res.ok) throw new Error(`Spotify indisponivel (HTTP ${res.status}). Tente novamente mais tarde.`);
         const html = await res.text();
-
-        // Encontra a base de dados embutida no HTML
-        const jsonMatch = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
-
-        if (jsonMatch && jsonMatch[1]) {
-            const data = JSON.parse(jsonMatch[1]);
-            const entity = data.props?.pageProps?.state?.data?.entity;
-            if (!entity) return null;
-
-            const title = entity.name || "Playlist do Spotify";
-            const tracksData = entity.trackList || [];
-
-            // SEM LIMITE! Puxa todas as 100, 200, 500 faixas instantaneamente
-            const queries = tracksData.map(t => `${t.title} ${t.subtitle}`).filter(t => t.trim() !== "");
-
-            return { title: title, searchQueries: queries };
-        }
-        return null;
+        return parseSpotifyEmbed(html, type.toLowerCase());
     } catch (error) {
         console.error("Erro no scraping do Spotify:", error);
-        return null;
+        return { error: error.message || 'Nao foi possivel acessar o Spotify.' };
     }
 });
 // =========================================================================

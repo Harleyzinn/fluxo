@@ -1,0 +1,334 @@
+/* The theme browser keeps controls independent from the active layout. */
+.theme-search-row { display: grid; grid-template-columns: minmax(0,1fr) 190px; gap: 12px; background: var(--bg-panel); }
+.theme-search-box { grid-template-columns: auto minmax(0,1fr) auto 30px; min-width: 0; }
+.theme-search-row select { width: 100%; min-width: 0; }
+.theme-clear-search { border: 0; color: var(--text-muted); background: transparent; width: 30px; height: 32px; cursor: pointer; font-size: 1rem; }
+#resultsList .theme-result-item { display: grid; grid-template-columns: minmax(0,1fr) 44px; gap: 8px; padding: 8px 16px; min-width: 0; cursor: default; }
+#resultsList .theme-result-item::before, #resultsList .theme-result-item::after { display: none; }
+.theme-select-button { display: flex; align-items: center; gap: 18px; width: 100%; min-width: 0; min-height: 80px; padding: 8px 0; text-align: left; border: 0; background: transparent; color: var(--text-main); font: inherit; cursor: pointer; }
+.theme-select-button .result-info { min-width: 0; }
+.theme-select-button .result-title { white-space: normal; overflow-wrap: anywhere; color: var(--text-main); }
+.theme-select-button .result-artist { white-space: normal; line-height: 1.4; color: var(--text-muted); }
+.theme-select-button[aria-pressed="true"] .result-title { color: var(--neon-cyan); }
+.theme-emblem { width: 48px; height: 48px; display: grid; place-items: center; border: 1px solid var(--neon-cyan); flex-shrink: 0; font-size: 1.6rem; color: var(--neon-cyan); }
+.theme-palette { display: flex; gap: 5px; margin-top: 8px; }
+.theme-palette > span { width: 22px; height: 8px; border: 1px solid color-mix(in srgb,var(--text-main) 25%,transparent); }
+.theme-favorite-button { width: 40px; height: 40px; align-self: center; border: 1px solid var(--theme-line, var(--text-muted)); border-radius: 4px; font-size: 1.2rem; }
+.theme-favorite-button.active { color: var(--neon-pink); border-color: currentColor; background: color-mix(in srgb,var(--neon-pink) 10%,transparent); }
+.theme-select-button:focus-visible, .theme-favorite-button:focus-visible, .theme-clear-search:focus-visible { outline: 2px solid var(--neon-cyan); outline-offset: 2px; }
+@media (max-width: 950px) { .theme-search-row { grid-template-columns: minmax(0,1fr); } }
+
+/* Widgets and OBS read the same palette as the main window. */
+body.collection-theme {
+    --fx-a: var(--neon-cyan); --fx-b: var(--neon-pink); --fx-c: var(--neon-purple);
+    --fx-ink: var(--text-main); --fx-muted: var(--text-muted); --fx-bg: var(--bg-base);
+    --fx-panel: var(--bg-panel); --fx-overlay: var(--bg-panel); --fx-party-bg: var(--bg-panel);
+    --fx-line: var(--border-tech); --fx-font: var(--global-font); --fx-radius: var(--item-radius);
+    --fx-badge: var(--collection-label); --fx-party-label: var(--collection-label);
+}
+body.volume-two-theme { --item-radius: 2px; }
+body.volume-two-theme .sidebar-donate { background: transparent; box-shadow: none; border-radius: var(--item-radius); }
+body.volume-two-theme .btn:hover { text-shadow: none; }
+body.volume-two-theme .eq-card-head { border-bottom: 1px solid var(--theme-line); padding-bottom: 10px; }
+body.volume-two-theme .eq-band-value { font-variant-numeric: tabular-nums; }
+
+/* House of Hades: the room index is a bottom dock; the feed is an inscription. */
+body.theme-hades { --bg-base:#112522; --bg-panel:#18352f; --text-main:#e7ddbc; --text-muted:#b4c1ae; --neon-cyan:#cbd29a; --neon-pink:#ee7770; --neon-purple:#d8a459; --theme-line:#526a59; --global-font:'Cinzel', Georgia, serif; --collection-label:'HOUSE OF HADES / NIGHT SHIFT'; }
+body.theme-hades:not(.party-mode):not(.mini-mode) .app-layout { flex-direction: column-reverse; }
+body.theme-hades .sidebar { width: 100%; height: 146px; flex-direction: row; border-top: 5px double #d8a459; border-right: 0; }
+body.theme-hades .brand { width: 185px; flex-shrink: 0; align-self: center; }
+body.theme-hades .sidebar-menu { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); padding: 4px; align-content: start; gap: 2px; }
+body.theme-hades .sidebar-btn { font-family:'Outfit', Arial, sans-serif; font-size:.72rem; min-height:40px; padding:6px 8px; border-bottom:1px solid #526a59; }
+body.theme-hades .sidebar-btn.active { color:#112522; background:#cbd29a; border-left-color:#bc443e; }
+body.theme-hades .sidebar-donate { margin:0; width:100%; }
+body.theme-hades .sidebar-bottom { width:145px; padding:12px; border:0; align-self:center; }
+body.theme-hades .sidebar-bottom button { font-size:.68rem; }
+body.theme-hades .panel-header { border-bottom:5px double #d8a459; font-weight:700; }
+body.theme-hades .result-item { border-left:5px solid #526a59; }
+body.theme-hades .player-deck { background:#10231f; border-top:4px solid #bc443e; }
+body.theme-hades .deck-media-center { border-radius:0; border:3px double #d8a459; }
+body.theme-hades .eq-profile-grid { gap:0; border-bottom:3px solid #bc443e; }
+body.theme-hades .dsp-profile-btn { border-radius:0; border-width:0 1px 0 0; background:#112522; }
+body.theme-hades .eq-band { border:0; border-inline:3px double #526a59; background:#10231f; }
+body.theme-hades .eq-band-label { font-family:'Cinzel', Georgia, serif; color:#d8a459; }
+
+/* Chozo Frequency: a right-hand instrument stack, separate from the mission log. */
+body.theme-metroid { --bg-base:#171a1e; --bg-panel:#24252a; --text-main:#eef0e6; --text-muted:#b2bebc; --neon-cyan:#73d6d0; --neon-pink:#f3b44c; --neon-purple:#b6a7e0; --theme-line:#535b60; --global-font:'Chakra Petch', Arial, sans-serif; --collection-label:'CHOZO / FIELD TELEMETRY'; }
+body.theme-metroid .sidebar { width:184px; border-right:4px solid #f3b44c; }
+body.theme-metroid .brand { border-bottom:1px solid #73d6d0; }
+body.theme-metroid .sidebar-btn { border-bottom:1px solid #424b51; border-right:6px solid transparent; }
+body.theme-metroid .sidebar-btn.active { border-right-color:#f3b44c; color:#eef0e6; }
+body.theme-metroid .header { border-bottom:3px solid #73d6d0; }
+body.theme-metroid .panel-header { background:#303640; border-left:12px solid #f3b44c; }
+body.theme-metroid .result-item { border-bottom:1px dashed #535b60; }
+body.theme-metroid .deck-media-center { border-radius:4px; border:2px solid #f3b44c; }
+body.theme-metroid .eq-shell { border-top:8px solid #f3b44c; }
+body.theme-metroid .eq-band { border:1px solid #535b60; border-top:4px solid #73d6d0; background:#13191c; }
+body.theme-metroid .eq-card { border-right:5px solid #b6a7e0; }
+@media (min-width:1150px) {
+    body.theme-metroid:not(.party-mode):not(.mini-mode) { display:grid; grid-template-columns:minmax(0,1fr) 244px; grid-template-rows:32px minmax(0,1fr); }
+    body.theme-metroid:not(.party-mode):not(.mini-mode) #customTitleBar { grid-column:1/-1; }
+    body.theme-metroid:not(.party-mode):not(.mini-mode) .app-layout { grid-column:1; grid-row:2; min-height:0; }
+    body.theme-metroid:not(.party-mode):not(.mini-mode) .player-deck { grid-column:2; grid-row:2; display:flex; flex-direction:column; width:244px; height:100%; gap:22px; padding:22px 16px; border-left:4px solid #f3b44c; border-top:0; }
+    body.theme-metroid:not(.party-mode):not(.mini-mode) .now-playing { width:100%; max-width:100%; flex-direction:column; gap:18px; align-items:flex-start; }
+    body.theme-metroid:not(.party-mode):not(.mini-mode) .np-cover { width:186px; height:186px; border:5px solid #73d6d0; }
+    body.theme-metroid:not(.party-mode):not(.mini-mode) .deck-controls { width:100%; min-width:0; }
+    body.theme-metroid:not(.party-mode):not(.mini-mode) .hardware-buttons { display:flex !important; flex-wrap:wrap; justify-content:center; gap:18px; }
+    body.theme-metroid:not(.party-mode):not(.mini-mode) .deck-media-center { order:-1; width:100%; }
+    body.theme-metroid:not(.party-mode):not(.mini-mode) .volume-container { width:100%; margin-top:auto; }
+}
+
+/* Island Mail: compact postal navigation and a two-column collection of postcards. */
+body.theme-animalcrossing { --bg-base:#d6e8e5; --bg-panel:#f5faf6; --text-main:#253d36; --text-muted:#52685f; --neon-cyan:#246b5c; --neon-pink:#b74652; --neon-purple:#526695; --theme-line:#91b1a4; --global-font:'Outfit', Arial, sans-serif; --collection-label:'ISLAND MAIL / SPECIAL DELIVERY'; --item-radius:8px; }
+body.theme-animalcrossing .sidebar { width:154px; border-right:2px dashed #91b1a4; }
+body.theme-animalcrossing .brand { padding:20px 12px; font-size:1.1rem; text-align:center; }
+body.theme-animalcrossing .sidebar-btn { flex-direction:column; justify-content:center; gap:6px; text-align:center; min-height:60px; padding:8px; border-left:0; font-size:.72rem; }
+body.theme-animalcrossing .sidebar-btn.active { background:#d6e8e5; border-right:4px solid #b74652; }
+body.theme-animalcrossing .sidebar-btn i { font-size:1.45rem; }
+body.theme-animalcrossing .sidebar-donate { margin:6px 8px; width:calc(100% - 16px); }
+body.theme-animalcrossing .sidebar-bottom { padding:12px; }
+body.theme-animalcrossing .sidebar-bottom button { font-size:.7rem; }
+body.theme-animalcrossing .results-list:has(> .result-item):not(:has(.theme-result-item)) { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; padding:14px; align-content:start; }
+body.theme-animalcrossing .results-list > :not(.result-item) { grid-column:1/-1; }
+body.theme-animalcrossing .result-item:not(.theme-result-item) { border:1px solid #91b1a4; border-top:6px solid #246b5c; padding:14px; flex-wrap:wrap; gap:10px; border-radius:6px; background:#f5faf6; }
+body.theme-animalcrossing .result-item:nth-child(even) { border-top-color:#b74652; }
+body.theme-animalcrossing .result-info { flex:1 1 130px; }
+body.theme-animalcrossing .search-input { background:#fff; border:2px solid #91b1a4; }
+body.theme-animalcrossing .panel-header { background:#246b5c; color:#fff; }
+body.theme-animalcrossing .player-deck { border-top:3px dashed #91b1a4; background:#f5faf6; }
+body.theme-animalcrossing .np-cover { border:3px solid #b74652; border-radius:8px; }
+body.theme-animalcrossing .deck-media-center { background:#d6e8e5; border:1px solid #91b1a4; border-radius:8px; }
+body.theme-animalcrossing .eq-band { background:#d6e8e5; border:0; border-bottom:5px solid #526695; }
+body.theme-animalcrossing .eq-card { border:1px dashed #91b1a4; }
+body.theme-animalcrossing .eq-hero { border-bottom-style:dashed; }
+
+/* Nocturne: gothic column proportions and a restrained parchment-on-stone score. */
+body.theme-castlevania { --bg-base:#100f16; --bg-panel:#19171f; --text-main:#e2d4ba; --text-muted:#b2a9b8; --neon-cyan:#d2b77b; --neon-pink:#e59db2; --neon-purple:#b7a2cc; --theme-line:#514653; --global-font:'Cinzel', Georgia, serif; --collection-label:'NOCTURNE / CASTLE ARCHIVES'; }
+body.theme-castlevania .sidebar { order:2; width:218px; border-right:0; border-left:7px double #514653; }
+body.theme-castlevania .brand { font-family:Georgia,serif; border-bottom:5px double #d2b77b; padding-block:30px; }
+body.theme-castlevania .sidebar-btn { border-bottom:1px solid #514653; font-family:'Outfit',Arial,sans-serif; }
+body.theme-castlevania .sidebar-btn.active { border-left:5px solid #e59db2; background:#322434; }
+body.theme-castlevania .header { padding-block:24px; }
+body.theme-castlevania .search-input { border:3px double #514653; }
+body.theme-castlevania .panel-header { border-block:3px double #514653; background:#100f16; }
+body.theme-castlevania .result-item { border-left:10px solid #29212e; }
+body.theme-castlevania .player-deck { border-top:6px double #d2b77b; }
+body.theme-castlevania .deck-media-center { border-radius:0; border:3px double #e59db2; background:#100f16; }
+body.theme-castlevania .eq-shell { border-left:7px double #d2b77b; }
+body.theme-castlevania .eq-profile-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+body.theme-castlevania .dsp-profile-btn { border-width:0 0 2px; border-bottom-color:#e59db2; background:#100f16; }
+body.theme-castlevania .eq-band { border-inline:1px solid #514653; border-top:5px double #d2b77b; background:#100f16; }
+
+/* Public Safety: an offset print desk, a broad transport strip and stamped rows. */
+body.theme-chainsawman { --bg-base:#d5dad5; --bg-panel:#f4f4f1; --text-main:#171a18; --text-muted:#555c54; --neon-cyan:#293d35; --neon-pink:#b8292d; --neon-purple:#665911; --theme-line:#777e72; --global-font:'Chakra Petch',Arial,sans-serif; --collection-label:'PUBLIC SAFETY / SPECIAL DIVISION'; }
+body.theme-chainsawman .sidebar { width:216px; border-right:9px solid #b8292d; }
+body.theme-chainsawman .brand { font-size:1.8rem; font-weight:900; border-bottom:12px solid #171a18; }
+body.theme-chainsawman .sidebar-menu { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-content:start; padding-top:0; }
+body.theme-chainsawman .sidebar-btn { flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:8px 4px; min-height:66px; gap:6px; border-bottom:1px solid #171a18; border-right:1px solid #171a18; font-size:.72rem; }
+body.theme-chainsawman .sidebar-donate { width:100%; margin:0; border-left:0; }
+body.theme-chainsawman .sidebar-btn.active { background:#171a18; color:#f2ece0; border-left:6px solid #b8292d; }
+body.theme-chainsawman .content-wrapper { padding:14px 0 0; }
+body.theme-chainsawman .header { border-bottom:3px solid #171a18; }
+body.theme-chainsawman .panel-header { background:#b8292d; color:#fff; font-weight:900; }
+body.theme-chainsawman .result-item { border-bottom:2px solid #171a18; border-left:9px solid #bfc5b8; }
+body.theme-chainsawman .result-title { font-weight:700; }
+body.theme-chainsawman .player-deck { background:#f4f4f1; border-top:10px solid #171a18; }
+body.theme-chainsawman .np-cover { border:4px solid #b8292d; transform:rotate(-2deg); }
+body.theme-chainsawman .deck-media-center { background:#171a18; border-radius:0; border:0; }
+body.theme-chainsawman .deck-media-center .btn { color:#f2ece0; }
+body.theme-chainsawman .btn-play { color:#ee6b66 !important; }
+body.theme-chainsawman .eq-shell { border-top:8px solid #b8292d; }
+body.theme-chainsawman .eq-hero h3 { font-weight:900; }
+body.theme-chainsawman .eq-profile-grid { gap:3px; }
+body.theme-chainsawman .dsp-profile-btn { background:#171a18; color:#f2ece0; border:0; }
+body.theme-chainsawman .eq-band { background:#f4f4f1; border:2px solid #171a18; border-bottom:8px solid #b8292d; }
+
+/* Tenkaichi: a narrow arena index, score-board rules and tournament controls. */
+body.theme-dragonball { --bg-base:#d9e9ef; --bg-panel:#f7fbfd; --text-main:#193347; --text-muted:#526e7b; --neon-cyan:#176696; --neon-pink:#b84420; --neon-purple:#785923; --theme-line:#91abb8; --global-font:'Outfit',Arial,sans-serif; --collection-label:'TENKAICHI / WORLD TOURNAMENT'; --item-radius:6px; }
+body.theme-dragonball .sidebar { width:136px; border-right:5px solid #b84420; }
+body.theme-dragonball .brand { font-size:1.1rem; padding:18px 10px; text-align:center; }
+body.theme-dragonball .sidebar-btn { min-height:60px; flex-direction:column; gap:6px; justify-content:center; text-align:center; font-size:.7rem; padding:8px; border:0; border-bottom:1px solid #91abb8; }
+body.theme-dragonball .sidebar-btn.active { color:#fff; background:#176696; }
+body.theme-dragonball .sidebar-donate { width:calc(100% - 12px); margin:6px; }
+body.theme-dragonball .sidebar-bottom { padding:10px; }
+body.theme-dragonball .sidebar-bottom button { font-size:.67rem; padding:10px 6px; }
+body.theme-dragonball .panel-header { color:#fff; background:#176696; border-bottom:7px solid #b84420; }
+body.theme-dragonball .result-item { border-bottom:2px solid #91abb8; }
+body.theme-dragonball .player-deck { border-top:5px solid #b84420; background:#f7fbfd; }
+body.theme-dragonball .np-cover { border-radius:50%; border:4px solid #176696; }
+body.theme-dragonball .deck-media-center { border-radius:6px; border:2px solid #176696; background:#d9e9ef; }
+body.theme-dragonball .eq-card { background:#f7fbfd; border-bottom:4px solid #176696; }
+body.theme-dragonball .eq-band { border:0; border-top:5px solid #b84420; background:#d9e9ef; }
+body.theme-dragonball .eq-band-value { background:#176696; color:#fff; padding:4px; min-width:36px; text-align:center; }
+
+/* Red Tail: a right-hand jazz programme, a lower search bar and large record type. */
+body.theme-bebop { --bg-base:#0e1013; --bg-panel:#16181b; --text-main:#ede5cc; --text-muted:#b7b4a7; --neon-cyan:#ded48d; --neon-pink:#ee7870; --neon-purple:#a5c4ba; --theme-line:#56524a; --global-font:'Outfit',Arial,sans-serif; --collection-label:'RED TAIL / SESSION 01'; }
+body.theme-bebop .sidebar { order:2; width:230px; border-right:0; border-left:14px solid #db504b; }
+body.theme-bebop .brand { font-family:Georgia,serif; font-style:italic; font-size:2rem; border-bottom:1px solid #ded48d; }
+body.theme-bebop .brand span { display:none; }
+body.theme-bebop .sidebar-btn { border-left:0; border-bottom:1px solid #383c3f; }
+body.theme-bebop .sidebar-btn.active { color:#16181b; background:#ded48d; }
+body.theme-bebop .header { order:2; border-top:1px solid #ded48d; border-bottom:0; padding-block:12px; }
+body.theme-bebop .main-container { order:1; }
+body.theme-bebop .panel-header { font-size:.85rem; background:#db504b; color:#111; font-weight:900; }
+body.theme-bebop .result-title { font-weight:700; }
+body.theme-bebop .result-item { border-left:5px solid #373b3d; }
+body.theme-bebop .player-deck { border-top:2px solid #ded48d; background:#0e1013; }
+body.theme-bebop .deck-media-center { border-radius:0; background:#db504b; border:0; }
+body.theme-bebop .deck-media-center .btn { color:#0e1013; }
+body.theme-bebop .eq-hero { font-family:Georgia,serif; font-style:italic; border-bottom-color:#db504b; }
+body.theme-bebop .eq-profile-grid { display:flex; flex-wrap:wrap; border-bottom:1px solid #ded48d; padding-bottom:12px; }
+body.theme-bebop .dsp-profile-btn { flex:1 1 140px; border-width:0 0 1px; }
+body.theme-bebop .eq-band { background:#0e1013; border:0; border-top:3px solid #db504b; }
+
+/* Forest Station: a ticket-book layout, route-number navigation and blue ink. */
+body.theme-ghibli { --bg-base:#dbe8df; --bg-panel:#edf5ed; --text-main:#26433b; --text-muted:#52695d; --neon-cyan:#285c50; --neon-pink:#a64242; --neon-purple:#3e6479; --theme-line:#8ea79a; --global-font:Georgia,serif; --collection-label:'FOREST STATION / LAST TRAIN'; --item-radius:3px; }
+body.theme-ghibli .sidebar { width:228px; border-right:2px dashed #8ea79a; }
+body.theme-ghibli .brand { padding:28px 16px; font-family:Georgia,serif; border-bottom:3px double #285c50; }
+body.theme-ghibli .brand span { display:none; }
+body.theme-ghibli .sidebar-menu { counter-reset:station; }
+body.theme-ghibli .sidebar-btn { counter-increment:station; border-bottom:1px dotted #8ea79a; font-family:'Outfit',Arial,sans-serif; }
+body.theme-ghibli .sidebar-btn::before { content:counter(station,decimal-leading-zero); font-family:Georgia,serif; font-size:.8rem; color:#3e6479; }
+body.theme-ghibli .sidebar-btn i { display:none; }
+body.theme-ghibli .sidebar-btn.active { background:#cdded2; border-left:4px solid #a64242; }
+body.theme-ghibli .header { border-bottom:2px dashed #8ea79a; }
+body.theme-ghibli .panel-header { border-block:3px double #285c50; color:#285c50; background:#edf5ed; }
+body.theme-ghibli .result-item { border-bottom:1px dotted #8ea79a; }
+body.theme-ghibli .result-thumb { border:4px solid #fff; box-shadow:0 1px 2px #8ea79a; }
+body.theme-ghibli .player-deck { background:#edf5ed; border-top:4px double #285c50; }
+body.theme-ghibli .np-cover { border:4px solid #fff; transform:rotate(2deg); }
+body.theme-ghibli .deck-media-center { background:#dbe8df; border-radius:3px; border:1px solid #8ea79a; }
+body.theme-ghibli .eq-hero { border-bottom:2px dashed #8ea79a; }
+body.theme-ghibli .eq-card { border:1px dashed #8ea79a; background:#edf5ed; }
+body.theme-ghibli .eq-band { background:transparent; border:0; border-left:1px dotted #8ea79a; }
+body.theme-ghibli .eq-band-label { font-family:Georgia,serif; color:#3e6479; }
+
+/* Endurance: a mission rail and a mechanical, numbered log rather than a dashboard. */
+body.theme-interstellar { --bg-base:#0d1113; --bg-panel:#15191b; --text-main:#e9edf0; --text-muted:#b4bbbe; --neon-cyan:#e9edf0; --neon-pink:#d3b775; --neon-purple:#93b0b3; --theme-line:#525e62; --global-font:'Space Mono',monospace; --collection-label:'ENDURANCE / MISSION LOG'; --item-radius:0px; }
+body.theme-interstellar .sidebar { width:150px; border-right:1px solid #d3b775; }
+body.theme-interstellar .brand { font-size:1.1rem; padding:22px 10px; border-bottom:5px double #525e62; }
+body.theme-interstellar .sidebar-btn { font-size:.68rem; padding:10px; border-bottom:1px solid #3c474b; }
+body.theme-interstellar .sidebar-donate { margin:6px; width:calc(100% - 12px); }
+body.theme-interstellar .sidebar-bottom { padding:10px; }
+body.theme-interstellar .sidebar-bottom button { font-size:.67rem; padding:10px 6px; }
+body.theme-interstellar .search-input { border:1px solid #525e62; border-left:10px solid #d3b775; }
+body.theme-interstellar .panel-header { border-bottom:1px solid #d3b775; font-size:.7rem; }
+body.theme-interstellar .result-item { border-bottom:1px solid #3c474b; font-variant-numeric:tabular-nums; }
+body.theme-interstellar .result-title { font-size:.85rem; }
+body.theme-interstellar .player-deck { border-top:1px solid #d3b775; background:#0d1113; }
+body.theme-interstellar .np-cover { border:5px solid #e9edf0; border-radius:50%; }
+body.theme-interstellar .deck-media-center { border:1px solid #525e62; border-radius:0; background:#15191b; }
+body.theme-interstellar .eq-card { background:transparent; border:1px solid #525e62; }
+body.theme-interstellar .eq-band { border:0; background:#0d1113; border-inline:1px solid #525e62; }
+body.theme-interstellar .eq-band-value { padding:5px; border:1px solid #d3b775; color:#d3b775; }
+body.theme-interstellar .dsp-profile-btn { border:1px solid #525e62; font-size:.7rem; }
+@media (min-width:1150px) {
+    body.theme-interstellar:not(.party-mode):not(.mini-mode) { display:grid; grid-template-columns:150px 236px minmax(0,1fr); grid-template-rows:32px minmax(0,1fr); }
+    body.theme-interstellar:not(.party-mode):not(.mini-mode) #customTitleBar { grid-column:1/-1; }
+    body.theme-interstellar:not(.party-mode):not(.mini-mode) .app-layout { display:contents; }
+    body.theme-interstellar:not(.party-mode):not(.mini-mode) .sidebar { grid-column:1; grid-row:2; min-height:0; }
+    body.theme-interstellar:not(.party-mode):not(.mini-mode) .content-wrapper { grid-column:3; grid-row:2; min-height:0; }
+    body.theme-interstellar:not(.party-mode):not(.mini-mode) .player-deck { grid-column:2; grid-row:2; width:236px; height:100%; display:flex; flex-direction:column; gap:24px; padding:24px 16px; border-top:0; border-right:1px solid #d3b775; }
+    body.theme-interstellar:not(.party-mode):not(.mini-mode) .now-playing { width:100%; max-width:100%; flex-direction:column; align-items:flex-start; gap:24px; }
+    body.theme-interstellar:not(.party-mode):not(.mini-mode) .np-cover { width:172px; height:172px; border-width:8px; }
+    body.theme-interstellar:not(.party-mode):not(.mini-mode) .np-title { font-size:.95rem; }
+    body.theme-interstellar:not(.party-mode):not(.mini-mode) .deck-controls { width:100%; min-width:0; }
+    body.theme-interstellar:not(.party-mode):not(.mini-mode) .hardware-buttons { display:flex !important; flex-wrap:wrap; justify-content:center; gap:18px; }
+    body.theme-interstellar:not(.party-mode):not(.mini-mode) .deck-media-center { order:-1; padding:4px 8px; gap:6px; }
+    body.theme-interstellar:not(.party-mode):not(.mini-mode) .volume-container { width:100%; margin-top:auto; }
+}
+
+/* Side A: a hi-fi faceplate, inset counters and tape-machine transport. */
+body.theme-cassette { --bg-base:#bfc6c4; --bg-panel:#dedfd8; --text-main:#202a2b; --text-muted:#4d5c5b; --neon-cyan:#235956; --neon-pink:#9d4930; --neon-purple:#515a86; --theme-line:#809390; --global-font:'Chakra Petch',Arial,sans-serif; --collection-label:'STEREO CASSETTE DECK / SIDE A'; --item-radius:3px; }
+body.theme-cassette .sidebar { width:196px; border-right:8px solid #394846; }
+body.theme-cassette .brand { border-block:5px double #809390; margin-top:14px; }
+body.theme-cassette .sidebar-btn { border-bottom:1px solid #809390; border-left:6px solid transparent; }
+body.theme-cassette .sidebar-btn.active { background:#394846; color:#f0f2e8; border-left-color:#ce855c; }
+body.theme-cassette .search-input { background:#eff1e8; border:2px inset #809390; }
+body.theme-cassette .panel-header { background:#394846; color:#f0f2e8; border-bottom:6px solid #809390; }
+body.theme-cassette .result-item { border-bottom:1px solid #809390; }
+body.theme-cassette .player-deck { border-top:10px solid #394846; background:#dedfd8; }
+body.theme-cassette .np-cover { border:3px inset #809390; }
+body.theme-cassette .deck-media-center { background:#eff1e8; border:3px inset #809390; border-radius:3px; }
+body.theme-cassette .deck-media-center .btn { background:#394846; color:#eff1e8; border-radius:2px; }
+body.theme-cassette .deck-media-center .btn-play { color:#e8a175; }
+body.theme-cassette .time { background:#394846; color:#d7e3cf; font-family:monospace; padding:4px 2px; font-size:.75rem; }
+body.theme-cassette .eq-band { background:#eff1e8; border:2px inset #809390; }
+body.theme-cassette .eq-band-value { background:#394846; color:#d7e3cf; padding:4px; min-width:38px; text-align:center; }
+body.theme-cassette .eq-card { border:3px double #809390; background:#dedfd8; }
+@media (min-width:1100px) {
+    body.theme-cassette:not(.party-mode):not(.mini-mode) .player-deck { display:grid; grid-template-columns:210px minmax(0,1fr) 140px; height:154px; padding:12px 24px; gap:22px; flex-shrink:0; }
+    body.theme-cassette:not(.party-mode):not(.mini-mode) .now-playing { width:100%; gap:12px; align-items:flex-start; }
+    body.theme-cassette:not(.party-mode):not(.mini-mode) .np-cover { width:86px; height:96px; flex-shrink:0; }
+    body.theme-cassette:not(.party-mode):not(.mini-mode) .np-info { padding-top:8px; }
+    body.theme-cassette:not(.party-mode):not(.mini-mode) .deck-controls { width:100%; gap:16px; }
+    body.theme-cassette:not(.party-mode):not(.mini-mode) .deck-tool-group { gap:10px; }
+    body.theme-cassette:not(.party-mode):not(.mini-mode) .deck-media-center { gap:8px; }
+    body.theme-cassette:not(.party-mode):not(.mini-mode) .volume-container { flex-direction:column; width:100%; gap:16px; }
+}
+
+/* Distinct party compositions, with the shared video surface kept intact. */
+body.volume-two-theme.party-mode .player-deck { padding-top:54px !important; }
+body.theme-hades.party-mode .now-playing { flex-direction:row !important; gap:40px !important; text-align:left !important; }
+body.theme-hades.party-mode .np-cover:not(.video-active) { width:280px !important; height:340px !important; border:8px double #d8a459 !important; border-radius:0 !important; flex-shrink:0; }
+body.theme-hades.party-mode .np-info { align-items:flex-start !important; border-top:6px solid #bc443e; padding-top:24px; }
+body.theme-hades.party-mode .deck-controls { padding:18px; border-top:5px double #526a59; }
+body.theme-metroid.party-mode .now-playing { flex-direction:row-reverse !important; gap:42px !important; text-align:left !important; }
+body.theme-metroid.party-mode .np-cover:not(.video-active) { border:10px solid #f3b44c !important; border-radius:8px !important; flex-shrink:0; }
+body.theme-metroid.party-mode .np-info { align-items:flex-start !important; padding-block:24px; border-block:2px solid #73d6d0; }
+body.theme-metroid.party-mode .np-title { font-family:'Chakra Petch',Arial,sans-serif; }
+body.theme-animalcrossing.party-mode .np-cover:not(.video-active) { width:290px !important; height:290px !important; border:14px solid #fff !important; border-radius:8px !important; box-shadow:0 0 0 1px #91b1a4 !important; transform:rotate(-3deg) !important; }
+body.theme-animalcrossing.party-mode .np-info { border-bottom:3px dashed #91b1a4; padding-bottom:20px; }
+body.theme-animalcrossing.party-mode .np-title { color:#246b5c; }
+body.theme-castlevania.party-mode .now-playing { flex-direction:row !important; gap:40px !important; text-align:left !important; }
+body.theme-castlevania.party-mode .np-cover:not(.video-active) { width:250px !important; height:340px !important; border:8px double #d2b77b !important; border-radius:120px 120px 0 0 !important; flex-shrink:0; }
+body.theme-castlevania.party-mode .np-info { align-items:flex-start !important; border-bottom:5px double #e59db2; padding-block:24px; }
+body.theme-castlevania.party-mode .deck-controls { border-top:1px solid #514653; padding-top:22px; }
+body.theme-chainsawman.party-mode .now-playing { flex-direction:row-reverse !important; gap:36px !important; text-align:left !important; }
+body.theme-chainsawman.party-mode .np-cover:not(.video-active) { border:12px solid #171a18 !important; border-radius:0 !important; transform:rotate(2deg) !important; flex-shrink:0; }
+body.theme-chainsawman.party-mode .np-info { align-items:flex-start !important; padding-block:22px; border-block:8px solid #b8292d; }
+body.theme-chainsawman.party-mode .np-title { font-weight:900; text-transform:uppercase; }
+body.theme-dragonball.party-mode .np-cover:not(.video-active) { border:12px solid #176696 !important; border-radius:50% !important; box-shadow:0 0 0 4px #b84420 !important; }
+body.theme-dragonball.party-mode .np-info { padding-block:12px; border-block:3px solid #91abb8; }
+body.theme-dragonball.party-mode .np-title { color:#176696; font-weight:900; }
+body.theme-bebop.party-mode .now-playing { flex-direction:row !important; text-align:left !important; gap:42px !important; }
+body.theme-bebop.party-mode .np-cover:not(.video-active) { border-radius:0 !important; border:12px solid #db504b !important; flex-shrink:0; }
+body.theme-bebop.party-mode .np-info { align-items:flex-start !important; border-bottom:16px solid #ded48d; padding-bottom:26px; }
+body.theme-bebop.party-mode .np-title { font-family:Georgia,serif; font-style:italic; font-size:2.8rem !important; }
+body.theme-ghibli.party-mode .np-cover:not(.video-active) { width:310px !important; height:310px !important; border:12px solid #fff !important; border-radius:2px !important; transform:rotate(2deg) !important; box-shadow:0 0 0 1px #8ea79a !important; }
+body.theme-ghibli.party-mode .np-info { border-bottom:4px double #285c50; padding-bottom:18px; }
+body.theme-ghibli.party-mode .np-title { font-family:Georgia,serif; font-weight:400; }
+body.theme-interstellar.party-mode .now-playing { flex-direction:row !important; text-align:left !important; gap:42px !important; }
+body.theme-interstellar.party-mode .np-cover:not(.video-active) { border-radius:50% !important; border:12px solid #e9edf0 !important; flex-shrink:0; }
+body.theme-interstellar.party-mode .np-info { align-items:flex-start !important; padding-block:24px; border-block:1px solid #d3b775; }
+body.theme-interstellar.party-mode .np-title { font-size:1.8rem !important; }
+body.theme-interstellar.party-mode .deck-controls { border-top:1px solid #525e62; padding-top:22px; }
+body.theme-cassette.party-mode .np-cover:not(.video-active) { width:360px !important; height:260px !important; border:18px solid #394846 !important; border-radius:8px !important; outline:2px solid #809390; outline-offset:6px; }
+body.theme-cassette.party-mode .np-info { padding:12px 24px; border:3px inset #809390; background:#eff1e8; }
+body.theme-cassette.party-mode .np-title { font-family:'Chakra Petch',Arial,sans-serif; }
+
+@media (max-width:1100px) {
+    body.theme-hades .brand { width:140px; font-size:1.2rem; padding:12px; }
+    body.theme-hades .sidebar-menu { grid-template-columns:repeat(4,minmax(0,1fr)); }
+    body.theme-hades .sidebar-btn { font-size:.65rem; min-height:32px; }
+    body.theme-hades .sidebar-bottom { width:120px; padding:8px; }
+    body.theme-animalcrossing .results-list:has(> .result-item):not(:has(.theme-result-item)) { grid-template-columns:minmax(0,1fr); }
+    body.theme-castlevania .eq-profile-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media (max-width:850px) {
+    body.theme-hades .sidebar { height:142px; }
+    body.theme-hades .brand { width:124px; font-size:1rem; }
+    body.theme-hades .brand::after { font-size:.6rem; }
+    body.theme-ghibli .sidebar, body.theme-castlevania .sidebar, body.theme-bebop .sidebar { width:190px; }
+    body.volume-two-theme.party-mode .np-title { font-size:1.5rem !important; }
+    body.theme-cassette.party-mode .np-cover:not(.video-active) { width:280px !important; height:220px !important; }
+}
+body.volume-two-theme.party-mode .now-playing:has(.video-active) { flex-direction:column !important; }
+body.volume-two-theme.party-mode .now-playing:has(.video-active) .np-info { border:0; background:none; padding:0; align-items:center !important; }
+
+/* The native mini window is 580px wide; all three groups must fit that width. */
+body.collection-theme.mini-mode:not(.video-mode) .player-deck { grid-template-columns:minmax(0,1fr) minmax(180px,1.1fr) 84px !important; width:100vw !important; }
+body.collection-theme.mini-mode:not(.video-mode) .np-cover { transform:none !important; }
+body.collection-theme.mini-mode:not(.video-mode) .mini-controls { min-width:0; width:84px; gap:8px !important; }
+body.collection-theme.mini-mode:not(.video-mode) .deck-controls { opacity:1 !important; transform:none !important; background:transparent !important; }
+body.collection-theme.mini-mode:not(.video-mode) .deck-media-center { background:var(--bg-panel) !important; border-color:var(--theme-line) !important; }

@@ -12,6 +12,7 @@ async function main() {
     const failures = [], errors = [];
     try {
         const page = await app.firstWindow();
+        page.setDefaultTimeout(15000);
         page.on('pageerror', error => { if (!error.stack?.includes('logSecurityWarnings')) errors.push(error.message); });
         await page.waitForFunction(() => typeof currentHotkeys !== 'undefined');
         await page.evaluate(() => {
@@ -22,7 +23,7 @@ async function main() {
             titleEl.innerText = 'Carnaval'; artistEl.innerText = 'Kamaitachi';
             coverEl.style.backgroundImage = `url('${queue[0].thumbnail}')`; coverIcon.style.display = 'none';
         });
-        const themes = await page.evaluate(() => COLLECTION_THEMES.map(theme => theme.id));
+        const themes = await page.evaluate(volume => (volume === '4' ? VOLUME_FOUR_THEMES : volume === '3' ? VOLUME_THREE_THEMES : volume === '2' ? VOLUME_TWO_THEMES : COLLECTION_THEMES).map(theme => theme.id), process.env.FLUXO_THEME_VOLUME || 'all');
         async function checkButton(id, context) {
             const state = await page.locator(`#${id}`).evaluate(el => {
                 const r = el.getBoundingClientRect();
@@ -37,7 +38,12 @@ async function main() {
             for (const theme of themes) {
                 await page.locator('#btnThemes').click();
                 await page.locator('#themeSearchInput').fill(theme);
-                await page.locator(`[data-theme-id="${theme}"]`).click();
+                await page.locator(`[data-theme-id="${theme}"] .theme-select-button`).click();
+                const widgetPalette = await page.evaluate(() => {
+                    const payload = getCurrentThemePayload(), style = getComputedStyle(document.body);
+                    return { accent: payload.palette.accent, expected: style.getPropertyValue('--neon-cyan').trim(), badge: payload.badge };
+                });
+                if (widgetPalette.accent !== widgetPalette.expected || !widgetPalette.badge || widgetPalette.badge === 'FLUXO THEME') failures.push({ context: `${theme}/${width}/widget`, ...widgetPalette });
                 await page.locator('#btnQueueView').click();
                 await page.waitForTimeout(350);
                 for (const id of ['playPauseBtn', 'prevBtn', 'nextBtn', 'shuffleBtn', 'loopBtn', 'autoMixBtn', 'crossfadeBtn', 'btnSpeedFx', 'btnToggleVideo', 'btnPiP', 'btnFullscreen', 'volumeSlider', 'btnSearch', 'searchInput']) await checkButton(id, `${theme}/${width}/queue`);
@@ -56,6 +62,7 @@ async function main() {
                 await page.locator('#btnMiniPlayer').click();
                 await page.waitForTimeout(300);
                 for (const id of ['playPauseBtn', 'btnExitMini', 'btnPinMini']) await checkButton(id, `${theme}/${width}/mini`);
+                await page.screenshot({ path: path.join(profile, `${theme}-${width}-mini.png`) });
                 await page.locator('#btnExitMini').click();
                 await page.waitForTimeout(300);
                 console.log('Checked', theme, width);

@@ -17,7 +17,8 @@ body.collection-theme {
 }
 body.collection-theme * { letter-spacing: 0; }
 body.collection-theme :is(.header, .main-container) { padding: 18px 22px; }
-body.collection-theme .sidebar { flex-shrink: 0; background: var(--bg-panel); }
+body.collection-theme .sidebar { flex-shrink: 0; background: var(--bg-panel); transition: background-color .2s, color .2s; }
+body.collection-theme :is(.player-deck,.header,.results-area,.np-cover) { transition: background-color .2s, border-color .2s, color .2s; }
 body.collection-theme #customTitleBar { background: var(--bg-panel); }
 body.collection-theme .brand { display: block; padding: 22px 16px; font-size: 1.5rem; text-align: left; }
 body.collection-theme .brand::after { content: var(--collection-label); display: block; margin-top: 8px; font-size: .68rem; line-height: 1.4; font-weight: 400; color: var(--text-muted); overflow-wrap: anywhere; }
@@ -27,6 +28,7 @@ body.collection-theme .search-input { border: var(--border-tech); border-radius:
 body.collection-theme :is(.btn-action, .btn-confirm, .btn-abort) { border-radius: var(--item-radius); box-shadow: none; white-space: normal; }
 body.collection-theme .results-area { border: var(--border-tech); border-radius: 0; }
 body.collection-theme .panel-header { padding: 12px 18px; font-size: .76rem; background: var(--bg-panel); }
+body.collection-theme .panel-header #btnClearQueue { color:inherit !important; border-color:currentColor !important; background:transparent !important; }
 body.collection-theme .result-item { min-width: 0; padding: 16px; border-bottom: var(--border-tech); }
 body.collection-theme .result-item:hover { background: color-mix(in srgb, var(--neon-cyan) 7%, var(--bg-panel)); transform: none; }
 body.collection-theme .result-info { min-width: 0; }

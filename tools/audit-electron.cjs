@@ -28,6 +28,7 @@ async function main() {
     const failures = [], errors = [];
     try {
         const page = await app.firstWindow();
+        page.setDefaultTimeout(15000);
         page.on('pageerror', error => {
             if (error.stack?.includes('logSecurityWarnings') && error.stack?.includes('node:electron/')) return;
             errors.push(error.message);
@@ -43,6 +44,7 @@ async function main() {
             audioPlayer.muted = true;
         }, fixtureAudio());
         async function test(name, fn) {
+            if (process.env.FLUXO_AUDIT_FILTER && !name.includes(process.env.FLUXO_AUDIT_FILTER)) return;
             try { await fn(); console.log('PASS', name); }
             catch (error) { failures.push({ name, error: error.message }); console.log('FAIL', name, error.message); }
         }
@@ -95,6 +97,22 @@ async function main() {
             assert.equal(await page.evaluate(() => audioPlayer.getAttribute('src')), null);
             assert.equal(await page.evaluate(() => audioPlayer.dataset.id || ''), '');
         });
+        await test('an old stream error cannot restart a newly selected pending track', async () => {
+            await start();
+            const retries = await page.evaluate(async () => {
+                const realRetry = retryCurrentStreamAfterMediaError;
+                let finish, retries = 0;
+                resolvePlayableStreamForTrack = () => new Promise(resolve => { finish = resolve; });
+                retryCurrentStreamAfterMediaError = () => { retries++; };
+                try {
+                    const pending = loadAndPlayTrack(1);
+                    audioPlayer.onerror();
+                    finish({ url: auditUrl, mode: 'audio' }); await pending;
+                    return retries;
+                } finally { retryCurrentStreamAfterMediaError = realRetry; resolvePlayableStreamForTrack = auditResolve; }
+            });
+            assert.equal(retries, 0);
+        });
         await test('preview stops when leaving its page', async () => {
             await page.evaluate(async () => { setMediaElementSource(previewPlayer, auditUrl, 'preview'); previewPlayer.muted = true; await previewPlayer.play(); });
             await page.locator('#btnLibrary').click();
@@ -133,6 +151,38 @@ async function main() {
             assert.equal(restored.playing, true);
             assert.deepEqual(restored.manifests, ['https://fixture.invalid/previous.m3u8', 'https://fixture.invalid/previous.m3u8']);
         });
+        await test('preview selection, navigation and failures cannot start stale audio', async () => {
+            await page.evaluate(async () => {
+                window.auditOriginalSearch = searchAudioTracks;
+                searchAudioTracks = async () => ({ tracks: [{ id: 'preview-a', title: 'Preview A' }, { id: 'preview-b', title: 'Preview B' }] });
+                searchInput.value = 'Preview audit';
+                await executeSearch();
+                window.auditPreviewRequests = {};
+                resolvePlayableStreamForTrack = track => new Promise(resolve => { auditPreviewRequests[track.id] = resolve; });
+                previewPlayer.muted = true;
+            });
+            try {
+                const thumbs = page.locator('#resultsList .result-thumb');
+                await thumbs.nth(0).click();
+                await thumbs.nth(1).click();
+                await page.evaluate(() => auditPreviewRequests['preview-b']({ url: auditUrl, mode: 'audio' }));
+                await page.waitForFunction(() => previewPlayer.dataset.id === 'preview-b' && !previewPlayer.paused);
+                await page.evaluate(async () => { auditPreviewRequests['preview-a']({ url: auditUrl, mode: 'audio' }); await new Promise(resolve => setTimeout(resolve, 0)); });
+                assert.equal(await page.evaluate(() => previewPlayer.dataset.id), 'preview-b');
+                await thumbs.nth(0).click();
+                await page.locator('#btnLibrary').click();
+                await page.evaluate(async () => { auditPreviewRequests['preview-a']({ url: auditUrl, mode: 'audio' }); await new Promise(resolve => setTimeout(resolve, 0)); });
+                assert.deepEqual(await page.evaluate(() => ({ paused: previewPlayer.paused, src: previewPlayer.getAttribute('src') })), { paused: true, src: null });
+                await page.evaluate(async () => {
+                    await executeSearch();
+                    resolvePlayableStreamForTrack = async () => { throw new Error('Injected preview failure'); };
+                });
+                await page.locator('#resultsList .result-thumb').first().click();
+                await page.waitForFunction(() => document.querySelector('.btn-preview.ph-warning-circle'));
+            } finally {
+                await page.evaluate(() => { stopPreviewPlayback(); searchAudioTracks = auditOriginalSearch; resolvePlayableStreamForTrack = auditResolve; });
+            }
+        });
         await test('a stale crossfade cannot replace a direct track selection', async () => {
             await start();
             const result = await page.evaluate(async () => {
@@ -149,6 +199,30 @@ async function main() {
                 } finally { fadeMainVolume = oldFade; getBeatSyncDelay = oldBeat; }
             });
             assert.equal(result, 'audit-first');
+        });
+        await test('DJ cancels an old Deck B load and restores the main volume on exit', async () => {
+            await start();
+            await page.evaluate(() => {
+                queue.push({ id: 'audit-third', title: 'Third', artist: 'Audit' });
+                originalQueue = [...queue];
+                renderDjPanel();
+                resolvePlayableStreamForTrack = () => new Promise(resolve => { window.auditDjFinish = resolve; });
+            });
+            try {
+                await page.locator('#btnPreviewDeckB').click();
+                await page.locator('#djDeckBSelect').selectOption('2');
+                await page.evaluate(async () => { auditDjFinish({ url: auditUrl, mode: 'audio' }); await new Promise(resolve => setTimeout(resolve, 0)); });
+                assert.equal(await page.evaluate(() => previewPlayer.getAttribute('src')), null);
+                await page.evaluate(() => {
+                    previewPlayer.playbackRate = 1.25;
+                    const slider = document.getElementById('djCrossfader');
+                    slider.value = '.75'; slider.dispatchEvent(new Event('input', { bubbles: true }));
+                });
+                assert.ok(await page.evaluate(() => audioPlayer.volume < getTargetVolume()));
+                await page.locator('#btnLibrary').click();
+                assert.ok(await page.evaluate(() => Math.abs(audioPlayer.volume - getTargetVolume()) < .001));
+                assert.equal(await page.evaluate(() => previewPlayer.playbackRate), 1);
+            } finally { await page.evaluate(() => { stopPreviewPlayback(); resolvePlayableStreamForTrack = auditResolve; }); }
         });
         await test('shared session follows a pause received during stream loading', async () => {
             const result = await page.evaluate(async () => {
@@ -270,6 +344,100 @@ async function main() {
             });
             assert.deepEqual(result, { rejected: true, preserved: true });
         });
+        await test('Spotify conversion releases old audio and ignores a late result', async () => {
+            await start();
+            const result = await page.evaluate(async () => {
+                const original = resolveGhostTrack;
+                let finish;
+                try {
+                    resolveGhostTrack = () => new Promise(resolve => { finish = resolve; });
+                    queue.push({ id: 'ghost_spotify_pending', title: 'Pending import', isGhost: true, query: 'Pending' });
+                    const pending = loadAndPlayTrack(2);
+                    const released = !audioPlayer.dataset.streamUrl && audioPlayer.paused;
+                    await loadAndPlayTrack(1);
+                    finish({ id: 'late', title: 'Late Spotify result' });
+                    await pending;
+                    return { released, title: titleEl.innerText, id: audioPlayer.dataset.id };
+                } finally { resolveGhostTrack = original; }
+            });
+            assert.deepEqual(result, { released: true, title: 'Second', id: 'audit-second' });
+        });
+        await test('theme favorites and categories preserve the selected theme', async () => {
+            await page.locator('#btnThemes').click();
+            await page.locator('#themeCategory').selectOption('all');
+            await page.locator('#themeSearchInput').fill('hades');
+            const selectedBefore = await page.evaluate(() => localStorage.getItem('fluxo_theme'));
+            await page.locator('[data-theme-id="hades"] .theme-favorite-button').click();
+            assert.equal(await page.evaluate(() => localStorage.getItem('fluxo_theme')), selectedBefore);
+            await page.locator('#themeCategory').selectOption('favorites');
+            assert.equal(await page.locator('.theme-result-item').count(), 1);
+            await page.locator('[data-theme-id="hades"] .theme-select-button').click();
+            assert.equal(await page.evaluate(() => localStorage.getItem('fluxo_theme')), 'hades');
+            assert.deepEqual(await page.evaluate(() => JSON.parse(getFluxoLibraryBackupSnapshot().fluxo_theme_favorites)), ['hades']);
+            await page.locator('[data-theme-id="hades"] .theme-favorite-button').click();
+            assert.equal(await page.locator('.theme-result-item').count(), 0);
+            await page.locator('#themeCategory').selectOption('new');
+            await page.locator('#btnClearThemeSearch').click();
+            assert.equal(await page.locator('.theme-result-item').count(), 7);
+            await page.locator('#themeCategory').selectOption('games');
+            assert.equal(await page.locator('[data-theme-id="default"]').count(), 0);
+            await page.locator('#themeCategory').selectOption('all');
+            await page.evaluate(() => { applyThemeClass('default'); localStorage.setItem('fluxo_theme', 'default'); });
+        });
+        await test('individual room permissions override the legacy all-controls switch', async () => {
+            const result = await page.evaluate(() => {
+                const legacy = normalizeRoomSettings({ controlsEnabled: true });
+                const partial = normalizeRoomSettings({ ...legacy, allowGuestSeek: false });
+                return { legacy, partial };
+            });
+            assert.equal(result.legacy.controlsEnabled, true);
+            assert.equal(result.partial.allowGuestPlayPause, true);
+            assert.equal(result.partial.allowGuestSeek, false);
+            assert.equal(result.partial.allowGuestSkip, true);
+            assert.equal(result.partial.controlsEnabled, false);
+        });
+        await test('accepting a music request twice adds once and preserves playback', async () => {
+            await start();
+            const result = await page.evaluate(async () => {
+                const realDb = db, realPublish = publishRoomState, realSort = sortSessionQueueByPriority, realMessage = sendSessionSystemMessage;
+                let finish, reads = 0;
+                const request = { status: 'pending', sender: 'Guest', track: { id: 'accepted-once', title: 'Accepted once' } };
+                db = { ref: () => ({ once: () => { reads++; return new Promise(resolve => { finish = resolve; }); }, update: async patch => Object.assign(request, patch) }) };
+                publishRoomState = () => {}; sortSessionQueueByPriority = () => {}; sendSessionSystemMessage = () => {};
+                currentRoom = 'TEST'; isHost = true;
+                try {
+                    audioPlayer.currentTime = 7;
+                    const first = acceptMusic('request-1');
+                    await acceptMusic('request-1');
+                    finish({ val: () => request }); await first;
+                    const tracks = queue.filter(track => track.id === 'accepted-once').length;
+                    const preserved = audioPlayer.dataset.id === 'audit-first' && audioPlayer.currentTime >= 7;
+                    const completed = acceptMusic('request-1');
+                    finish({ val: () => request }); await completed;
+                    const stale = acceptMusic('request-2');
+                    currentRoom = null;
+                    finish({ val: () => ({ ...request, status: 'pending' }) }); await stale;
+                    return { tracks, preserved, reads, finalCount: queue.filter(track => track.id === 'accepted-once').length, status: request.status };
+                } finally {
+                    db = realDb; publishRoomState = realPublish; sortSessionQueueByPriority = realSort; sendSessionSystemMessage = realMessage;
+                    currentRoom = null; isHost = false;
+                }
+            });
+            assert.deepEqual(result, { tracks: 1, preserved: true, reads: 3, finalCount: 1, status: 'accepted' });
+        });
+        await test('seeking before metadata is safe and out-of-bounds clicks are clamped', async () => {
+            await page.evaluate(() => { stopMainPlayback(); document.getElementById('progressBar').click(); });
+            await start();
+            const result = await page.evaluate(() => {
+                const bar = document.getElementById('progressBar'), bounds = bar.getBoundingClientRect();
+                bar.onclick({ clientX: bounds.left - 100 });
+                const beginning = audioPlayer.currentTime;
+                bar.onclick({ clientX: bounds.right + 100 });
+                return { beginning, end: audioPlayer.currentTime, duration: audioPlayer.duration };
+            });
+            assert.equal(result.beginning, 0);
+            assert.equal(result.end, result.duration);
+        });
         await test('shared session menus fit both roles and narrow themed windows', async () => {
             await page.evaluate(() => {
                 stopMainPlayback();
@@ -332,6 +500,38 @@ async function main() {
             console.log('Themes checked:', themes.length);
             assert.deepEqual(layoutIssues, []);
         });
+        await test('focus and ambient layouts fit and expose an exit across theme collections', async () => {
+            const themes = await page.evaluate(() => COLLECTION_THEMES.map(theme => theme.id));
+            const failures = [];
+            const controlsFit = mode => page.evaluate(({ mode }) => ['prevBtn', 'playPauseBtn', 'nextBtn'].map(id => {
+                const button = document.getElementById(id), r = button.getBoundingClientRect();
+                const target = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+                return { mode, id, fits: r.width > 0 && r.height > 0 && r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight && !!target && button.contains(target), rect: { x:r.x, y:r.y, width:r.width, height:r.height }, viewport: [innerWidth,innerHeight], target:target?.id || target?.className };
+            }).filter(item => !item.fits), { mode });
+            for (const width of [800, 1200]) {
+                await app.evaluate(({ BrowserWindow }, width) => BrowserWindow.getAllWindows()[0].setSize(width, width === 800 ? 600 : 800), width);
+                await page.waitForFunction(width => innerWidth === width && innerHeight === (width === 800 ? 600 : 800), width);
+                for (const theme of themes) {
+                    await page.evaluate(theme => { applyThemeClass(theme); setAmbientMode(true); }, theme);
+                    const ambient = await page.locator('.player-deck').evaluate(el => {
+                        const r = el.getBoundingClientRect();
+                        return { width: r.width, height: r.height, expectedWidth: innerWidth, expectedHeight: innerHeight };
+                    });
+                    if (ambient.width < ambient.expectedWidth - 2 || ambient.height < ambient.expectedHeight - 2) failures.push({ theme, width, mode: 'ambient', ...ambient });
+                    failures.push(...(await controlsFit('ambient')).map(item => ({ theme, width, ...item })));
+                    await page.locator('#btnExitLayoutMode').click();
+                    assert.equal(await page.evaluate(() => document.body.classList.contains('ambient-mode')), false);
+                    await page.evaluate(() => { document.body.classList.add('focus-mode'); });
+                    const content = await page.locator('.results-area').evaluate(el => ({ width: el.getBoundingClientRect().width, viewport: innerWidth }));
+                    if (content.width < content.viewport - 70) failures.push({ theme, width, mode: 'focus', ...content });
+                    failures.push(...(await controlsFit('focus')).map(item => ({ theme, width, ...item })));
+                    await page.keyboard.press('Escape');
+                    assert.equal(await page.evaluate(() => document.body.classList.contains('focus-mode')), false);
+                }
+            }
+            await page.evaluate(() => { applyThemeClass('default'); exitImmersiveLayoutModes(); });
+            assert.deepEqual(failures, []);
+        });
         await test('invalid saved settings cannot prevent startup', async () => {
             await page.evaluate(() => {
                 localStorage.setItem('fluxo_history', '{broken');
@@ -345,6 +545,19 @@ async function main() {
             await page.waitForFunction(() => typeof currentHotkeys !== 'undefined', null, { timeout: 5000 });
             assert.equal(await page.evaluate(() => savedPlaylists[0]?.title), 'Keep me');
             await page.locator('#btnLibrary').click();
+        });
+        await test('icons load locally with external icon and font services blocked', async () => {
+            await page.route('**/unpkg.com/**', route => route.abort());
+            await page.route('**/fonts.googleapis.com/**', route => route.abort());
+            await page.route('**/fonts.gstatic.com/**', route => route.abort());
+            await page.reload();
+            await page.waitForFunction(() => typeof currentHotkeys !== 'undefined');
+            const fonts = await page.evaluate(async () => {
+                const loaded = await document.fonts.load('24px "Phosphor"');
+                const glyph = getComputedStyle(document.querySelector('#playPauseBtn i'), '::before').content;
+                return { count: loaded.length, glyph, local: [...document.querySelectorAll('link[rel="stylesheet"]')].some(link => link.href.includes('node_modules/@phosphor-icons/web/')) };
+            });
+            assert.ok(fonts.count > 0 && fonts.local && !['none', 'normal', '""'].includes(fonts.glyph));
         });
         await test('no uncaught renderer exceptions', () => assert.deepEqual(errors, []));
         await page.screenshot({ path: path.join(profile, 'audit.png') });

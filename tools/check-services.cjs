@@ -18,7 +18,7 @@ async function main() {
             await run('startControlServer()');
             const stream = await handlers.get('resolve-track-stream')({}, { id: 'a7SkWyLhLbY', title: 'Kamaitachi - Carnaval' }, 'audio');
             if (!stream?.url) throw new Error('No stream');
-            for (const range of ['bytes=0-', 'bytes=2097152-']) {
+            for (const range of ['bytes=0-', 'bytes=1048576-', 'bytes=2097152-']) {
                 const sample = await fetch(stream.url, { headers: { Range: range }, signal: AbortSignal.timeout(12000) });
                 assert.equal(sample.status, 206);
                 console.log(JSON.stringify({ test: 'range support', range, status: sample.status, length: sample.headers.get('content-length'), contentRange: sample.headers.get('content-range') }));

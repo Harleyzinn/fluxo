@@ -1,0 +1,244 @@
+/* All theme layouts share the same controls and playback state. */
+body.volume-three-theme { --item-radius:3px; }
+body.volume-three-theme .sidebar-donate { background:transparent; box-shadow:none; border-radius:var(--item-radius); }
+body.volume-three-theme .btn { text-shadow:none; }
+body.volume-three-theme .np-cover { flex-shrink:0; }
+
+/* Pokedex: the music readout moves above the field index. */
+body.theme-pokedex { --bg-base:#dce6e4; --bg-panel:#f3f6f2; --text-main:#24363b; --text-muted:#52676c; --neon-cyan:#216b77; --neon-pink:#a72e3b; --neon-purple:#4a6468; --theme-line:#8da8ac; --global-font:'Chakra Petch',Arial,sans-serif; --collection-label:'POKEDEX / FIELD RECORDS'; }
+body.theme-pokedex .sidebar { width:184px; background:#a72e3b; border-right:7px solid #76222c; }
+body.theme-pokedex .brand { color:#fff; border-bottom:5px double #f4b9b5; font-size:1.35rem; }
+body.theme-pokedex .brand span, body.theme-pokedex .brand::after { color:#f7dfdb; }
+body.theme-pokedex .sidebar-btn { color:#fff; border-left:0; border-bottom:1px solid #c95a62; }
+body.theme-pokedex .sidebar-btn.active { color:#24363b; background:#f3f6f2; border-left:6px solid #52b5c6; }
+body.theme-pokedex .sidebar-donate { color:#fff; border-color:#f4b9b5; }
+body.theme-pokedex .sidebar-bottom { border-top:2px solid #76222c; padding:14px; }
+body.theme-pokedex .sidebar-bottom button { color:#fff; border-color:#f4b9b5; font-size:.7rem; }
+body.theme-pokedex .panel-header { background:#216b77; color:#fff; }
+body.theme-pokedex .result-item { border-bottom:1px dashed #8da8ac; }
+body.theme-pokedex .player-deck { border-block:5px solid #a72e3b; background:#e8f0ed; }
+body.theme-pokedex .np-cover { border:4px solid #216b77; border-radius:50%; }
+body.theme-pokedex .deck-media-center { background:#24363b; border-radius:6px; }
+body.theme-pokedex .deck-media-center .btn { color:#f3f6f2; }
+body.theme-pokedex .eq-band { border:2px solid #8da8ac; border-bottom:6px solid #a72e3b; background:#e8f0ed; }
+body.theme-pokedex .eq-band-value { padding:4px; color:#f3f6f2; background:#216b77; min-width:38px; text-align:center; }
+body.theme-pokedex .eq-profile-grid { gap:4px; border-bottom:5px solid #a72e3b; padding-bottom:14px; }
+@media (min-width:1100px) {
+    body.theme-pokedex:not(.party-mode):not(.mini-mode) { display:grid; grid-template-columns:184px minmax(0,1fr); grid-template-rows:32px 124px minmax(0,1fr); }
+    body.theme-pokedex:not(.party-mode):not(.mini-mode) #customTitleBar { grid-column:1/-1; }
+    body.theme-pokedex:not(.party-mode):not(.mini-mode) .app-layout { display:contents; }
+    body.theme-pokedex:not(.party-mode):not(.mini-mode) .sidebar { grid-column:1; grid-row:2/4; min-height:0; }
+    body.theme-pokedex:not(.party-mode):not(.mini-mode) .player-deck { grid-column:2; grid-row:2; height:124px; padding:12px 18px; gap:16px; }
+    body.theme-pokedex:not(.party-mode):not(.mini-mode) .now-playing { width:190px; min-width:0; gap:10px; }
+    body.theme-pokedex:not(.party-mode):not(.mini-mode) .volume-container { width:90px; }
+    body.theme-pokedex:not(.party-mode):not(.mini-mode) .content-wrapper { grid-column:2; grid-row:3; min-height:0; }
+}
+
+/* YoRHa: a compact command index at the top and a ruled operational record. */
+body.theme-nier { --bg-base:#cbd1c9; --bg-panel:#e3e5df; --text-main:#353b37; --text-muted:#5c665f; --neon-cyan:#414c43; --neon-pink:#8b3945; --neon-purple:#4d666c; --theme-line:#89968b; --global-font:'Space Mono',monospace; --collection-label:'YORHA / OPERATIONAL RECORD'; --item-radius:0px; }
+body.theme-nier:not(.party-mode):not(.mini-mode) .app-layout { flex-direction:column; }
+body.theme-nier .sidebar { width:100%; height:132px; flex-direction:row; border-right:0; border-bottom:5px double #414c43; }
+body.theme-nier .brand { width:158px; align-self:center; flex-shrink:0; padding:14px; font-size:1.2rem; }
+body.theme-nier .sidebar-menu { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); align-content:start; gap:2px; padding:4px; }
+body.theme-nier .sidebar-btn { min-height:37px; padding:6px; font-size:.65rem; gap:7px; border-bottom:1px solid #89968b; }
+body.theme-nier .sidebar-btn.active { background:#414c43; color:#e3e5df; border-left-color:#8b3945; }
+body.theme-nier .sidebar-donate { margin:0; width:100%; }
+body.theme-nier .sidebar-bottom { width:132px; padding:10px; border:0; align-self:center; flex-shrink:0; }
+body.theme-nier .sidebar-bottom button { font-size:.65rem; }
+body.theme-nier .panel-header { border-block:3px double #414c43; background:#cbd1c9; color:#353b37; }
+body.theme-nier .result-item { border-bottom:1px dotted #89968b; border-left:8px solid #b7c1b6; }
+body.theme-nier .player-deck { border-top:5px double #414c43; }
+body.theme-nier .deck-media-center { border-radius:0; background:#414c43; }
+body.theme-nier .deck-media-center .btn { color:#e3e5df; }
+body.theme-nier .eq-card { border:1px solid #89968b; background:transparent; }
+body.theme-nier .eq-band { border:0; border-left:1px solid #89968b; background:transparent; }
+body.theme-nier .dsp-profile-btn { border-width:0 0 1px; border-radius:0; font-size:.7rem; }
+
+/* Turf Radio: the tool index occupies the right and music becomes a poster wall. */
+body.theme-splatoon { --bg-base:#243337; --bg-panel:#172124; --text-main:#f5f4e8; --text-muted:#c1ccc7; --neon-cyan:#67dfd7; --neon-pink:#ffb765; --neon-purple:#dfb5ea; --theme-line:#576e6d; --global-font:'Outfit',Arial,sans-serif; --collection-label:'INKOPOLIS / TURF RADIO'; --item-radius:8px; }
+body.theme-splatoon .sidebar { order:2; width:188px; border-right:0; border-left:10px solid #67dfd7; }
+body.theme-splatoon .brand { font-size:1.75rem; font-weight:900; border-bottom:8px solid #ffb765; }
+body.theme-splatoon .sidebar-menu { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-content:start; padding:0; }
+body.theme-splatoon .sidebar-btn { min-height:68px; padding:8px 4px; flex-direction:column; gap:7px; text-align:center; font-size:.68rem; border:0; border-bottom:1px solid #576e6d; }
+body.theme-splatoon .sidebar-btn.active { color:#172124; background:#67dfd7; }
+body.theme-splatoon .sidebar-donate { margin:0; width:100%; }
+body.theme-splatoon .sidebar-bottom { padding:12px; }
+body.theme-splatoon .sidebar-bottom button { font-size:.68rem; }
+body.theme-splatoon .results-list:has(> .result-item):not(:has(.theme-result-item)) { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; padding:14px; align-content:start; }
+body.theme-splatoon .results-list > :not(.result-item) { grid-column:1/-1; }
+body.theme-splatoon .result-item:not(.theme-result-item) { border:2px solid #67dfd7; border-bottom:7px solid #67dfd7; flex-wrap:wrap; padding:14px; border-radius:6px; }
+body.theme-splatoon .result-item:nth-child(even) { border-color:#ffb765; }
+body.theme-splatoon .result-info { flex:1 1 120px; }
+body.theme-splatoon .panel-header { background:#67dfd7; color:#172124; font-weight:900; border-bottom:7px solid #ffb765; }
+body.theme-splatoon .player-deck { border-top:9px solid #67dfd7; }
+body.theme-splatoon .deck-media-center { background:#ffb765; border-radius:8px; border:0; }
+body.theme-splatoon .deck-media-center .btn { color:#172124; }
+body.theme-splatoon .eq-band { border:0; background:#243337; border-top:8px solid #67dfd7; }
+body.theme-splatoon .eq-band:nth-child(even) { border-top-color:#ffb765; }
+body.theme-splatoon .eq-card { border-bottom:5px solid #dfb5ea; }
+
+/* Nostromo: a lower crew roster and an inset mechanical readout. */
+body.theme-nostromo { --bg-base:#151c18; --bg-panel:#242b25; --text-main:#e5e8d9; --text-muted:#b6c0ae; --neon-cyan:#c8d0ad; --neon-pink:#e9b568; --neon-purple:#cf8a70; --theme-line:#65725c; --global-font:'Fira Code',monospace; --collection-label:'USCSS NOSTROMO / CREW CHANNEL'; --item-radius:0px; }
+body.theme-nostromo:not(.party-mode):not(.mini-mode) .app-layout { flex-direction:column-reverse; }
+body.theme-nostromo .sidebar { width:100%; height:136px; flex-direction:row; border-top:6px solid #65725c; border-right:0; }
+body.theme-nostromo .brand { width:178px; flex-shrink:0; align-self:center; font-size:1.25rem; padding:14px; }
+body.theme-nostromo .sidebar-menu { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); align-content:start; gap:2px; padding:4px; }
+body.theme-nostromo .sidebar-btn { min-height:36px; padding:6px; font-size:.64rem; gap:6px; border:1px solid #65725c; }
+body.theme-nostromo .sidebar-btn.active { color:#151c18; background:#c8d0ad; }
+body.theme-nostromo .sidebar-donate { margin:0; width:100%; }
+body.theme-nostromo .sidebar-bottom { width:140px; border:0; padding:10px; align-self:center; flex-shrink:0; }
+body.theme-nostromo .sidebar-bottom button { font-size:.64rem; }
+body.theme-nostromo .search-input { border:3px inset #65725c; background:#151c18; }
+body.theme-nostromo .panel-header { background:#c8d0ad; color:#151c18; border-bottom:6px solid #65725c; }
+body.theme-nostromo .result-item { border-bottom:1px solid #65725c; }
+body.theme-nostromo .player-deck { border-top:7px solid #65725c; background:#151c18; }
+body.theme-nostromo .deck-media-center { background:#242b25; border:3px inset #65725c; border-radius:0; }
+body.theme-nostromo .time { background:#c8d0ad; color:#151c18; padding:4px 0; }
+body.theme-nostromo .eq-card { border:3px inset #65725c; background:#151c18; }
+body.theme-nostromo .eq-band { border:1px solid #65725c; background:#151c18; }
+body.theme-nostromo .eq-band-value { padding:4px; background:#c8d0ad; color:#151c18; min-width:38px; text-align:center; }
+
+/* Green Hill: a lap index, checkered separators and a wide racing transport. */
+body.theme-sonic { --bg-base:#d9e9f3; --bg-panel:#f5f9fd; --text-main:#19354c; --text-muted:#536e80; --neon-cyan:#175aba; --neon-pink:#ac3439; --neon-purple:#316943; --theme-line:#9eb7c6; --global-font:'Chakra Petch',Arial,sans-serif; --collection-label:'GREEN HILL FM / ACT 01'; --item-radius:5px; }
+body.theme-sonic .sidebar { width:146px; border-right:8px solid #175aba; }
+body.theme-sonic .brand { padding:20px 8px; font-size:1.15rem; text-align:center; font-style:italic; border-bottom:6px solid #ac3439; }
+body.theme-sonic .sidebar-btn { flex-direction:column; text-align:center; justify-content:center; gap:5px; min-height:60px; padding:8px; font-size:.68rem; border-left:0; border-bottom:1px solid #9eb7c6; }
+body.theme-sonic .sidebar-btn.active { color:#fff; background:#175aba; }
+body.theme-sonic .sidebar-donate { width:calc(100% - 12px); margin:6px; }
+body.theme-sonic .sidebar-bottom { padding:10px; }
+body.theme-sonic .sidebar-bottom button { font-size:.65rem; }
+body.theme-sonic .panel-header { background:#175aba; color:#fff; border-bottom:7px solid #ac3439; }
+body.theme-sonic .result-item { border-left:7px solid #316943; }
+body.theme-sonic .result-item:nth-child(even) { border-left-color:#175aba; }
+body.theme-sonic .player-deck { border-top:7px solid #175aba; background:#f5f9fd; }
+body.theme-sonic .deck-media-center { background:#175aba; border:0; border-radius:6px; }
+body.theme-sonic .deck-media-center .btn { color:#fff; }
+body.theme-sonic .np-cover { border-radius:50%; border:4px solid #ac3439; }
+body.theme-sonic .eq-hero { border-bottom:7px solid #175aba; }
+body.theme-sonic .eq-band { background:#d9e9f3; border:0; border-bottom:6px solid #ac3439; }
+body.theme-sonic .eq-band:nth-child(even) { border-bottom-color:#316943; }
+body.theme-sonic .dsp-profile-btn { font-style:italic; border-radius:0; }
+
+/* Revachol: a newspaper spine with a separate record column on wide screens. */
+body.theme-discoelysium { --bg-base:#ccd8d8; --bg-panel:#e6ebeb; --text-main:#283b3f; --text-muted:#53676b; --neon-cyan:#316d70; --neon-pink:#a33f3f; --neon-purple:#655172; --theme-line:#8ca3a7; --global-font:Georgia,serif; --collection-label:'REVACHOL / OPEN CASES'; --item-radius:0px; }
+body.theme-discoelysium .sidebar { width:198px; border-right:6px solid #a33f3f; }
+body.theme-discoelysium .brand { font-size:1.7rem; font-style:italic; border-bottom:5px double #283b3f; }
+body.theme-discoelysium .brand span { display:none; }
+body.theme-discoelysium .sidebar-btn { font-family:'Outfit',Arial,sans-serif; border-bottom:1px dotted #8ca3a7; }
+body.theme-discoelysium .sidebar-btn.active { background:#316d70; color:#fff; border-left:0; }
+body.theme-discoelysium .panel-header { color:#a33f3f; background:#e6ebeb; border-block:3px double #283b3f; }
+body.theme-discoelysium .result-item { border-bottom:1px dotted #8ca3a7; }
+body.theme-discoelysium .player-deck { border-top:5px double #283b3f; background:#e6ebeb; }
+body.theme-discoelysium .deck-media-center { border:1px solid #316d70; background:#ccd8d8; border-radius:0; }
+body.theme-discoelysium .eq-shell { border-left:8px solid #a33f3f; }
+body.theme-discoelysium .eq-band { background:transparent; border:0; border-left:1px dotted #8ca3a7; }
+body.theme-discoelysium .eq-card { background:transparent; border-bottom:3px double #316d70; }
+@media (min-width:1150px) {
+    body.theme-discoelysium:not(.party-mode):not(.mini-mode) { display:grid; grid-template-columns:224px minmax(0,1fr); grid-template-rows:32px minmax(0,1fr); }
+    body.theme-discoelysium:not(.party-mode):not(.mini-mode) #customTitleBar { grid-column:1/-1; }
+    body.theme-discoelysium:not(.party-mode):not(.mini-mode) .app-layout { grid-column:2; grid-row:2; min-height:0; }
+    body.theme-discoelysium:not(.party-mode):not(.mini-mode) .player-deck { grid-column:1; grid-row:2; display:flex; flex-direction:column; width:224px; height:100%; padding:22px 14px; gap:22px; border-top:0; border-right:5px double #316d70; }
+    body.theme-discoelysium:not(.party-mode):not(.mini-mode) .now-playing { width:100%; max-width:100%; flex-direction:column; align-items:flex-start; gap:18px; }
+    body.theme-discoelysium:not(.party-mode):not(.mini-mode) .np-cover { width:176px; height:210px; border:8px solid #ccd8d8; }
+    body.theme-discoelysium:not(.party-mode):not(.mini-mode) .deck-controls { width:100%; min-width:0; }
+    body.theme-discoelysium:not(.party-mode):not(.mini-mode) .hardware-buttons { display:flex !important; flex-wrap:wrap; justify-content:center; gap:18px; }
+    body.theme-discoelysium:not(.party-mode):not(.mini-mode) .deck-media-center { order:-1; padding:4px 6px; gap:6px; }
+    body.theme-discoelysium:not(.party-mode):not(.mini-mode) .volume-container { width:100%; margin-top:auto; }
+}
+
+/* Desktop Radio: classic explorer tree, title strips and real raised controls. */
+body.theme-win98 { --bg-base:#277e7e; --bg-panel:#d8dbd8; --text-main:#20252a; --text-muted:#485459; --neon-cyan:#172b7c; --neon-pink:#873a35; --neon-purple:#245e58; --theme-line:#7a8788; --global-font:Tahoma,Arial,sans-serif; --collection-label:'MY COMPUTER / DESKTOP RADIO'; --item-radius:0px; }
+body.theme-win98 #customTitleBar { background:#172b7c; color:#fff; }
+body.theme-win98 #titleBarTitle span, body.theme-win98 .btn-win-control { color:#fff; }
+body.theme-win98 .sidebar { width:196px; border:3px outset #edf0ea; }
+body.theme-win98 .brand { margin:4px; padding:14px 10px; color:#fff; background:#172b7c; font-size:1.25rem; border:0; }
+body.theme-win98 .brand::after, body.theme-win98 .brand span { color:#fff; }
+body.theme-win98 .sidebar-btn { font-family:Tahoma,Arial,sans-serif; padding:10px; font-size:.75rem; border:1px solid transparent; }
+body.theme-win98 .sidebar-btn.active { color:#fff; background:#172b7c; border:1px dotted #fff; }
+body.theme-win98 .sidebar-donate { box-shadow:none; background:transparent; border:2px outset #edf0ea; border-radius:0; }
+body.theme-win98 .header { background:#d8dbd8; border-bottom:3px outset #edf0ea; }
+body.theme-win98 .search-input { background:#fff; border:2px inset #edf0ea; border-radius:0; }
+body.theme-win98 .inline-input { background:#fff; color:#20252a; border:2px inset #edf0ea; border-radius:0; }
+body.theme-win98 .results-area { border:3px outset #edf0ea; background:#fff; }
+body.theme-win98 .panel-header { margin:3px; background:#172b7c; color:#fff; border:0; font-weight:700; }
+body.theme-win98 .result-item { background:#fff; border-bottom:1px solid #c5cece; }
+body.theme-win98 .player-deck { border:3px outset #edf0ea; background:#d8dbd8; }
+body.theme-win98 .btn-action, body.theme-win98 .btn-confirm, body.theme-win98 .btn-abort, body.theme-win98 .deck-media-center .btn { border:2px outset #edf0ea; background:#d8dbd8; border-radius:0; }
+body.theme-win98 .deck-media-center { background:transparent; border:0; border-radius:0; }
+body.theme-win98 .deck-media-center .btn:active { border-style:inset; }
+body.theme-win98 .np-cover { border:3px inset #edf0ea; }
+body.theme-win98 .eq-shell { background:#d8dbd8; }
+body.theme-win98 .eq-card { border:2px inset #edf0ea; background:#d8dbd8; }
+body.theme-win98 .eq-band { border:2px inset #edf0ea; background:#d8dbd8; }
+body.theme-win98 .eq-band-value { color:#fff; background:#172b7c; padding:4px; min-width:38px; text-align:center; }
+body.theme-win98 .dsp-profile-btn { border:2px outset #edf0ea; border-radius:0; }
+
+/* Every composition has a matching party scene, without changing video routing. */
+body.theme-pokedex.party-mode .now-playing { flex-direction:row !important; text-align:left !important; gap:36px !important; }
+body.theme-pokedex.party-mode .player-deck { border-left:20px solid #a72e3b !important; }
+body.theme-pokedex.party-mode .np-cover:not(.video-active) { border:12px solid #216b77 !important; border-radius:50% !important; }
+body.theme-pokedex.party-mode .np-info { align-items:flex-start !important; padding-block:20px; border-block:4px solid #a72e3b; }
+body.theme-nier.party-mode .now-playing { flex-direction:row-reverse !important; text-align:left !important; gap:40px !important; }
+body.theme-nier.party-mode .np-cover:not(.video-active) { border:10px solid #414c43 !important; border-radius:0 !important; filter:grayscale(1); }
+body.theme-nier.party-mode .np-info { align-items:flex-start !important; border-bottom:6px double #414c43; padding-bottom:20px; }
+body.theme-nier.party-mode .np-title { font-family:'Space Mono',monospace; font-size:1.8rem !important; }
+body.theme-splatoon.party-mode .np-cover:not(.video-active) { border:12px solid #67dfd7 !important; border-radius:8px !important; transform:rotate(-3deg) !important; box-shadow:10px 10px 0 #ffb765 !important; }
+body.theme-splatoon.party-mode .np-info { border-bottom:8px solid #ffb765; padding-bottom:14px; }
+body.theme-splatoon.party-mode .np-title { text-transform:uppercase; font-weight:900; }
+body.theme-nostromo.party-mode .now-playing { flex-direction:row !important; text-align:left !important; gap:40px !important; }
+body.theme-nostromo.party-mode .np-cover:not(.video-active) { border:14px inset #65725c !important; border-radius:0 !important; }
+body.theme-nostromo.party-mode .np-info { align-items:flex-start !important; padding:20px; border:2px solid #65725c; background:#151c18; }
+body.theme-nostromo.party-mode .np-title { font-family:'Fira Code',monospace; font-size:1.8rem !important; }
+body.theme-sonic.party-mode .now-playing { flex-direction:row !important; text-align:left !important; gap:40px !important; }
+body.theme-sonic.party-mode .np-cover:not(.video-active) { border:12px solid #175aba !important; border-radius:50% !important; box-shadow:0 0 0 4px #ac3439 !important; }
+body.theme-sonic.party-mode .np-info { align-items:flex-start !important; border-bottom:10px solid #316943; padding-bottom:20px; }
+body.theme-sonic.party-mode .np-title { font-style:italic; color:#175aba; }
+body.theme-discoelysium.party-mode .now-playing { flex-direction:row !important; text-align:left !important; gap:38px !important; }
+body.theme-discoelysium.party-mode .np-cover:not(.video-active) { width:250px !important; height:340px !important; border:10px solid #ccd8d8 !important; border-radius:0 !important; }
+body.theme-discoelysium.party-mode .np-info { align-items:flex-start !important; border-top:8px solid #a33f3f; padding-top:18px; }
+body.theme-discoelysium.party-mode .np-title { font-family:Georgia,serif; font-style:italic; font-weight:400; }
+body.theme-win98.party-mode .np-cover:not(.video-active) { border:10px inset #edf0ea !important; border-radius:0 !important; }
+body.theme-win98.party-mode .np-info { border:3px outset #edf0ea; background:#172b7c; padding:14px; }
+body.theme-win98.party-mode .np-title, body.theme-win98.party-mode .np-artist { color:#fff; }
+
+@media (max-width:1100px) {
+    body.theme-nier .brand, body.theme-nostromo .brand { width:130px; font-size:1rem; }
+    body.theme-nier .sidebar-menu, body.theme-nostromo .sidebar-menu { grid-template-columns:repeat(4,minmax(0,1fr)); }
+    body.theme-nier .sidebar-btn, body.theme-nostromo .sidebar-btn { min-height:32px; font-size:.61rem; }
+    body.theme-nier .sidebar-bottom, body.theme-nostromo .sidebar-bottom { width:120px; padding:8px; }
+    body.theme-nier .sidebar { height:142px; }
+    body.theme-nostromo .sidebar { height:146px; }
+    body.theme-splatoon .results-list:has(> .result-item):not(:has(.theme-result-item)) { grid-template-columns:minmax(0,1fr); }
+}
+@media (max-width:850px) {
+    body.volume-three-theme.party-mode .np-title { font-size:1.45rem !important; }
+    body.theme-nostromo.party-mode .np-info { padding:12px; }
+}
+body.volume-three-theme.party-mode .now-playing:has(.video-active) { flex-direction:column !important; }
+body.volume-three-theme.party-mode .now-playing:has(.video-active) .np-info { padding:0; border:0; background:none; align-items:center !important; }
+
+/* Immersive modes own their geometry, independently of the selected theme. */
+#btnExitLayoutMode { display:none; }
+body:is(.focus-mode,.ambient-mode):not(.party-mode):not(.mini-mode) .mini-controls { display:flex !important; position:absolute !important; top:12px !important; right:14px !important; z-index:10002 !important; }
+body:is(.focus-mode,.ambient-mode):not(.party-mode):not(.mini-mode) .mini-controls > :not(#btnExitLayoutMode) { display:none !important; }
+body:is(.focus-mode,.ambient-mode):not(.party-mode):not(.mini-mode) #btnExitLayoutMode { display:flex; width:36px; height:36px; border:1px solid var(--text-muted); border-radius:4px; background:var(--bg-panel); color:var(--text-main); }
+body.collection-theme:is(.focus-mode,.ambient-mode):not(.party-mode):not(.mini-mode) { display:flex !important; flex-direction:column; }
+body.collection-theme.focus-mode:not(.party-mode):not(.mini-mode) .app-layout { display:flex !important; flex:1; min-height:0; flex-direction:row; }
+body.collection-theme.focus-mode:not(.party-mode):not(.mini-mode) .player-deck { display:flex !important; flex-direction:row !important; width:100% !important; height:150px !important; min-height:150px; padding:14px 22px !important; gap:18px; }
+body.collection-theme.focus-mode:not(.party-mode):not(.mini-mode) .now-playing { flex-direction:row !important; width:180px !important; max-width:180px !important; gap:12px !important; }
+body.collection-theme.focus-mode:not(.party-mode):not(.mini-mode) .np-cover { width:58px !important; height:58px !important; }
+body.collection-theme.focus-mode:not(.party-mode):not(.mini-mode) .deck-controls { width:auto !important; min-width:0 !important; flex:1; }
+body.collection-theme.focus-mode:not(.party-mode):not(.mini-mode) .volume-container { width:100px !important; margin:0; }
+body.collection-theme.ambient-mode:not(.party-mode):not(.mini-mode) .app-layout { display:none !important; }
+body.collection-theme.ambient-mode:not(.party-mode):not(.mini-mode) .player-deck { position:fixed; inset:0; display:flex !important; flex-direction:column !important; justify-content:center; width:100vw !important; height:100vh !important; padding:48px 24px 20px !important; gap:20px; background:var(--bg-panel); border:0; }
+body.collection-theme.ambient-mode:not(.party-mode):not(.mini-mode) .now-playing { flex-direction:column !important; width:min(760px,90vw) !important; max-width:90vw !important; gap:14px !important; align-items:center !important; text-align:center; }
+body.collection-theme.ambient-mode:not(.party-mode):not(.mini-mode) .np-cover { width:min(240px,32vh) !important; height:min(240px,32vh) !important; }
+body.collection-theme.ambient-mode:not(.party-mode):not(.mini-mode) .np-title { font-size:1.4rem !important; white-space:normal; }
+body.collection-theme.ambient-mode:not(.party-mode):not(.mini-mode) .np-info { width:100%; align-items:center !important; }
+body.collection-theme.ambient-mode:not(.party-mode):not(.mini-mode) .deck-controls { width:min(760px,90vw) !important; min-width:0 !important; flex:0 0 auto; }
+body.collection-theme.ambient-mode:not(.party-mode):not(.mini-mode) .hardware-buttons { display:flex !important; flex-wrap:wrap; justify-content:center; gap:12px !important; }
+body.collection-theme.ambient-mode:not(.party-mode):not(.mini-mode) .volume-container { width:150px !important; margin:0; }
+body.collection-theme.ambient-mode:not(.party-mode):not(.mini-mode) .mini-controls { top:42px !important; }
+@media (max-width:1000px) {
+    body.collection-theme.focus-mode:not(.party-mode):not(.mini-mode) .hardware-buttons { display:grid !important; grid-template-columns:auto auto auto !important; gap:8px !important; }
+}

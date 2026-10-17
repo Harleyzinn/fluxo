@@ -1,6 +1,11 @@
 Fluxo Music includes Electron and its third-party notices, installed alongside
 the application. JavaScript dependencies retain their own license files.
 
+Phosphor Icons Web 2.1.2
+https://github.com/phosphor-icons/web
+MIT License. The package's license and local icon fonts are included with
+the JavaScript dependencies in the application archive.
+
 yt-dlp 2026.08.19
 https://github.com/yt-dlp/yt-dlp
 The bundled official executable contains components with their respective
