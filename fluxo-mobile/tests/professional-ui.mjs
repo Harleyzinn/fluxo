@@ -57,6 +57,7 @@ try {
   await page.getByRole('button', { name: 'Abrir player', exact: true }).click();
   await page.getByRole('button', { name: 'Timer', exact: true }).click();
   await page.getByRole('button', { name: '15 minutos', exact: true }).click();
+  await page.waitForFunction(() => /14:5\d/.test(document.querySelector('[data-sleep-label]')?.textContent || ''), null, { timeout: 4000 });
   assert.match(await page.locator('[data-sleep-label]').textContent(), /14:5\d/);
   assert.match(await page.locator('.player-context').textContent(), /No dispositivo.*1 de 3/); report.playerContextAndCountdown = true;
   await page.getByRole('button', { name: 'Minimizar player', exact: true }).click();

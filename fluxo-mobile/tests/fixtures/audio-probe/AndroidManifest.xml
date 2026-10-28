@@ -1,0 +1,11 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.fluxo.qa.audio">
+  <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="36" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+  <uses-permission android:name="android.permission.WAKE_LOCK" />
+  <application android:label="Audio probe (test)" android:debuggable="true" android:theme="@android:style/Theme.Material.Light.NoActionBar">
+    <activity android:name=".ProbeActivity" android:exported="true" />
+    <service android:name=".ProbeService" android:exported="true" android:foregroundServiceType="mediaPlayback" />
+  </application>
+</manifest>

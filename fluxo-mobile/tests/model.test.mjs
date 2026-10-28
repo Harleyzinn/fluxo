@@ -4,7 +4,73 @@ import { cleanTrack, unique, sameTrack, withDownload, removeLibraryTracks, resto
 import { normalizeSettings, normalizeAppearance, playlistAppearance, contrastText, surfacePalette } from '../www/appearance.js';
 import { mergeTracks, groupArtists, collectionDuration, SearchCache, ActionGate, filterSearchResults, sameOccurrence } from '../www/discovery.js';
 import { metadataFields, updateModelMetadata, syncTargets, restoreTrackOrder, playlistFile, validatePlaylistFile } from '../www/collection-tools.js';
+import { normalizeRuntime, pollingDelay } from '../www/runtime.js';
+import { readableAccent } from '../www/appearance.js';
+import { playbackView, playbackItem, samePlaybackItem, seekRequest, speedLabel, normalizePlaybackPreferences, extendSleepTimer } from '../www/player-state.js';
 const track = { id: 'one', title: 'Canção', artist: 'Álvaro', duration: 65, url: 'https://example.com/a.mp3' };
+test('playback shortcuts have safe defaults and preserve only supported values', () => {
+  assert.deepEqual(normalizePlaybackPreferences(null), { seekStep: 10, remainingTime: false });
+  for (const seekStep of [5, 10, 15, 30]) assert.equal(normalizeSettings({ seekStep }).seekStep, seekStep);
+  for (const seekStep of [0, '30', NaN, Infinity, 100]) assert.equal(normalizeSettings({ seekStep }).seekStep, 10);
+});
+test('playback preferences survive backup but do not change appearance profiles', () => {
+  const settings = { seekStep: 30, remainingTime: true };
+  const backup = validateBackup({ format: 'fluxo-mobile', version: 2, playlists: [], favorites: [], settings });
+  assert.equal(backup.settings.seekStep, 30); assert.equal(backup.settings.remainingTime, true);
+  assert.equal(normalizeAppearance(settings).remainingTime, undefined);
+});
+test('sleep extension preserves the remaining duration and never revives an expired timer', () => {
+  assert.equal(extendSleepTimer(61000, 1000), 6); assert.equal(extendSleepTimer(14401000, 1000), 240);
+  for (const value of [0, 1000, NaN, Infinity]) assert.equal(extendSleepTimer(value, 1000), null);
+  assert.equal(extendSleepTimer(2000, NaN), null);
+});
+
+test('buffering playback stays pausable without rotating the pause control', () => {
+  const view = playbackView({ playing: false, playWhenReady: true, buffering: true });
+  assert.equal(view.action, 'pause'); assert.equal(view.icon, 'pause'); assert.equal(view.label, 'Pausar'); assert.equal(view.busy, true);
+  assert.equal(playbackView({ playing: false, playWhenReady: false, buffering: true }).action, 'play');
+  assert.equal(playbackView({ error: 'Failed' }).label, 'Tentar novamente');
+});
+test('player speed labels hide native float artifacts and stay compact', () => {
+  assert.equal(speedLabel(1.100000023841858), '1,1×'); assert.equal(speedLabel(.5500000119), '0,55×');
+  assert.equal(speedLabel(NaN), '1×'); assert.equal(speedLabel(Infinity), '1×'); assert.equal(speedLabel(3), '2×');
+});
+test('seek commands clamp positions and reject unknown or nonfinite values', () => {
+  const state = { queue: [track], index: 0, duration: 65 };
+  assert.equal(seekRequest(state, -10).value, 0); assert.equal(seekRequest(state, 90).value, 65);
+  for (const value of [NaN, Infinity, '5']) assert.equal(seekRequest(state, value), null);
+  assert.equal(seekRequest({ ...state, duration: 0 }, 5), null);
+});
+test('seek ownership rejects transitions, reordered duplicates and changed sources', () => {
+  const state = { queue: [track, { ...track, id: 'two' }], index: 0, duration: 65 }, expected = playbackItem(state);
+  assert.equal(samePlaybackItem(state, expected), true);
+  assert.equal(seekRequest({ ...state, index: 1 }, 20, expected), null);
+  assert.equal(seekRequest({ ...state, queue: [{ ...track, url: 'https://example.com/changed' }] }, 20, expected), null);
+  assert.equal(samePlaybackItem({ queue: [], index: 0 }, expected), false);
+  assert.equal(samePlaybackItem(state, null), false);
+});
+
+test('runtime defaults are silent and do not disable existing downloads', () => {
+  const settings = normalizeRuntime(null); assert.equal(settings.silentInterface, true); assert.equal(settings.backgroundDownloads, true); assert.equal(settings.diagnosticEnabled, false);
+  assert.equal(normalizeRuntime({ performanceMode: 'unsafe', uiSounds: 'yes' }).performanceMode, 'balanced'); assert.equal(normalizeRuntime({ uiSounds: 'yes' }).uiSounds, false);
+});
+test('runtime preferences survive backup but never leak into an appearance profile', () => {
+  const settings = normalizeSettings({ performanceMode: 'battery', diagnosticEnabled: true, downloadNotifications: false, colorMode: 'system' });
+  const backup = validateBackup({ format: 'fluxo-mobile', version: 2, playlists: [], favorites: [], settings });
+  assert.equal(backup.settings.performanceMode, 'battery'); assert.equal(backup.settings.diagnosticEnabled, true); assert.equal(backup.settings.downloadNotifications, false);
+  assert.equal(normalizeAppearance(settings).diagnosticEnabled, undefined); assert.equal(normalizeAppearance(settings).colorMode, 'system');
+});
+test('polling slows down while idle or in battery mode', () => {
+  assert.equal(pollingDelay({ performanceMode: 'balanced' }, true), 2500); assert.equal(pollingDelay({ performanceMode: 'balanced' }, false), 12000);
+  assert.equal(pollingDelay({ performanceMode: 'battery' }, true), 8000); assert.equal(pollingDelay({ performanceMode: 'battery' }, false), 30000);
+});
+test('light surfaces get readable accents without mutating saved colors', () => {
+  assert.notEqual(readableAccent('#a5f060', '#f6f8fa'), '#a5f060'); assert.equal(readableAccent('#a5f060', '#0e1110'), '#a5f060');
+  assert.match(readableAccent('#fa84ad', '#f6f8fa'), /^#[0-9a-f]{6}$/);
+});
+test('temporary search cache can be cleared independently of library data', () => {
+  const cache = new SearchCache(); cache.put('my song', 'youtube', [track]); cache.clear(); assert.equal(cache.get('my song', 'youtube'), null); assert.equal(track.title, 'Canção');
+});
 
 test('metadata edits update every matching collection without changing audio identity', () => {
   const alias = { ...track, id: 'alias', localUri: 'private', bytes: 123 };

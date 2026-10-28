@@ -130,7 +130,7 @@ public class LibraryStore {
             .setTitle(track.optString("title", "Fluxo Music"))
             .setDescription(track.optString("artist", ""))
             .addRequestHeader("User-Agent", StreamResolver.AGENT)
-            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+            .setNotificationVisibility(context.getSharedPreferences("runtime", 0).getBoolean("downloadNotifications", true) ? DownloadManager.Request.VISIBILITY_VISIBLE : DownloadManager.Request.VISIBILITY_HIDDEN)
             .setDestinationInExternalFilesDir(context, Environment.DIRECTORY_MUSIC, fileName)
             .setAllowedOverMetered(!wifiOnly).setAllowedOverRoaming(false);
         if (wifiOnly) request.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI);
@@ -149,6 +149,14 @@ public class LibraryStore {
         JSONArray rows = records();
         for (int i = 0; i < rows.length(); i++) if (LibrarySync.sameTrack(rows.getJSONObject(i), track)) rows.getJSONObject(i).put("title", title).put("artist", artist);
         save(rows);
+    }
+    public synchronized JSONObject noticeRecord(long id) throws Exception {
+        JSONArray rows = list();
+        for (int i = 0; i < rows.length(); i++) {
+            JSONObject record = rows.getJSONObject(i);
+            if (record.optLong("downloadId", -1) == id && record.optString("status").equals("ready") && !record.optBoolean("noticeSent")) { record.put("noticeSent", true); save(rows); return record; }
+        }
+        return null;
     }
     private void cacheArtwork(String id, String url) {
         if (!url.startsWith("https://")) return;

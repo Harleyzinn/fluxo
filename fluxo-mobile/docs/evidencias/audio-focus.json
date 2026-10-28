@@ -1,0 +1,94 @@
+{
+  "environment": "Android API 37 emulator; synthetic second player, not Spotify or physical POCO",
+  "reproducedScenario": "Explicit failed own stream, then external transient focus, wait 65 seconds without another play command",
+  "baselineVersion": "2.7.0",
+  "candidateVersion": "2.8.0",
+  "candidateApkSha256": "1aefa4948c56ed15af9927afca53eb0e773ba15a376a696c85ef42327e0e440c",
+  "before": {
+    "external": {
+      "playing": false,
+      "position": 11625,
+      "losses": 1,
+      "requests": 1,
+      "lastChange": -1
+    },
+    "fluxo": {
+      "playing": false,
+      "playWhenReady": true,
+      "buffering": true,
+      "recovering": false,
+      "retries": 1
+    }
+  },
+  "after": {
+    "external": {
+      "playing": true,
+      "position": 3028,
+      "playedMs": 63925,
+      "losses": 0,
+      "requests": 1,
+      "lastChange": 0
+    },
+    "fluxo": {
+      "playing": false,
+      "playWhenReady": false,
+      "buffering": false,
+      "recovering": false,
+      "retries": 0,
+      "focusState": "none"
+    }
+  },
+  "candidateScenarios": {
+    "interfaceSounds": true,
+    "background": true,
+    "lockedScreen": true,
+    "notifications": true,
+    "networkLoss": true,
+    "networkReturn": true,
+    "batterySaver": true,
+    "rapidAppSwitching": true,
+    "idleAudioPreferences": true,
+    "downloadCompletion": true
+  },
+  "recentFocusEvents": [
+    {
+      "time": 1791769409244,
+      "elapsed": 4720731,
+      "component": "pause_user",
+      "event": "focus_release",
+      "result": 1,
+      "releases": 2
+    },
+    {
+      "time": 1791771052365,
+      "elapsed": 6363852,
+      "component": "downloads",
+      "event": "silent_notice"
+    },
+    {
+      "time": 1791771055709,
+      "elapsed": 6367197,
+      "component": "queue_user",
+      "event": "focus_request",
+      "result": 1,
+      "token": 1,
+      "requests": 1
+    },
+    {
+      "time": 1791771058281,
+      "elapsed": 6369769,
+      "component": "audio_focus",
+      "event": "change",
+      "change": -2,
+      "token": 1
+    },
+    {
+      "time": 1791771058288,
+      "elapsed": 6369776,
+      "component": "focus_loss",
+      "event": "focus_release",
+      "result": 1,
+      "releases": 1
+    }
+  ]
+}

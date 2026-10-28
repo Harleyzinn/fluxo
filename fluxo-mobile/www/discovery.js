@@ -32,6 +32,7 @@ export const filterSearchResults = (tracks, filter, downloaded, favorite) => tra
 export class SearchCache {
   constructor({ limit = 8, ttl = 300000, now = Date.now } = {}) { this.entries = new Map(); this.limit = limit; this.ttl = ttl; this.now = now; }
   key(query, provider) { return `${provider}:${normalizeName(query)}`; }
+  clear() { this.entries.clear(); }
   get(query, provider) {
     const key = this.key(query, provider), entry = this.entries.get(key);
     if (!entry) return null;

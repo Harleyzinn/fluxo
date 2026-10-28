@@ -11,7 +11,7 @@ shell('forward', 'tcp:9223', `localabstract:webview_devtools_remote_${pid}`);
 const browser = await chromium.connectOverCDP('http://127.0.0.1:9223');
 const page = browser.contexts()[0].pages()[0];
 const call = (method, data = {}) => page.evaluate(async ({ method, data }) => window.Capacitor.Plugins.FluxoAudio[method](data), { method, data });
-const report = {};
+const report = { startedAt: new Date().toISOString() };
 const fixture = { id: 'qa-background-radio', title: 'Background radio fixture', artist: 'Test', duration: 12, url: '', source: 'local' };
 let notificationLayout;
 await mkdir('.qa/screenshots', { recursive: true });
@@ -31,10 +31,13 @@ async function asleep(seconds) {
   assert.ok(after.playing && after.position - before.position > seconds - 5, 'Audio must progress beyond the maximum streaming buffer while screen is off');
   assert.ok(shell('shell', 'dumpsys', 'activity', 'services', 'com.fluxo.music.mobile/.PlaybackService').includes('isForeground=true'));
   shell('shell', 'input', 'keyevent', 'KEYCODE_WAKEUP'); shell('shell', 'wm', 'dismiss-keyguard');
+  shell('shell', 'am', 'start', '-W', '-n', 'com.fluxo.music.mobile/.MainActivity'); await delay(1500);
   return { seconds, advanced: after.position - before.position, foreground: true };
 }
 async function notificationButton(pattern) {
-  shell('shell', 'cmd', 'statusbar', 'expand-notifications'); await delay(1500);
+  shell('shell', 'cmd', 'statusbar', 'collapse'); await delay(300);
+  shell('shell', 'cmd', 'statusbar', 'expand-notifications'); await delay(2200);
+  await writeFile(`.qa/screenshots/notification-${pattern.includes('Next') ? 'next' : pattern.includes('Pause') ? 'pause' : 'play'}.png`, execFileSync(adb, ['exec-out', 'screencap', '-p']));
   // Capture controls while paused: Android's animated playing seekbar can prevent
   // the shell UiAutomator dumper from ever reaching its idle state.
   if (!notificationLayout) {
@@ -86,8 +89,11 @@ try {
   report.onlineScreenOff = await asleep(Number(process.env.BACKGROUND_SECONDS || 180));
   await writeFile('.qa/native-background-report.json', JSON.stringify(report, null, 2));
   await notificationButton('^Pause$'); await waitFor(s => !s.playWhenReady); report.notificationPause = true;
+  await writeFile('.qa/native-background-report.json', JSON.stringify(report, null, 2));
   await notificationButton('^Play$'); await waitFor(s => s.playing); report.notificationPlay = true;
+  await writeFile('.qa/native-background-report.json', JSON.stringify(report, null, 2));
   await notificationButton('^Next( track)?$'); await waitFor(s => s.index === 1 && s.playing); report.notificationNext = true;
+  await writeFile('.qa/native-background-report.json', JSON.stringify(report, null, 2));
   await writeFile('.qa/screenshots/android-notification.png', execFileSync(adb, ['exec-out', 'screencap', '-p']));
   shell('shell', 'cmd', 'statusbar', 'collapse');
   shell('shell', 'am', 'start', '-n', 'com.fluxo.music.mobile/.MainActivity');

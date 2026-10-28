@@ -2,9 +2,11 @@ import { themes } from './themes.js';
 import { loadModel, unique, cleanTrack, sameTrack, withDownload, removeLibraryTracks, restoreLibraryTracks, libraryTracks, filterTracks, filterPlaylists, filterDownloads, downloadStats, duration, size, publicBackup, validateBackup } from './model.js';
 import { commands, native, artURL } from './platform.js';
 import { startVisualizer, stopVisualizer } from './visualizer.js';
-import { appearanceDefaults, normalizeSettings, normalizeAppearance, playlistAppearance, playlistIcons, playlistColors, surfacePalette, contrastText } from './appearance.js';
+import { appearanceDefaults, normalizeSettings, normalizeAppearance, playlistAppearance, playlistIcons, playlistColors, surfacePalette, contrastText, readableAccent } from './appearance.js';
 import { groupArtists, mergeTracks, collectionDuration, filterSearchResults, SearchCache, ActionGate, sameOccurrence } from './discovery.js';
 import { metadataFields, updateTrackCopies, updateModelMetadata, syncTargets, restoreTrackOrder, playlistFile, validatePlaylistFile } from './collection-tools.js';
+import { pollingDelay } from './runtime.js';
+import { playbackView, playbackItem, samePlaybackItem, seekRequest, speedLabel, extendSleepTimer } from './player-state.js';
 
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -21,6 +23,8 @@ let downloads = [];
 let readyTracks = [];
 let storageInfo;
 let storageUpdated = 0;
+let downloadRefresh, pollTimer;
+const systemColors = matchMedia('(prefers-color-scheme: dark)');
 const readyIds = new Map(), readyUrls = new Map(), downloadIds = new Map(), downloadUrls = new Map();
 let savedIds = new Set(), savedUrls = new Set(), favoriteIds = new Set(), favoriteUrls = new Set();
 function collectionIndexes() {
@@ -63,6 +67,9 @@ let menuContext = '';
 let menuSnapshot = [];
 let sheetOpener;
 let playerKey = '';
+let playerViewKey = '';
+let seekPreview, seekTimer, playerCountdown;
+const seekItems = new WeakMap();
 let historyId = '';
 let toastTimer;
 let undoAction;
@@ -125,9 +132,17 @@ function theme() {
   document.body.style.setProperty('--pink', model.settings.customSecondary ? model.settings.secondary : '');
   for (const key of ['--bg', '--panel', '--panel-2', '--text', '--muted']) document.body.style.removeProperty(key);
   if (model.settings.customBackground) for (const [key, value] of Object.entries(surfacePalette(model.settings.background))) document.body.style.setProperty(key, value);
+  if (model.settings.colorMode !== 'theme') {
+    const light = model.settings.colorMode === 'light' || model.settings.colorMode === 'system' && !systemColors.matches;
+    for (const [key, value] of Object.entries(surfacePalette(light ? '#f6f8fa' : '#0e1110'))) document.body.style.setProperty(key, value);
+    document.body.style.setProperty('--line', light ? '#d2d8dc' : '#303a34');
+    for (const key of ['--cyan', '--pink']) document.body.style.setProperty(key, readableAccent(getComputedStyle(document.body).getPropertyValue(key).trim(), light ? '#f6f8fa' : '#0e1110'));
+  } else document.body.style.removeProperty('--line');
+  document.body.dataset.performanceMode = model.settings.performanceMode;
   document.body.style.setProperty('--accent-ink', contrastText(getComputedStyle(document.body).getPropertyValue('--cyan').trim()));
   document.body.style.setProperty('--radius', `${model.settings.radius}px`);
   for (const key of ['density', 'textSize', 'font', 'artworkShape', 'playlistView', 'playerLayout', 'visualizer', 'reducedMotion']) document.body.dataset[key] = String(model.settings[key]);
+  if (model.settings.performanceMode === 'battery') document.body.dataset.reducedMotion = 'true';
   const rgb = getComputedStyle(document.body).backgroundColor.match(/[\d.]+/g)?.map(Number) || [0, 0, 0];
   document.documentElement.style.colorScheme = (rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722) > 140 ? 'light' : 'dark';
   document.querySelector('meta[name=theme-color]').content = getComputedStyle(document.body).getPropertyValue('--bg').trim();
@@ -290,17 +305,23 @@ async function startRadio(track, local = offline()) {
   toast(local ? 'Rádio offline iniciado.' : 'Infinite Radio iniciado.');
 }
 const setting = (name, title, description, control) => `<div class="setting">${icon(name)}<div><strong>${esc(title)}</strong>${description ? `<small>${esc(description)}</small>` : ''}</div>${control}</div>`;
-const toggle = (id, label) => `<input class="toggle" type="checkbox" data-setting="${id}" aria-label="${esc(label)}" ${model.settings[id] ? 'checked' : ''}>`;
+const toggle = (id, label) => `<input class="toggle" type="checkbox" data-setting="${id}" aria-label="${esc(label)}" ${model.settings[id] ? 'checked' : ''} ${['uiSounds', 'alertSounds'].includes(id) && model.settings.silentInterface || id === 'prefetchNext' && model.settings.performanceMode === 'battery' ? 'disabled' : ''}>`;
 const actionSetting = (name, title, desc, action) => `<button class="setting action-row" data-action="${action}">${icon(name)}<div><strong>${esc(title)}</strong>${desc ? `<small>${esc(desc)}</small>` : ''}</div>${icon('chevron-right', 'chevron')}</button>`;
 function settingsPage() {
   if (appearanceOpen) return appearancePage();
   const sections = {
-    audio: `<section class="settings-group"><h2>Reprodução</h2>${setting('wifi-off', 'Modo offline', '', toggle('offline', 'Modo offline'))}${actionSetting('volume-2', 'Volume do app', `${Math.round((current.volume ?? 1) * 100)}%`, 'volume')}${actionSetting('moon', 'Temporizador', current.sleepEnd ? 'Ao fim desta música' : current.sleepAt ? `${Math.max(1, Math.ceil((current.sleepAt - Date.now()) / 60000))} min restantes` : 'Desativado', 'sleep')}${actionSetting('gauge', 'Velocidade', `${current.speed || 1}×`, 'speed')}${actionSetting('radio', 'Preferências do rádio', `${model.radioExcluded.length} músicas não recomendadas`, 'radio-preferences')}${native ? actionSetting('audio-lines', 'Equalizador', ['Normal', 'Graves', 'Voz', 'Agudos'][current.eqPreset || 0], 'equalizer') : ''}</section>`,
+    audio: `<section class="settings-group"><h2>Reprodução</h2>${setting('wifi-off', 'Modo offline', '', toggle('offline', 'Modo offline'))}${actionSetting('volume-2', 'Volume do app', `${Math.round((current.volume ?? 1) * 100)}%`, 'volume')}${actionSetting('moon', 'Temporizador', current.sleepEnd ? 'Ao fim desta música' : current.sleepAt ? `${Math.max(1, Math.ceil((current.sleepAt - Date.now()) / 60000))} min restantes` : 'Desativado', 'sleep')}${actionSetting('gauge', 'Velocidade', speedLabel(current.speed), 'speed')}${actionSetting('radio', 'Preferências do rádio', `${model.radioExcluded.length} músicas não recomendadas`, 'radio-preferences')}${native ? actionSetting('audio-lines', 'Equalizador', ['Normal', 'Graves', 'Voz', 'Agudos'][current.eqPreset || 0], 'equalizer') : ''}</section>`,
     visual: `<section class="settings-group"><h2>Aparência</h2>${actionSetting('palette', 'Temas do Fluxo', `${themes.length} temas · ${themes.find(t => t.id === model.settings.theme)?.name || 'Fluxo Bug'}`, 'themes')}${actionSetting('paintbrush', 'Personalizar aparência', `${model.settings.density === 'compact' ? 'Compacto' : 'Confortável'} · ${model.settings.profiles.length} estilos salvos`, 'appearance')}</section>`,
     library: `<section class="settings-group"><h2>Biblioteca e downloads</h2>${setting('cloud-download', 'Download automático', '', toggle('autoDownload', 'Download automático'))}${setting('wifi', 'Baixar só no Wi-Fi', '', toggle('wifiOnly', 'Baixar só no Wi-Fi'))}${actionSetting('download', 'Central de downloads', `${downloadStats(downloads).pending} pendentes · ${downloadStats(downloads).failed} falhas`, 'downloads-center')}${actionSetting('hard-drive', 'Músicas no dispositivo', `${ready().length} arquivos · ${size(downloadStats(downloads).bytes)}`, 'go-downloads')}${actionSetting('folder-plus', 'Importar arquivos', '', 'import')}${actionSetting('list-plus', 'Importar playlist', '', 'import-playlist')}</section>`,
-    system: `<section class="settings-group"><h2>Dados e permissões</h2>${actionSetting('file-down', 'Exportar backup', 'Playlists, favoritos e preferências', 'export')}${actionSetting('file-up', 'Restaurar backup', '', 'restore')}${native ? actionSetting('shield-check', 'Tela apagada e notificações', '', 'background-settings') : ''}${actionSetting('info', 'Sobre o Fluxo Mobile', 'Versão 2.7.0', 'about')}</section>`
+    system: `<section class="settings-group"><h2>Dados e permissões</h2>${actionSetting('file-down', 'Exportar backup', 'Playlists, favoritos e preferências', 'export')}${actionSetting('file-up', 'Restaurar backup', '', 'restore')}${native ? actionSetting('shield-check', 'Tela apagada e notificações', '', 'background-settings') : ''}${actionSetting('info', 'Sobre o Fluxo Mobile', 'Versão 2.10.0', 'about')}</section>`
   };
-  return heading('Ajustes') + `<div class="settings-tabs segmented" role="tablist" aria-label="Categorias de ajustes">${[['audio', 'headphones', 'Áudio'], ['library', 'hard-drive', 'Biblioteca'], ['visual', 'palette', 'Visual'], ['system', 'shield-check', 'Sistema']].map(([id, name, label]) => `<button role="tab" aria-selected="${settingsTab === id}" class="${settingsTab === id ? 'active' : ''}" data-action="settings-tab" data-value="${id}">${icon(name)}${label}</button>`).join('')}</div>` + sections[settingsTab];
+  sections.audio += `<section class="settings-group"><h2>Controles do player</h2>${setting('timer-reset', 'Avançar e voltar', '', selectSetting('seekStep', 'Intervalo dos atalhos', [5, 10, 15, 30].map(value => [value, `${value} segundos`])))}${setting('hourglass', 'Mostrar tempo restante', '', toggle('remainingTime', 'Mostrar tempo restante'))}</section>`;
+  sections.audio += `<section class="settings-group"><h2>Sons e resposta</h2>${setting('volume-x', 'Silenciar interface', '', toggle('silentInterface', 'Silenciar interface'))}${setting('mouse-pointer-click', 'Sons dos controles', '', toggle('uiSounds', 'Sons dos controles'))}${setting('bell-ring', 'Sons de alerta', '', toggle('alertSounds', 'Sons de alerta'))}${setting('vibrate', 'Feedback tátil', '', toggle('haptics', 'Feedback tátil'))}${actionSetting('activity', 'Diagnóstico de áudio', model.settings.diagnosticEnabled ? 'Registro ativado' : 'Registro desativado', 'audio-diagnostics')}</section>`;
+  sections.library += `<section class="settings-group"><h2>Notificações</h2>${setting('bell', 'Avisos de download', '', toggle('downloadNotifications', 'Avisos de download'))}${native ? actionSetting('music-2', 'Controles de reprodução', '', 'notification-settings') : ''}</section>`;
+  sections.visual = `<section class="settings-group"><h2>Tema e movimento</h2>${setting('sun-moon', 'Modo de cor', '', selectSetting('colorMode', 'Modo de cor', [['theme', 'Do tema'], ['light', 'Claro'], ['dark', 'Escuro'], ['system', 'Automático']]))}${setting('sparkles', 'Reduzir animações', '', toggle('reducedMotion', 'Reduzir animações'))}</section>` + sections.visual;
+  sections.performance = `<section class="settings-group"><h2>Desempenho</h2>${setting('cpu', 'Modo', '', selectSetting('performanceMode', 'Modo de desempenho', [['balanced', 'Equilibrado'], ['battery', 'Economia de bateria']]))}${setting('download-cloud', 'Downloads em segundo plano', '', toggle('backgroundDownloads', 'Downloads em segundo plano'))}${setting('list-start', 'Pré-carregar próxima faixa', '', toggle('prefetchNext', 'Pré-carregar próxima faixa'))}${actionSetting('database', 'Cache temporário', '', 'clear-cache')}</section>`;
+  sections.system += `<section class="settings-group"><h2>Diagnóstico</h2>${setting('activity', 'Registrar diagnóstico', '', toggle('diagnosticEnabled', 'Registrar diagnóstico'))}${actionSetting('shield-check', 'Estado do áudio e serviços', '', 'audio-diagnostics')}${actionSetting('file-down', 'Exportar registros técnicos', '', 'export-audio-log')}</section>`;
+  return heading('Ajustes') + `<div class="settings-tabs segmented" role="tablist" aria-label="Categorias de ajustes">${[['audio', 'headphones', 'Áudio'], ['library', 'hard-drive', 'Biblioteca'], ['visual', 'palette', 'Visual'], ['performance', 'cpu', 'Desempenho'], ['system', 'shield-check', 'Sistema']].map(([id, name, label]) => `<button role="tab" aria-selected="${settingsTab === id}" class="${settingsTab === id ? 'active' : ''}" data-action="settings-tab" data-value="${id}">${icon(name)}${label}</button>`).join('')}</div>` + sections[settingsTab];
 }
 function selectSetting(key, label, options) {
   return `<select data-preference="${key}" aria-label="${esc(label)}">${options.map(([value, text]) => `<option value="${value}" ${model.settings[key] === value ? 'selected' : ''}>${esc(text)}</option>`).join('')}</select>`;
@@ -336,7 +357,7 @@ function appearancePage() {
 }
 function applyAppearance() {
   model.settings = normalizeSettings(model.settings); save(); theme(); render(); renderPlayer(true);
-  stopVisualizer(); if ($('#player').open && model.settings.visualizer !== 'off') startVisualizer(() => current, () => model.settings);
+  syncPlayerActivity();
 }
 function themeTiles() {
   return themes.map(t => `<div class="theme-option" data-theme-id="${t.id}" data-name="${esc(t.name.toLowerCase())}"><button class="theme-tile ${t.id === model.settings.theme ? 'active' : ''}" data-action="theme" data-id="${t.id}" aria-label="Tema ${esc(t.name)}"><span class="theme-swatch theme-${t.id}"><span></span><span></span><span></span></span><strong>${esc(t.name)}</strong></button>${ib('star', 'favorite-theme', `${model.settings.themeFavorites.includes(t.id) ? 'Desfavoritar' : 'Favoritar'} tema ${t.name}`, `data-id="${t.id}"`, `theme-star ${model.settings.themeFavorites.includes(t.id) ? 'active' : ''}`)}</div>`).join('');
@@ -451,53 +472,106 @@ function editTrack() {
 function assertMenuFresh(tracks) {
   if (!sameOccurrence(tracks, menuSnapshot, menuIndex)) { closeSheet(); throw new Error('A lista mudou. Abra as opções da música novamente.'); }
 }
-function showPlayer() { if (!current.queue.length) return toast('Escolha uma música primeiro.'); renderPlayer(true); if (!$('#player').open) $('#player').showModal(); if (model.settings.visualizer !== 'off') startVisualizer(() => current, () => model.settings); }
+function showPlayer() { if (!current.queue.length) return toast('Escolha uma música primeiro.'); renderPlayer(true); if (!$('#player').open) $('#player').showModal(); syncPlayerActivity(); }
 function renderPlayer(force = false) {
   const t = current.queue[current.index];
-  const key = JSON.stringify([t?.id, t?.title, t?.artist, t?.thumbnail, downloaded(t)?.thumbnail, current.index, current.queue.length, current.canNext, current.playing, current.playWhenReady, current.buffering, current.error, current.repeat, current.shuffle, favorite(t), current.speed, current.sleepAt, current.sleepEnd, current.radio, current.radioError, current.radioLoading, current.recovering, !!downloaded(t)]);
-  if (!force && key === playerKey) return updateProgress();
+  const record = downloaded(t), view = playbackView(current);
+  const key = JSON.stringify([t?.id, t?.url, t?.title, t?.artist, t?.thumbnail, record?.thumbnail, current.index]);
+  const viewKey = JSON.stringify([key, current.queue.length, current.canNext, current.playing, current.playWhenReady, current.buffering, current.recovering, current.error, current.repeat, current.shuffle, favorite(t), current.speed, current.volume, current.sleepAt, current.sleepEnd, current.radio, current.radioOffline, current.radioError, !!record]);
+  if (!force && viewKey === playerViewKey) { updateProgress(); syncPlayerActivity(); return; }
+  playerViewKey = viewKey;
+  const rebuild = key !== playerKey;
   playerKey = key;
   const mini = $('#mini');
   mini.hidden = !t; document.body.classList.toggle('has-player', !!t);
-  if (!t) { if ($('#player').open) $('#player').close(); return; }
-  const loading = current.buffering && current.playWhenReady !== false;
-  const status = current.error ? 'Falha ao reproduzir' : loading ? 'Preparando áudio...' : t.artist;
-  const toggleIcon = current.error ? 'rotate-cw' : loading ? 'loader-circle' : current.playing ? 'pause' : 'play';
+  if (!t) { cancelSeek(); mini.replaceChildren(); if ($('#player').open) $('#player').close(); syncPlayerActivity(); return; }
+  let changedIcons = false;
+  const paint = (root, action, name, label, active, disabled = false) => {
+    const control = root.querySelector(`[data-action="${action}"]`); if (!control) return;
+    if (control.querySelector('[data-lucide]')?.getAttribute('data-lucide') !== name) { control.innerHTML = icon(name); changedIcons = true; }
+    control.setAttribute('aria-label', label); control.title = label; control.disabled = disabled;
+    if (active !== undefined) { control.classList.toggle('active', !!active); control.setAttribute('aria-pressed', String(!!active)); }
+  };
   const hasNext = current.canNext ?? (current.radio || current.index < current.queue.length - 1 || current.repeat === 2 || (current.shuffle && current.queue.length > 1));
-  mini.innerHTML = `<button class="track-main" data-action="open-player" aria-label="Abrir player">${art(t)}<span class="track-copy"><strong>${esc(t.title)}</strong><small>${esc(status)}</small></span></button>${ib(toggleIcon, 'toggle', current.playing ? 'Pausar' : 'Reproduzir', '', loading ? 'spin' : '')}${ib('skip-forward', 'next', 'Próxima música', hasNext ? '' : 'disabled')}<div class="mini-buffer"></div><div class="mini-progress"></div>`;
-  if ($('#player').open || force) {
-    $('#player').innerHTML = `<div class="player-header">${ib('chevron-down', 'close-player', 'Minimizar player')}<small>Reproduzindo agora</small>${ib('ellipsis', 'current-menu', 'Opções da música')}</div>${art(t, 'player-art')}<div class="player-info"><div><h2>${esc(t.title)}</h2><p>${esc(t.artist)}</p></div>${ib('heart', 'favorite-current', favorite(t) ? 'Desfavoritar' : 'Favoritar', '', favorite(t) ? 'active' : '')}</div><input class="seek" id="seek" type="range" min="0" max="${Math.max(1, current.duration)}" step="0.1" value="${current.position || 0}" aria-label="Posição da música"><div class="time-labels"><span id="elapsed">${duration(current.position)}</span><span id="total">${duration(current.duration)}</span></div><div class="player-controls">${ib('shuffle', 'shuffle', 'Reprodução aleatória', '', current.shuffle ? 'active' : '')}${ib('skip-back', 'previous', 'Música anterior')}${ib(toggleIcon, 'toggle', current.playing ? 'Pausar' : 'Reproduzir', '', `big-play ${current.buffering ? 'spin' : ''}`)}${ib('skip-forward', 'next', 'Próxima música')}${ib(current.repeat === 1 ? 'repeat-1' : 'repeat', 'repeat', current.repeat === 0 ? 'Repetição desativada' : current.repeat === 1 ? 'Repetir uma' : 'Repetir fila', '', current.repeat ? 'active' : '')}</div><div class="player-status">${esc(current.error || (current.buffering ? 'Preparando áudio...' : downloaded(t) ? 'Reprodução offline' : ''))}</div><div class="player-footer"><button data-action="current-download">${icon(downloaded(t) ? 'circle-check' : 'download')}<span>${downloaded(t) ? 'Baixada' : 'Baixar'}</span></button><button data-action="sleep">${icon('moon')}<span>Timer</span></button><button data-action="speed">${icon('gauge')}<span>${current.speed || 1}×</span></button><button data-action="player-queue">${icon('list-music')}<span>Fila</span></button></div>`;
+  if (rebuild || !mini.firstElementChild) {
+    mini.innerHTML = `<button class="track-main" data-action="open-player" aria-label="Abrir player">${art(t)}<span class="track-copy"><strong>${esc(t.title)}</strong><small></small></span></button>${ib(view.icon, 'toggle', view.label)}${ib('skip-forward', 'next', 'Próxima música')}<div class="mini-buffer"></div><div class="mini-progress"></div>`;
+    changedIcons = true;
   }
+  mini.querySelector('.track-copy small').textContent = current.error ? 'Falha ao reproduzir' : view.busy ? 'Preparando áudio...' : t.artist;
+  paint(mini, 'toggle', view.icon, view.label);
+  paint(mini, 'next', 'skip-forward', 'Próxima música', undefined, !hasNext);
   if ($('#player').open || force) {
-    const info = $('#player .player-info');
-    $('#player [data-action=current-menu]').insertAdjacentHTML('beforebegin', ib('volume-2', 'volume', 'Volume do app'));
-    $('#player .player-footer').insertAdjacentHTML('afterbegin', `<button data-action="radio-options" class="${current.radio ? 'active' : ''}" aria-label="Infinite Radio">${icon('radio')}<span>Rádio</span></button>`);
-    const artwork = $('#player .player-art');
-    $('#player .player-header').insertAdjacentHTML('afterend', `<div class="player-context"><span>${icon(downloaded(t) ? 'hard-drive' : 'globe')}${esc(sourceLabel(t))}</span><span>${current.index + 1} de ${current.queue.length}</span></div>`);
-    $('#player [data-action=sleep] span').dataset.sleepLabel = '';
+    const player = $('#player');
+    const itemKey = JSON.stringify(playbackItem(current));
+    if (player.dataset.itemKey !== itemKey || !$('#seek')) {
+      cancelSeek();
+      player.innerHTML = `<div class="player-header">${ib('chevron-down', 'close-player', 'Minimizar player')}<small>Reproduzindo agora</small>${ib('volume-2', 'volume', 'Volume do app')}${ib('ellipsis', 'current-menu', 'Opções da música')}</div><div class="player-context"><span data-player-source></span><button data-action="player-queue" class="player-position" title="Abrir fila" aria-label="Abrir fila">${icon('list-music')}<span></span></button></div><div class="player-stage">${art(t, 'player-art')}<div class="player-info"><div><h2>${esc(t.title)}</h2><p>${esc(t.artist)}</p></div>${ib('heart', 'favorite-current', 'Favoritar')}</div></div><canvas id="audio-visual" class="audio-visual" aria-hidden="true"></canvas><div class="player-timeline"><input class="seek" id="seek" type="range" min="0" max="1" step="0.1" value="0" aria-label="Posição da música"><div class="time-labels"><span id="elapsed"></span><div class="seek-steps">${ib('rotate-ccw', 'seek-back', 'Voltar 10 segundos', '', 'seek-step')}${ib('rotate-cw', 'seek-forward', 'Avançar 10 segundos', '', 'seek-step')}</div><button id="total" data-action="toggle-time-mode"></button></div></div><div class="player-controls">${ib('shuffle', 'shuffle', 'Reprodução aleatória')}${ib('skip-back', 'previous', 'Música anterior')}${ib(view.icon, 'toggle', view.label, '', 'big-play')}${ib('skip-forward', 'next', 'Próxima música')}${ib('repeat', 'repeat', 'Repetição desativada')}</div><div class="player-status" role="status" aria-live="polite"></div><div class="player-footer"><button data-action="radio-options" aria-label="Infinite Radio">${icon('radio')}<span>Rádio</span></button><button data-action="current-download">${icon('download')}<span></span></button><button data-action="sleep">${icon('moon')}<span data-sleep-label>Timer</span></button><button data-action="speed">${icon('gauge')}<span></span></button><button data-action="player-queue">${icon('list-music')}<span>Fila</span></button></div>`;
+      seekItems.set($('#seek'), playbackItem(current)); player.dataset.itemKey = itemKey; player.dataset.contentKey = key; changedIcons = true;
+    } else if (player.dataset.contentKey !== key) {
+      player.dataset.contentKey = key; $('#player .player-art').outerHTML = art(t, 'player-art');
+      $('#player .player-info h2').textContent = t.title; $('#player .player-info p').textContent = t.artist; changedIcons = true;
+    }
+    const source = $('#player [data-player-source]'), sourceKey = `${!!record}:${sourceLabel(t)}`;
+    if (source.dataset.key !== sourceKey) { source.dataset.key = sourceKey; source.innerHTML = `${icon(record ? 'hard-drive' : 'globe')}${esc(sourceLabel(t))}`; changedIcons = true; }
+    $('#player .player-position span').textContent = `${current.index + 1} de ${current.queue.length}`;
+    paint(player, 'toggle', view.icon, view.label);
+    paint(player, 'volume', (current.volume ?? 1) === 0 ? 'volume-x' : (current.volume ?? 1) < .5 ? 'volume-1' : 'volume-2', 'Volume do app');
+    paint(player, 'next', 'skip-forward', 'Próxima música', undefined, !hasNext);
+    paint(player, 'shuffle', 'shuffle', 'Reprodução aleatória', current.shuffle);
+    paint(player, 'repeat', current.repeat === 1 ? 'repeat-1' : 'repeat', ['Repetição desativada', 'Repetir uma', 'Repetir fila'][current.repeat || 0], !!current.repeat);
+    paint(player, 'favorite-current', 'heart', favorite(t) ? 'Desfavoritar' : 'Favoritar', favorite(t));
+    const downloadButton = $('#player [data-action=current-download]');
+    const downloadIcon = record ? 'circle-check' : 'download';
+    if (downloadButton.querySelector('[data-lucide]')?.getAttribute('data-lucide') !== downloadIcon) { downloadButton.innerHTML = `${icon(downloadIcon)}<span></span>`; changedIcons = true; }
+    downloadButton.querySelector('span').textContent = record ? 'Baixada' : 'Baixar';
+    $('#player [data-action=radio-options]').classList.toggle('active', !!current.radio);
     $('#player [data-action=sleep]').classList.toggle('active', !!(current.sleepAt || current.sleepEnd));
-    for (const [name, active] of [['shuffle', current.shuffle], ['repeat', !!current.repeat], ['favorite-current', favorite(t)]]) $('#player [data-action=' + name + ']').setAttribute('aria-pressed', String(!!active));
-    const stage = document.createElement('div'); stage.className = 'player-stage';
-    artwork.before(stage); stage.append(artwork, info);
-    stage.insertAdjacentHTML('afterend', '<canvas id="audio-visual" class="audio-visual" aria-hidden="true"></canvas>');
-    const statusLabel = $('#player .player-status');
-    if (statusLabel) statusLabel.textContent = current.error || (current.recovering ? 'Reconectando áudio...' : loading ? 'Preparando áudio...' : current.sleepEnd ? 'Parar ao fim desta música' : current.radioError || (current.radio ? `Infinite Radio${current.radioOffline ? ' offline' : ''}` : downloaded(t) ? 'Reprodução offline' : ''));
-    $('#player .time-labels').insertAdjacentHTML('beforeend', `<div class="seek-steps">${ib('rotate-ccw', 'seek-back', 'Voltar 10 segundos', '', 'seek-step')}${ib('rotate-cw', 'seek-forward', 'Avançar 10 segundos', '', 'seek-step')}</div>`);
+    $('#player [data-action=speed] span').textContent = speedLabel(current.speed);
+    const status = current.error || (current.recovering ? 'Reconectando áudio...' : view.busy ? 'Preparando áudio...' : current.sleepEnd ? 'Parar ao fim desta música' : current.radioError || (current.radio ? `Infinite Radio${current.radioOffline ? ' offline' : ''}` : view.active ? record ? 'Reprodução offline' : 'Reproduzindo' : 'Pausada'));
+    const statusLabel = $('#player .player-status'), statusKey = `${view.busy}:${!!current.error}:${status}`;
+    if (statusLabel.dataset.key !== statusKey) { statusLabel.dataset.key = statusKey; statusLabel.innerHTML = `${icon(current.error ? 'circle-alert' : view.busy ? 'loader-circle' : view.active ? 'audio-lines' : 'pause', view.busy ? 'spin' : '')}<span>${esc(status)}</span>`; changedIcons = true; }
+    statusLabel.classList.toggle('player-error', !!current.error);
   }
-  if (!loading) document.querySelectorAll('#mini .spin,#player .spin').forEach(button => button.classList.remove('spin'));
-  if ($('#player [data-action=next]')) $('#player [data-action=next]').disabled = !hasNext;
-  icons(); updateProgress();
+  if (changedIcons) icons(); updateProgress(); syncPlayerActivity();
+}
+function cancelSeek() { seekPreview = null; clearTimeout(seekTimer); }
+function previewSeek(el) {
+  const item = seekItems.get(el);
+  if (!samePlaybackItem(current, item)) return cancelSeek();
+  clearTimeout(seekTimer); seekPreview = { item, value: Number(el.value), committed: false }; updateProgress();
+}
+async function commitSeek(el) {
+  const request = seekRequest(current, Number(el.value), seekPreview?.item || seekItems.get(el));
+  if (!request) { cancelSeek(); updateProgress(); return; }
+  const pending = { item: request.expectedItem, value: request.value, committed: true, until: Date.now() + 2000 };
+  clearTimeout(seekTimer); seekPreview = pending; updateProgress();
+  seekTimer = setTimeout(() => { if (seekPreview === pending) { cancelSeek(); updateProgress(); } }, 2000);
+  try { await commands.command(request); } catch (error) { if (seekPreview === pending) cancelSeek(); updateProgress(); throw error; }
+}
+function syncPlayerActivity() {
+  clearTimeout(playerCountdown);
+  const visible = $('#player').open && !document.hidden;
+  if (visible && current.playing && model.settings.visualizer !== 'off' && model.settings.performanceMode !== 'battery' && $('#audio-visual')?.getBoundingClientRect().width > 0) startVisualizer(() => current, () => model.settings);
+  else stopVisualizer();
+  if (visible && current.sleepAt > Date.now()) playerCountdown = setTimeout(() => { updateProgress(); syncPlayerActivity(); }, 1000);
 }
 function updateProgress() {
   const timerLabel = $('[data-sleep-label]');
   if (timerLabel) timerLabel.textContent = current.sleepEnd ? 'Fim da faixa' : current.sleepAt ? duration(Math.max(0, (current.sleepAt - Date.now()) / 1000)) : 'Timer';
   const progress = $('.mini-progress'); if (progress) progress.style.width = `${Math.min(100, (current.position || 0) / (current.duration || 1) * 100)}%`;
   const buffered = $('.mini-buffer'); if (buffered) buffered.style.width = `${Math.min(100, (current.buffered || current.position || 0) / (current.duration || 1) * 100)}%`;
-  const seek = $('#seek'); if (seek && document.activeElement !== seek) { seek.max = Math.max(1, current.duration); seek.value = current.position || 0; }
+  if (seekPreview && (!samePlaybackItem(current, seekPreview.item) || seekPreview.committed && (Date.now() >= seekPreview.until || Math.abs(current.position - seekPreview.value) < 1))) cancelSeek();
+  const position = seekPreview?.value ?? current.position ?? 0;
+  const seek = $('#seek'); if (seek) { seek.max = Math.max(1, current.duration || 0); seek.value = position; seek.style.setProperty('--played', `${Math.max(0, Math.min(100, position / (current.duration || 1) * 100))}%`); seek.style.setProperty('--buffered', `${Math.max(0, Math.min(100, (current.buffered || 0) / (current.duration || 1) * 100))}%`); }
   if (seek) { seek.disabled = !current.duration; seek.setAttribute('aria-valuetext', `${duration(seek.value)} de ${duration(current.duration)}`); }
-  document.querySelectorAll('.seek-step').forEach(button => button.disabled = !current.duration);
-  if ($('#elapsed')) $('#elapsed').textContent = duration(current.position);
-  if ($('#total')) $('#total').textContent = duration(current.duration);
+  document.querySelectorAll('.seek-step').forEach(button => {
+    button.disabled = !current.duration;
+    const back = button.dataset.action === 'seek-back';
+    button.setAttribute('aria-label', `${back ? 'Voltar' : 'Avançar'} ${model.settings.seekStep} segundos`); button.title = button.getAttribute('aria-label');
+    button.dataset.seconds = String(model.settings.seekStep);
+  });
+  if ($('#elapsed')) $('#elapsed').textContent = duration(position);
+  const total = $('#total'); if (total) { total.textContent = model.settings.remainingTime ? `-${duration(Math.max(0, (current.duration || 0) - position))}` : duration(current.duration); total.setAttribute('aria-label', model.settings.remainingTime ? 'Mostrar duração total' : 'Mostrar tempo restante'); total.title = total.getAttribute('aria-label'); }
 }
 async function permissions() { if (!permissionAsked && native) { permissionAsked = true; localStorage.setItem('fluxo_v2_permissions', 'yes'); await commands.notifications(); } }
 async function play(tracks, index = 0, strict = false) {
@@ -510,6 +584,10 @@ async function play(tracks, index = 0, strict = false) {
   await commands.setQueue({ tracks: playable, index: Math.max(0, playable.findIndex(t => t.id === selected.id)) });
 }
 async function refreshDownloads() {
+  downloadRefresh ||= readDownloads().finally(() => { downloadRefresh = null; });
+  return downloadRefresh;
+}
+async function readDownloads() {
   const fresh = await commands.downloads();
   const structural = rows => JSON.stringify(rows.map(t => [t.id, t.url, t.status, t.thumbnail, t.title, t.artist, t.duration, t.bytes]));
   const changed = structural(fresh) !== structural(downloads);
@@ -587,10 +665,26 @@ async function backgroundSettings() {
     + setting('audio-lines', 'Serviço de áudio', status.foreground ? 'Ativo em primeiro plano' : 'Sem reprodução ativa', '')
     + (!status.notifications ? button('bell-plus', 'permissions', 'Permitir notificações', '', 'full primary') : ''));
 }
+async function audioDiagnostics() {
+  const status = await commands.diagnostics();
+  const metrics = [['Serviço', status.serviceActive ? 'Ativo' : 'Inativo'], ['Foco do Fluxo', status.focusState === 'held' ? 'Concedido' : 'Não solicitado'], ['Solicitações', status.focusRequests ?? 0], ['Liberações', status.focusReleases ?? 0], ['Memória PSS', status.memoryPssKb ? `${Math.round(status.memoryPssKb / 1024)} MB` : '-'], ['Cache', status.streamCacheEntries ?? 0]];
+  modal('Diagnóstico de áudio', `<div class="diagnostic-metrics">${metrics.map(([label, value]) => `<div><small>${esc(label)}</small><strong>${esc(value)}</strong></div>`).join('')}</div>${setting('activity', 'Registrar diagnóstico', '', toggle('diagnosticEnabled', 'Registrar diagnóstico'))}<div class="diagnostic-actions">${button('file-down', 'export-audio-log', 'Exportar registros técnicos')}${ib('trash-2', 'clear-audio-log', 'Limpar registros técnicos')}</div>`);
+}
+function schedulePoll() {
+  clearTimeout(pollTimer);
+  if (document.hidden) return;
+  pollTimer = setTimeout(async () => { try { await refreshDownloads(); } catch {} finally { schedulePoll(); } }, pollingDelay(model.settings, downloadStats(downloads).pending > 0));
+}
 async function action(name, el) {
   const index = Number(el?.dataset.index || 0);
   const cmd = (action, value = 0, index = 0) => commands.command({ action, value, index });
   switch (name) {
+    case 'audio-diagnostics': await audioDiagnostics(); break;
+    case 'export-audio-log': { const data = await commands.audioLog(); await commands.exportBackup(JSON.stringify(data, null, 2), 'fluxo-audio-diagnostico.json'); break; }
+    case 'clear-audio-log': confirm('Limpar registros técnicos?', 'A biblioteca e os arquivos de música serão mantidos.', 'clear-audio-log-confirm'); break;
+    case 'clear-audio-log-confirm': await commands.clearAudioLog(); closeSheet(); toast('Registros técnicos limpos.'); break;
+    case 'clear-cache': confirm('Limpar cache temporário?', 'Downloads, playlists, estilos e favoritos serão mantidos.', 'clear-cache-confirm'); break;
+    case 'clear-cache-confirm': await commands.clearCache(); searchCache.clear(); searchCached = false; closeSheet(); toast('Cache temporário limpo.'); break;
     case 'open-artists': navigate(() => { playlistId = ''; artistId = ''; libraryTab = 'artists'; }, true); break;
     case 'open-artist': navigate(() => { artistId = el.dataset.id; query = ''; }, true); break;
     case 'back-artists': navigate(() => artistId = ''); break;
@@ -744,16 +838,19 @@ async function action(name, el) {
     case 'remove-download': confirm('Remover arquivo?', 'A música ficará indisponível offline. As playlists serão mantidas.', 'remove-download-confirm'); break;
     case 'remove-download-confirm': { const record = downloads.find(track => sameTrack(track, menuTrack)); if (record) await commands.removeDownload(record.id); await refreshDownloads(); closeSheet(); break; }
     case 'import': { closeSheet(); toast('Selecione seus arquivos de áudio.'); const imported = await commands.importAudio(); await refreshDownloads(); if (imported.tracks?.length) { libraryTab = 'downloads'; playlistId = ''; query = ''; downloadFilter = 'all'; listLimit = 80; location.hash = 'library'; tab = 'library'; render(); toast(`${imported.tracks.length} músicas importadas.`); } break; }
-    case 'toggle': await cmd(current.playing || (current.buffering && current.playWhenReady !== false) ? 'pause' : 'play'); break;
+    case 'toggle': await cmd(playbackView(current).action); break;
     case 'retry-play': await cmd('play'); break;
     case 'next': case 'previous': await cmd(name); break;
-    case 'seek-back': case 'seek-forward': if (current.duration) await cmd('seek', Math.max(0, Math.min(current.duration, current.position + (name === 'seek-back' ? -10 : 10)))); break;
+    case 'seek-back': case 'seek-forward': { const request = seekRequest(current, current.position + (name === 'seek-back' ? -model.settings.seekStep : model.settings.seekStep)); if (request) await commands.command(request); break; }
+    case 'toggle-time-mode': model.settings.remainingTime = !model.settings.remainingTime; save(); updateProgress(); break;
     case 'shuffle': await cmd('shuffle', current.shuffle ? 0 : 1); break;
     case 'repeat': await cmd('repeat', ((current.repeat || 0) + 1) % 3); break;
     case 'player-queue': $('#player').close(); stopVisualizer(); location.hash = 'queue'; break;
-    case 'sleep': modal('Temporizador', `<form id="sleep-form" class="custom-timer"><label class="field"><input type="number" name="minutes" min="1" max="240" value="20" aria-label="Minutos do temporizador" required><span>min</span></label><button type="submit" class="icon-button primary" aria-label="Ativar temporizador personalizado">${icon('check')}</button></form>` + [-1, 0, 15, 30, 45, 60, 90].map(n => `<button class="menu-item" data-action="set-sleep" data-value="${n}">${icon(n ? 'moon' : 'moon-star')}${n === -1 ? 'Ao fim desta música' : n ? `${n} minutos` : 'Desativado'}</button>`).join('')); break;
+    case 'sleep': modal('Temporizador', `<form id="sleep-form" class="custom-timer"><label class="field"><input type="number" name="minutes" min="1" max="240" value="20" aria-label="Minutos do temporizador" required><span>min</span></label><button type="submit" class="icon-button primary" aria-label="Ativar temporizador personalizado">${icon('check')}</button></form>` + (current.sleepAt > Date.now() ? button('alarm-clock-plus', 'extend-sleep', 'Adicionar 5 minutos', '', 'full') : '') + [-1, 0, 15, 30, 45, 60, 90].map(n => `<button class="menu-item" data-action="set-sleep" data-value="${n}">${icon(n ? 'moon' : 'moon-star')}${n === -1 ? 'Ao fim desta música' : n ? `${n} minutos` : 'Desativado'}</button>`).join('')); break;
     case 'set-sleep': await cmd('sleep', Number(el.dataset.value)); closeSheet(); if (tab === 'settings') render(); toast(Number(el.dataset.value) ? 'Temporizador ativado.' : 'Temporizador desativado.'); break;
-    case 'speed': modal('Velocidade', `<div class="slider-row"><span>0,5×</span><input id="speed-slider" type="range" min="0.5" max="2" step="0.05" value="${current.speed || 1}" aria-label="Velocidade"><span>2×</span></div><p class="player-status" id="speed-value">${current.speed || 1}×</p>${button('rotate-ccw', 'reset-speed', 'Restaurar 1×', '', 'full')}`); break;
+    case 'extend-sleep': { const value = extendSleepTimer(current.sleepAt); if (value === null) return toast('O temporizador já terminou.'); await cmd('sleep', value); closeSheet(); if (tab === 'settings') render(); toast('Temporizador estendido.'); break; }
+    case 'speed-preset': await cmd('speed', Number(el.dataset.value)); closeSheet(); if (tab === 'settings') render(); break;
+    case 'speed': modal('Velocidade', `<div class="slider-row"><span>0,5×</span><input id="speed-slider" type="range" min="0.5" max="2" step="0.05" value="${current.speed || 1}" aria-label="Velocidade"><span>2×</span></div><p class="player-status" id="speed-value">${speedLabel(current.speed)}</p><div class="speed-presets" role="group" aria-label="Velocidades rápidas">${[.75, 1, 1.25, 1.5, 2].map(value => `<button data-action="speed-preset" data-value="${value}" aria-pressed="${Math.abs((current.speed || 1) - value) < .001}">${speedLabel(value)}</button>`).join('')}</div>${button('rotate-ccw', 'reset-speed', 'Restaurar 1×', '', 'full')}`); break;
     case 'reset-speed': await cmd('speed', 1); closeSheet(); render(); break;
     case 'volume': modal('Volume do app', `<div class="slider-row">${icon('volume-x')}<input id="volume-slider" type="range" min="0" max="1" step="0.01" value="${current.volume ?? 1}" aria-label="Volume do app">${icon('volume-2')}</div><p class="player-status" id="volume-value">${Math.round((current.volume ?? 1) * 100)}%</p>${button('volume-2', 'reset-volume', 'Restaurar 100%', '', 'full')}`); break;
     case 'reset-volume': clearTimeout(volumeTimer); await cmd('volume', 1); closeSheet(); if (tab === 'settings') render(); break;
@@ -769,7 +866,18 @@ async function action(name, el) {
     case 'battery-settings': await commands.openSettings('battery'); break;
     case 'app-settings': await commands.openSettings('app'); break;
     case 'export': await commands.exportBackup(JSON.stringify(publicBackup(model), null, 2)); break;
-    case 'restore': { const value = await commands.importBackup(); if (!value) break; const backup = validateBackup(JSON.parse(value)); model.library = unique([...model.library, ...backup.library]); model.favorites = unique([...model.favorites, ...backup.favorites]); model.playlists = [...new Map([...model.playlists, ...backup.playlists].map(p => [p.id, p])).values()]; model.history = unique([...model.history, ...backup.history]).slice(0, 100); model.radioExcluded = unique([...model.radioExcluded, ...backup.radioExcluded]).slice(0, 500); model.settings = { ...model.settings, ...backup.settings }; applyAppearance(); await commands.radioExclusions(model.radioExcluded); await syncLibrary(); toast('Backup restaurado. Seus arquivos locais foram mantidos.'); break; }
+    case 'restore': {
+      const value = await commands.importBackup(); if (!value) break;
+      const backup = validateBackup(JSON.parse(value));
+      model.library = unique([...model.library, ...backup.library]); model.favorites = unique([...model.favorites, ...backup.favorites]);
+      model.playlists = [...new Map([...model.playlists, ...backup.playlists].map(p => [p.id, p])).values()];
+      model.history = unique([...model.history, ...backup.history]).slice(0, 100);
+      model.radioExcluded = unique([...model.radioExcluded, ...backup.radioExcluded]).slice(0, 500);
+      model.settings = { ...model.settings, ...backup.settings };
+      applyAppearance(); await commands.configure(model.settings); schedulePoll();
+      await commands.radioExclusions(model.radioExcluded); await syncLibrary();
+      toast('Backup restaurado. Seus arquivos locais foram mantidos.'); break;
+    }
     case 'clear-history': confirm('Limpar histórico?', 'A biblioteca e as playlists serão mantidas.', 'clear-history-confirm'); break;
     case 'clear-history-confirm': { const removed = model.history; model.history = []; save(); closeSheet(); render(); toast('Histórico limpo.', () => { model.history = unique([...model.history, ...removed]).slice(0, 100); }); break; }
     case 'clear-searches': model.searches = []; save(); render(); break;
@@ -787,8 +895,8 @@ document.addEventListener('click', event => {
   const key = ['favorite', 'favorite-current'].includes(name) ? 'favorite' : name;
   actionGate.run(key, async () => {
     el.setAttribute('aria-busy', 'true');
-    try { await action(name, el); } finally { el.removeAttribute('aria-busy'); }
-  }).catch(e => toast(e.message || 'Não foi possível concluir.'));
+    try { await action(name, el); if (model.settings.haptics || !model.settings.silentInterface && model.settings.uiSounds) await commands.feedback().catch(() => {}); } finally { el.removeAttribute('aria-busy'); }
+  }).catch(e => { toast(e.message || 'Não foi possível concluir.'); if (model.settings.haptics || !model.settings.silentInterface && model.settings.alertSounds) commands.feedback(true).catch(() => {}); });
 });
 document.addEventListener('submit', event => {
   event.preventDefault();
@@ -826,7 +934,7 @@ document.addEventListener('submit', event => {
       closeSheet(); await play([track]);
     }
     } finally { form.removeAttribute('aria-busy'); }
-  }).catch(e => toast(e.message));
+  }).catch(e => { toast(e.message); if (model.settings.haptics || !model.settings.silentInterface && model.settings.alertSounds) commands.feedback(true).catch(() => {}); });
 });
 document.addEventListener('input', event => {
   const el = event.target;
@@ -840,8 +948,8 @@ document.addEventListener('input', event => {
   if (el.id === 'theme-filter') { themeQuery = el.value; filterThemes(); }
   if (el.dataset.color) { model.settings[el.dataset.color] = el.value; save(); theme(); }
   if (el.closest('#playlist-form')) updatePlaylistPreview();
-  if (el.id === 'speed-slider') $('#speed-value').textContent = `${el.value}×`;
-  if (el.id === 'seek') $('#elapsed').textContent = duration(el.value);
+  if (el.id === 'speed-slider') $('#speed-value').textContent = speedLabel(Number(el.value));
+  if (el.id === 'seek') previewSeek(el);
 });
 document.addEventListener('change', event => {
   const el = event.target;
@@ -852,23 +960,26 @@ document.addEventListener('change', event => {
     if (el.id === 'search-filter') { searchFilter = el.value; listLimit = 80; render(); }
     if (el.id === 'volume-slider') { clearTimeout(volumeTimer); await commands.command({ action: 'volume', value: Number(el.value) }); }
     if (el.dataset.setting) {
-      model.settings[el.dataset.setting] = el.checked; applyAppearance();
-      if (['autoDownload', 'wifiOnly'].includes(el.dataset.setting)) { if (model.settings.autoDownload) await permissions(); await syncLibrary(); }
+      model.settings[el.dataset.setting] = el.checked; applyAppearance(); await commands.configure(model.settings); schedulePoll();
+      if (['autoDownload', 'wifiOnly', 'backgroundDownloads'].includes(el.dataset.setting)) { if (model.settings.autoDownload) await permissions(); await syncLibrary(); }
       if (el.dataset.setting === 'offline' && el.checked && current.radio && !current.radioOffline) await commands.command({ action: 'radio-stop' });
     }
-    if (el.dataset.preference) { model.settings[el.dataset.preference] = el.dataset.preference === 'radius' ? Number(el.value) : el.value; applyAppearance(); }
+    if (el.dataset.preference) { model.settings[el.dataset.preference] = ['radius', 'seekStep'].includes(el.dataset.preference) ? Number(el.value) : el.value; applyAppearance(); await commands.configure(model.settings); schedulePoll(); }
     if (el.dataset.color) { model.settings[el.dataset.color] = el.value; applyAppearance(); }
     if (el.closest('#playlist-form')) updatePlaylistPreview();
     if (el.id === 'select-playlist-visible') { $('#playlist-tracks').querySelectorAll('.selection-row:not([hidden]) input').forEach(input => input.checked = el.checked); updatePlaylistSelection(); }
     if (el.closest('#playlist-tracks')) updatePlaylistSelection();
     if (el.id === 'provider') { provider = el.value; if (searchTerm) await runSearch(); }
     if (el.id === 'sort') { sort = el.value; render(); }
-    if (el.id === 'seek') await commands.command({ action: 'seek', value: Number(el.value) });
+    if (el.id === 'seek') await commitSeek(el);
     if (el.id === 'speed-slider') await commands.command({ action: 'speed', value: Number(el.value) });
   })().catch(e => toast(e.message));
 });
 document.addEventListener('error', event => { if (event.target instanceof HTMLImageElement && !event.target.src.endsWith('/icon.ico')) event.target.src = './icon.ico'; }, true);
-$('#player').addEventListener('close', stopVisualizer);
+$('#player').addEventListener('close', () => { cancelSeek(); syncPlayerActivity(); });
+document.addEventListener('pointercancel', event => { if (event.target.id === 'seek') { cancelSeek(); updateProgress(); } });
+document.addEventListener('focusout', event => { if (event.target.id === 'seek' && seekPreview && !seekPreview.committed) { cancelSeek(); updateProgress(); } });
+window.addEventListener('resize', syncPlayerActivity);
 $('#sheet').addEventListener('close', () => { if (sheetOpener?.isConnected) sheetOpener.focus({ preventScroll: true }); });
 window.addEventListener('hashchange', route);
 const connectionChanged = () => { render(); renderPlayer(); };
@@ -876,10 +987,12 @@ window.addEventListener('online', connectionChanged); window.addEventListener('o
 window.fluxoBack = () => { if ($('#sheet').open) closeSheet(); else if ($('#player').open) $('#player').close(); else if (selectionMode) { resetSelection(); render(); } else if (appearanceOpen && tab === 'settings') navigate(() => appearanceOpen = false); else if (playlistId && tab === 'library') navigate(() => playlistId = ''); else if (artistId && tab === 'library') navigate(() => artistId = ''); else if (['history', 'artists'].includes(libraryTab) && tab === 'library') navigate(() => libraryTab = 'home'); else if (tab !== 'library') location.hash = 'library'; else return false; return true; };
 window.addEventListener('unhandledrejection', event => { toast(event.reason?.message || 'Ocorreu um erro inesperado.'); });
 theme(); route();
+systemColors.addEventListener('change', theme);
+await commands.configure(model.settings).catch(e => toast(e.message));
 await commands.init(data => {
   const playingChanged = data.playing !== current.playing;
   const settingsChanged = ['volume', 'speed', 'sleepAt', 'sleepEnd', 'eqPreset'].some(key => data[key] !== current[key]);
-  const changed = JSON.stringify(data.queue) !== JSON.stringify(current.queue) || data.index !== current.index || data.error !== current.error || data.radio !== current.radio || data.radioLoading !== current.radioLoading || data.radioError !== current.radioError;
+  const changed = data.queue !== current.queue && JSON.stringify(data.queue) !== JSON.stringify(current.queue) || data.index !== current.index || data.error !== current.error || data.radio !== current.radio || data.radioLoading !== current.radioLoading || data.radioError !== current.radioError;
   current = data;
   const track = current.queue[current.index];
   if (current.playing && track && historyId !== track.id) { historyId = track.id; model.history = unique([track, ...model.history]).slice(0, 100); save(); }
@@ -887,14 +1000,16 @@ await commands.init(data => {
   if (changed && tab === 'library' && libraryTab === 'home' && !playlistId) render();
   else if (playingChanged && $('#resume-slot')) { $('#resume-slot').innerHTML = resumeStrip(); icons(); }
   if (settingsChanged && tab === 'settings' && settingsTab === 'audio' && !appearanceOpen) render();
-  document.querySelectorAll('[data-row]').forEach(row => row.classList.toggle('playing', row.hasAttribute('data-queue-index') ? Number(row.dataset.queueIndex) === current.index : sameTrack({ id: row.dataset.row, url: row.dataset.rowUrl }, track)));
+  if (changed || playingChanged) document.querySelectorAll('[data-row]').forEach(row => row.classList.toggle('playing', row.hasAttribute('data-queue-index') ? Number(row.dataset.queueIndex) === current.index : sameTrack({ id: row.dataset.row, url: row.dataset.rowUrl }, track)));
   renderPlayer();
 }).catch(e => toast(e.message));
 await commands.radioExclusions(model.radioExcluded).catch(e => toast(e.message));
 await refreshDownloads().catch(e => toast(e.message));
 await syncLibrary().catch(e => toast(`Downloads pendentes: ${e.message}`));
 await commands.migrateOldDownloads(title => toast(`Recuperando download: ${title}`)).then(refreshDownloads).catch(e => toast(`Seus arquivos antigos foram preservados. Migração pendente: ${e.message}`));
-setInterval(() => { if (!document.hidden) refreshDownloads().catch(() => {}); }, 2500);
+schedulePoll();
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) { refreshDownloads().catch(e => toast(e.message)); commands.command({ action: 'refresh' }).catch(() => {}); }
+  schedulePoll();
+  if (!document.hidden) { refreshDownloads().catch(e => toast(e.message)); commands.command({ action: 'refresh' }).catch(() => {}); if (!model.settings.backgroundDownloads) syncLibrary().catch(() => {}); }
+  syncPlayerActivity();
 });

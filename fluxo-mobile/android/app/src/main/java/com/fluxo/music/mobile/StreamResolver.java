@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -26,7 +25,9 @@ public final class StreamResolver {
     public static final OkHttpClient HTTP = new OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS).readTimeout(18, TimeUnit.SECONDS)
         .callTimeout(28, TimeUnit.SECONDS).build();
-    private static final Map<String, Cached> cache = new ConcurrentHashMap<>();
+    private static final Map<String, Cached> cache = Collections.synchronizedMap(new java.util.LinkedHashMap<String, Cached>(64, .75f, true) {
+        @Override protected boolean removeEldestEntry(Map.Entry<String, Cached> entry) { return size() > 64; }
+    });
     private record Cached(String url, long expires) {}
     private static boolean initialized;
 
@@ -78,7 +79,7 @@ public final class StreamResolver {
             cache.put(url, new Cached(result, System.currentTimeMillis() + 20 * 60 * 1000));
             return result;
         } catch (Exception e) {
-            android.util.Log.e("FluxoResolver", "Audio extraction failed", e);
+            AudioDiagnostics.record("resolver", "failed");
             throw new IOException("Nao foi possivel obter o audio. " + readable(e), e);
         }
     }
@@ -99,6 +100,8 @@ public final class StreamResolver {
     }
 
     public static void invalidate(String url) { cache.remove(url); }
+    public static int cacheSize() { synchronized (cache) { cache.values().removeIf(hit -> hit.expires <= System.currentTimeMillis()); return cache.size(); } }
+    public static void clearCache() { cache.clear(); }
 
     public static JSONArray related(JSONObject seed) throws Exception {
         init();
@@ -113,7 +116,7 @@ public final class StreamResolver {
                         result.put(describe(stream, "youtube"));
                     if (result.length() >= 20) break;
                 }
-            } catch (Exception failure) { android.util.Log.w("FluxoRadio", "Related items unavailable", failure); }
+            } catch (Exception failure) { AudioDiagnostics.record("radio", "related_failed"); }
         }
         if (result.length() == 0) {
             String topic = seed.optString("artist", "");

@@ -1,17 +1,19 @@
 import { cleanTrack, sameTrack } from './model.js';
 import { sameOccurrence } from './discovery.js';
 import { metadataFields, updateTrackCopies } from './collection-tools.js';
+import { samePlaybackItem } from './player-state.js';
 export const native = !!window.Capacitor?.isNativePlatform();
 const plugin = native ? (window.Capacitor.Plugins.FluxoAudio || window.Capacitor.registerPlugin('FluxoAudio')) : null;
 let callback = () => {};
 let state = { queue: [], index: 0, position: 0, duration: 0, playing: false, playWhenReady: false, buffering: false, repeat: 0, shuffle: false, speed: 1, volume: 1, error: '', sleepAt: 0 };
-const audio = new Audio();
+const audio = native ? null : new Audio();
+let nativeListener;
 let objectURL = '';
 let timeout;
 let generation = 0;
 let radioExcluded = [];
 const excluded = track => radioExcluded.some(item => item.id === track.id || (item.url && item.url === track.url));
-const emit = () => callback({ ...state, queue: state.queue.map(track => ({ ...track })) });
+const emit = () => callback({ ...state, queue: native ? state.queue : state.queue.map(track => ({ ...track })) });
 const openDB = () => new Promise((resolve, reject) => {
   const request = indexedDB.open('fluxo-mobile-offline', 1);
   request.onupgradeneeded = () => request.result.createObjectStore('downloads', { keyPath: 'id' });
@@ -46,6 +48,7 @@ async function browserPlay(play = true) {
     await audio.play();
   } catch (error) { if (token !== generation) return; clearTimeout(timeout); state.buffering = false; state.playWhenReady = false; state.error = error.message; emit(); }
 }
+if (!native) {
 audio.addEventListener('playing', () => { clearTimeout(timeout); state.playing = true; state.buffering = false; emit(); });
 audio.addEventListener('pause', () => { state.playing = false; emit(); });
 audio.addEventListener('waiting', () => { state.buffering = true; emit(); });
@@ -60,6 +63,7 @@ audio.addEventListener('ended', () => {
   else { state.playWhenReady = false; emit(); }
 });
 setInterval(() => { if (state.sleepAt && Date.now() >= state.sleepAt) { audio.pause(); state.playWhenReady = false; state.sleepAt = 0; emit(); } }, 1000);
+}
 export const commands = {
   async migrateOldDownloads(onProgress) {
     if (!native || localStorage.fluxo_audio_migration_version === '2') return;
@@ -85,7 +89,8 @@ export const commands = {
   async init(listener) {
     callback = listener;
     if (native) {
-      await plugin.addListener('state', data => { state = data; emit(); });
+      nativeListener ||= plugin.addListener('state', data => { state = { ...state, ...data }; emit(); });
+      await nativeListener;
       for (let i = 0; i < 8; i++) { try { state = await plugin.getState(); emit(); break; } catch (e) { if (i === 7) throw e; await new Promise(r => setTimeout(r, 250)); } }
     } else emit();
   },
@@ -114,6 +119,7 @@ export const commands = {
   async append(options) { if (native) return plugin.append(options); state.queue.splice(options.next ? state.index + 1 : state.queue.length, 0, options.track); emit(); },
   async command(options) {
     if (native) return plugin.command(options);
+    if (options.expectedItem && !samePlaybackItem(state, options.expectedItem)) throw new Error('A música mudou. Ajuste a posição novamente.');
     const { action, value = 0, index = 0 } = options;
     if (options.expectedQueue && !sameOccurrence(state.queue, options.expectedQueue, index)) throw new Error('A fila mudou. Abra as opções novamente.');
     switch (action) {
@@ -194,6 +200,11 @@ export const commands = {
     return { available: Number.isFinite(estimate?.quota) ? Math.max(0, estimate.quota - (estimate.usage || 0)) : null };
   },
   async diagnostics() { return native ? plugin.diagnostics() : { notifications: false, batteryUnrestricted: false, manufacturer: 'Prévia', model: '', android: '', foreground: false }; },
+  async configure(settings) { if (native) return plugin.configure(settings); },
+  async feedback(error = false) { if (native) return plugin.feedback({ error }); },
+  async audioLog() { return native ? plugin.audioLog() : { format: 'fluxo-audio-diagnostics', version: 1, enabled: false, events: [] }; },
+  async clearAudioLog() { if (native) return plugin.clearAudioLog(); },
+  async clearCache() { if (native) return plugin.clearCache(); },
   async openSettings(page) { if (native) return plugin.openSettings({ page }); },
   async exportBackup(data, filename = 'fluxo-backup.json') {
     if (native) return plugin.exportBackup({ data, filename });

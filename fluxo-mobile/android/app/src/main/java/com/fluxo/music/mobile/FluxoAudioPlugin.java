@@ -31,15 +31,19 @@ import java.util.concurrent.Executors;
 })
 @androidx.media3.common.util.UnstableApi
 public class FluxoAudioPlugin extends Plugin {
-    static volatile boolean visible = true;
+    static volatile boolean visible;
+    static volatile boolean meterEnabled = true;
     static final ExecutorService IO = Executors.newFixedThreadPool(3);
     private static WeakReference<FluxoAudioPlugin> current = new WeakReference<>(null);
     private final Handler main = new Handler(Looper.getMainLooper());
     private LibraryStore library;
+    private boolean starting;
     @Override public void load() {
         current = new WeakReference<>(this);
         library = LibraryStore.get(getContext());
-        getContext().startService(new Intent(getContext(), PlaybackService.class));
+        AudioDiagnostics.init(getContext()); AudioDiagnostics.record("webview", "loaded");
+        var prefs = getContext().getSharedPreferences("runtime", 0);
+        meterEnabled = !"battery".equals(prefs.getString("performanceMode", "balanced")) && !"off".equals(prefs.getString("visualizer", "bars"));
     }
     static void emit(String event, JSONObject value) {
         FluxoAudioPlugin plugin = current.get();
@@ -53,33 +57,75 @@ public class FluxoAudioPlugin extends Plugin {
         IO.execute(() -> { try { task.run(); } catch (Exception e) { call.reject(StreamResolver.readable(e), e); } });
     }
     private void player(PluginCall call, Task task) {
-        main.post(() -> {
-            if (PlaybackService.instance == null) { call.reject("O player ainda esta iniciando. Tente novamente."); return; }
-            try { task.run(); call.resolve(JSObject.fromJSONObject(PlaybackService.instance.state())); }
-            catch (Exception e) { call.reject(StreamResolver.readable(e), e); }
-        });
+        main.post(() -> awaitPlayer(call, task, 0));
     }
-    @PluginMethod public void getState(PluginCall call) { player(call, () -> {}); }
+    private void awaitPlayer(PluginCall call, Task task, int attempt) {
+        try {
+            if (PlaybackService.instance == null) {
+                if (!starting) { starting = true; getContext().startService(new Intent(getContext(), PlaybackService.class)); }
+                if (attempt >= 40) { starting = false; call.reject("O player ainda esta iniciando. Tente novamente."); return; }
+                main.postDelayed(() -> awaitPlayer(call, task, attempt + 1), 50); return;
+            }
+            starting = false;
+            task.run(); call.resolve(JSObject.fromJSONObject(PlaybackService.instance.state()));
+        } catch (Exception e) { starting = false; call.reject(StreamResolver.readable(e), e); }
+    }
+    @PluginMethod public void getState(PluginCall call) {
+        main.post(() -> { try { call.resolve(JSObject.fromJSONObject(PlaybackService.instance == null ? PlaybackSnapshot.read(getContext()) : PlaybackService.instance.state())); }
+            catch (Exception e) { call.reject("Nao foi possivel ler o estado do player.", e); } });
+    }
+    private void resolveSnapshot(PluginCall call) throws Exception {
+        JSONObject state = PlaybackSnapshot.read(getContext()); emit("state", state); call.resolve(JSObject.fromJSONObject(state));
+    }
     @PluginMethod public void radio(PluginCall call) {
         player(call, () -> PlaybackService.instance.startRadio(call.getObject("track"), call.getBoolean("offline", false)));
     }
     @PluginMethod public void radioExclusions(PluginCall call) {
-        player(call, () -> PlaybackService.instance.setRadioExclusions(call.getArray("tracks", new JSArray())));
+        main.post(() -> {
+            try { JSONArray tracks = call.getArray("tracks", new JSArray()); getContext().getSharedPreferences("player", 0).edit().putString("radioExcluded", tracks.toString()).apply();
+                if (PlaybackService.instance != null) PlaybackService.instance.setRadioExclusions(tracks);
+                call.resolve();
+            } catch (Exception e) { call.reject("Nao foi possivel salvar as preferencias do radio.", e); }
+        });
     }
     @PluginMethod public void setQueue(PluginCall call) {
         player(call, () -> PlaybackService.instance.setQueue(call.getArray("tracks", new JSArray()), call.getInt("index", 0), true));
     }
     @PluginMethod public void append(PluginCall call) {
-        player(call, () -> {
-            PlaybackService service = PlaybackService.instance;
-            int count = service.player.getMediaItemCount();
-            int index = call.getBoolean("next", false) ? Math.min(count, service.player.getCurrentMediaItemIndex() + 1) : count;
-            service.player.addMediaItem(index, PlaybackService.item(call.getObject("track")));
-            service.persist();
+        main.post(() -> {
+            try {
+                PlaybackService service = PlaybackService.instance;
+                if (service == null) {
+                    PlaybackSnapshot.append(getContext(), call.getObject("track"), call.getBoolean("next", false));
+                    resolveSnapshot(call); return;
+                }
+                int count = service.player.getMediaItemCount();
+                int index = call.getBoolean("next", false) ? Math.min(count, service.player.getCurrentMediaItemIndex() + 1) : count;
+                service.player.addMediaItem(index, PlaybackService.item(call.getObject("track")));
+                service.persist(); call.resolve(JSObject.fromJSONObject(service.state()));
+            } catch (Exception e) { call.reject("Nao foi possivel adicionar a faixa.", e); }
         });
     }
     @PluginMethod public void command(PluginCall call) {
-        player(call, () -> {
+        main.post(() -> {
+          if (PlaybackService.instance == null) {
+            try {
+                JSONObject expected = call.getObject("expectedItem");
+                if (expected != null) {
+                    if (!"seek".equals(call.getString("action")) || !PlaybackSnapshot.seek(getContext(), expected, call.getDouble("value", 0.0))) { call.reject("A musica mudou. Ajuste a posicao novamente."); return; }
+                    resolveSnapshot(call); return;
+                }
+                if (call.getArray("expectedQueue") == null && PlaybackSnapshot.command(getContext(), call.getString("action", ""), call.getDouble("value", 0.0))) { resolveSnapshot(call); return; }
+            } catch (Exception error) { call.reject(StreamResolver.readable(error), error); return; }
+          }
+          awaitPlayer(call, () -> {
+            JSONObject expectedItem = call.getObject("expectedItem");
+            if (expectedItem != null) {
+                var service = PlaybackService.instance; var item = service.player.getCurrentMediaItem();
+                JSONObject actual = item == null ? new JSONObject() : PlaybackService.track(item);
+                if (item == null || !PlaybackSnapshot.matches(actual, service.player.getCurrentMediaItemIndex(), expectedItem))
+                    throw new IllegalStateException("A musica mudou. Ajuste a posicao novamente.");
+            }
             JSONArray expected = call.getArray("expectedQueue");
             if (expected != null) {
                 JSONArray actual = PlaybackService.instance.state().getJSONArray("queue");
@@ -90,6 +136,7 @@ public class FluxoAudioPlugin extends Plugin {
                 }
             }
             PlaybackService.instance.command(call.getString("action", ""), call.getDouble("value", 0.0), call.getInt("index", 0));
+          }, 0);
         });
     }
     @PluginMethod public void copyText(PluginCall call) {
@@ -123,7 +170,7 @@ public class FluxoAudioPlugin extends Plugin {
             if (track == null || track.optString("id").isEmpty() || title.isEmpty() || artist.isEmpty() || title.length() > 500 || artist.length() > 500) throw new IllegalArgumentException("Informe nome e artista com ate 500 caracteres.");
             synchronized (LibrarySync.class) { library.updateMetadata(track, title, artist); LibrarySync.updateMetadata(getContext(), track, title, artist); }
             main.post(() -> {
-                try { if (PlaybackService.instance != null) PlaybackService.instance.updateMetadata(track, title, artist); call.resolve(); }
+                try { if (PlaybackService.instance != null) PlaybackService.instance.updateMetadata(track, title, artist); else PlaybackSnapshot.updateMetadata(getContext(), track, title, artist); call.resolve(); }
                 catch (Exception failure) { call.reject(StreamResolver.readable(failure), failure); }
             });
         });
@@ -202,12 +249,59 @@ public class FluxoAudioPlugin extends Plugin {
         startActivityForResult(call, intent, "audioPicked");
     }
     @PluginMethod public void diagnostics(PluginCall call) {
+        main.post(() -> {
         var power = (android.os.PowerManager)getContext().getSystemService(android.content.Context.POWER_SERVICE);
+        android.os.Debug.MemoryInfo memory = new android.os.Debug.MemoryInfo(); android.os.Debug.getMemoryInfo(memory);
+        var runtime = getContext().getSharedPreferences("runtime", 0);
         call.resolve(new JSObject().put("notifications", androidx.core.app.NotificationManagerCompat.from(getContext()).areNotificationsEnabled())
             .put("batteryUnrestricted", power.isIgnoringBatteryOptimizations(getContext().getPackageName()))
             .put("manufacturer", Build.MANUFACTURER).put("model", Build.MODEL).put("android", Build.VERSION.RELEASE)
-            .put("foreground", PlaybackService.instance != null && PlaybackService.instance.isPlaybackOngoing()));
+            .put("foreground", PlaybackService.instance != null && PlaybackService.instance.isPlaybackOngoing())
+            .put("serviceActive", PlaybackService.instance != null).put("focusState", PlaybackService.instance == null ? "none" : PlaybackService.instance.state().optString("focusState"))
+            .put("focusRequests", AudioFocusController.requests).put("focusReleases", AudioFocusController.releases).put("memoryPssKb", memory.getTotalPss())
+            .put("diagnosticEnabled", AudioDiagnostics.enabled()).put("streamCacheEntries", StreamResolver.cacheSize()).put("audioMeterEnabled", meterEnabled)
+            .put("performanceMode", runtime.getString("performanceMode", "balanced")).put("visualizer", runtime.getString("visualizer", "bars"))
+            .put("downloadNotifications", runtime.getBoolean("downloadNotifications", true)).put("silentInterface", runtime.getBoolean("silentInterface", true))
+            .put("prefetchNext", runtime.getBoolean("prefetchNext", true)));
+        });
     }
+    @PluginMethod public void configure(PluginCall call) {
+        main.post(() -> {
+            var prefs = getContext().getSharedPreferences("runtime", 0);
+            var edit = prefs.edit();
+            for (String key : new String[]{"downloadNotifications", "silentInterface", "uiSounds", "alertSounds", "haptics", "backgroundDownloads", "prefetchNext"}) {
+                boolean fallback = key.equals("downloadNotifications") || key.equals("silentInterface") || key.equals("backgroundDownloads") || key.equals("prefetchNext");
+                edit.putBoolean(key, call.getBoolean(key, prefs.getBoolean(key, fallback)));
+            }
+            String mode = call.getString("performanceMode", prefs.getString("performanceMode", "balanced"));
+            if (!mode.equals("battery") && !mode.equals("balanced")) mode = prefs.getString("performanceMode", "balanced");
+            String visualizer = call.getString("visualizer", prefs.getString("visualizer", "bars"));
+            if (!visualizer.equals("off") && !visualizer.equals("bars") && !visualizer.equals("wave")) visualizer = prefs.getString("visualizer", "bars");
+            edit.putString("performanceMode", mode).putString("visualizer", visualizer).apply();
+            meterEnabled = !mode.equals("battery") && !visualizer.equals("off");
+            boolean diagnostic = call.getBoolean("diagnosticEnabled", AudioDiagnostics.enabled());
+            if (diagnostic != AudioDiagnostics.enabled()) AudioDiagnostics.enable(getContext(), diagnostic);
+            if (getActivity() != null) getBridge().getWebView().setSoundEffectsEnabled(false);
+            call.resolve();
+        });
+    }
+    @PluginMethod public void feedback(PluginCall call) {
+        main.post(() -> {
+            var prefs = getContext().getSharedPreferences("runtime", 0);
+            if (getActivity() != null && prefs.getBoolean("haptics", false)) getBridge().getWebView().performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP);
+            boolean error = call.getBoolean("error", false);
+            if (!prefs.getBoolean("silentInterface", true) && prefs.getBoolean(error ? "alertSounds" : "uiSounds", false)) {
+                ((android.media.AudioManager)getContext().getSystemService(Context.AUDIO_SERVICE)).playSoundEffect(android.media.AudioManager.FX_KEY_CLICK);
+                AudioDiagnostics.record("interface", "sound_effect");
+            }
+            call.resolve();
+        });
+    }
+    @PluginMethod public void audioLog(PluginCall call) {
+        try { call.resolve(JSObject.fromJSONObject(AudioDiagnostics.export())); } catch (Exception e) { call.reject("Falha ao ler o diagnostico.", e); }
+    }
+    @PluginMethod public void clearAudioLog(PluginCall call) { AudioDiagnostics.clear(); call.resolve(); }
+    @PluginMethod public void clearCache(PluginCall call) { StreamResolver.clearCache(); call.resolve(); }
     @PluginMethod public void openSettings(PluginCall call) {
         String page = call.getString("page", "app");
         Intent intent = page.equals("notifications") ? new Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
@@ -263,9 +357,10 @@ public class FluxoAudioPlugin extends Plugin {
         });
     }
     @Override protected void handleOnDestroy() {
+        AudioDiagnostics.record("webview", "destroyed"); main.removeCallbacksAndMessages(null);
         if (current.get() == this) current.clear();
         super.handleOnDestroy();
     }
-    @Override protected void handleOnPause() { visible = false; super.handleOnPause(); }
-    @Override protected void handleOnResume() { visible = true; super.handleOnResume(); }
+    @Override protected void handleOnPause() { visible = false; AudioDiagnostics.record("activity", "background"); super.handleOnPause(); }
+    @Override protected void handleOnResume() { visible = true; AudioDiagnostics.record("activity", "foreground"); super.handleOnResume(); }
 }

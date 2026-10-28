@@ -7,10 +7,12 @@ let frameId;
 function frame(time) {
   if (!running) return;
   const canvas = document.querySelector('#audio-visual');
+  if (!canvas || document.hidden || !canvas.closest('dialog')?.open) { running = false; return; }
   if (canvas && !document.hidden && time - lastFrame > 32) {
     lastFrame = time;
     const state = getState();
     const style = getAppearance();
+    if (!state.playing || style.performanceMode === 'battery' || style.visualizer === 'off') { canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height); running = false; return; }
     const rect = canvas.getBoundingClientRect();
     if (style.visualizer === 'off' || rect.width === 0) { frameId = requestAnimationFrame(frame); return; }
     const ratio = Math.min(2, devicePixelRatio || 1);
@@ -44,4 +46,8 @@ function frame(time) {
   frameId = requestAnimationFrame(frame);
 }
 export function startVisualizer(state, appearance = () => ({})) { getState = state; getAppearance = appearance; if (!running) { running = true; frameId = requestAnimationFrame(frame); } }
-export function stopVisualizer() { running = false; cancelAnimationFrame(frameId); }
+export function stopVisualizer() {
+  running = false; cancelAnimationFrame(frameId); levels.fill(0);
+  const canvas = document.querySelector('#audio-visual'), ctx = canvas?.getContext('2d');
+  if (ctx) { ctx.resetTransform(); ctx.clearRect(0, 0, canvas.width, canvas.height); }
+}

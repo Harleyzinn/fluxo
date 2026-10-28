@@ -1,14 +1,16 @@
+import { normalizeRuntime } from './runtime.js';
+import { normalizePlaybackPreferences } from './player-state.js';
 export const appearanceDefaults = Object.freeze({
   theme: 'fluxobug', accent: '#a5f060', secondary: '#fa84ad', background: '#0e1110',
   customAccent: false, customSecondary: false, customBackground: false,
   density: 'comfortable', textSize: 'normal', font: 'system', radius: 8,
   artworkShape: 'square', playlistView: 'grid', playerLayout: 'cover',
-  visualizer: 'bars', reducedMotion: false
+  visualizer: 'bars', reducedMotion: false, colorMode: 'theme'
 });
 const choices = {
   density: ['comfortable', 'compact'], textSize: ['normal', 'large'], font: ['system', 'mono', 'serif'],
   artworkShape: ['square', 'round'], playlistView: ['grid', 'list'], playerLayout: ['cover', 'compact'],
-  visualizer: ['bars', 'wave', 'off'], radius: [0, 4, 8]
+  visualizer: ['bars', 'wave', 'off'], radius: [0, 4, 8], colorMode: ['theme', 'light', 'dark', 'system']
 };
 export const playlistIcons = ['list-music', 'headphones', 'disc-3', 'heart', 'radio', 'music-2', 'sparkles'];
 export const playlistColors = ['#a5f060', '#fa84ad', '#54c7e8', '#e8b85a', '#ae9cf5', '#ff7c7c'];
@@ -27,7 +29,7 @@ export function normalizeAppearance(value = {}) {
 export function normalizeSettings(value = {}) {
   value = value && typeof value === 'object' ? value : {};
   const profiles = Array.isArray(value.profiles) ? value.profiles : [];
-  return { ...normalizeAppearance(value), offline: value.offline === true, wifiOnly: value.wifiOnly === true, autoDownload: value.autoDownload !== false,
+  return { ...normalizeAppearance(value), ...normalizeRuntime(value), ...normalizePlaybackPreferences(value), offline: value.offline === true, wifiOnly: value.wifiOnly === true, autoDownload: value.autoDownload !== false,
     themeFavorites: [...new Set((Array.isArray(value.themeFavorites) ? value.themeFavorites : []).filter(id => typeof id === 'string' && /^[a-z0-9-]{1,60}$/.test(id)))].slice(0, 100),
     profiles: [...new Map(profiles.filter(p => p && typeof p.id === 'string' && typeof p.name === 'string' && p.name.trim()).slice(0, 12)
       .map(p => [p.id, { id: p.id.slice(0, 100), name: p.name.trim().slice(0, 40), values: normalizeAppearance(p.values) }])).values()] };
@@ -42,6 +44,16 @@ const rgb = color => {
   return isColor(color) ? [1, 3, 5].map(i => parseInt(color.slice(i, i + 2), 16)) : [165, 240, 96];
 };
 const hex = values => '#' + values.map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
+const luminance = color => rgb(color).map(v => { v /= 255; return v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; }).reduce((sum, v, i) => sum + v * [.2126, .7152, .0722][i], 0);
+export function readableAccent(color, background) {
+  const base = rgb(color), ink = rgb(contrastText(background)); let result = color;
+  for (let ratio = .05; ratio <= 1; ratio += .05) {
+    const a = luminance(result), b = luminance(background);
+    if ((Math.max(a, b) + .05) / (Math.min(a, b) + .05) >= 4.5) return result;
+    result = hex(base.map((value, i) => value + (ink[i] - value) * ratio));
+  }
+  return hex(ink);
+}
 export function contrastText(color) {
   const channels = rgb(color).map(v => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; });
   return channels[0] * .2126 + channels[1] * .7152 + channels[2] * .0722 > .179 ? '#101411' : '#ffffff';

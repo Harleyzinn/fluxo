@@ -1,0 +1,72 @@
+{
+  "version": "2.9.0",
+  "apkSha256": "1ea2223fa5b3574092ff3ec91f46d8640d7fb01f663bdf055ef7d34e875efdb4",
+  "device": "Android API 37 emulator",
+  "physicalDeviceValidated": false,
+  "nativeBackground": {
+    "startedAt": "2026-10-17T21:46:09.581Z",
+    "noAutomaticQueue": true,
+    "onlineStartMs": 14963,
+    "onlineScreenOff": {
+      "seconds": 180,
+      "advanced": 183.917,
+      "foreground": true
+    },
+    "notificationPause": true,
+    "notificationPlay": true,
+    "notificationNext": true,
+    "onlineRadio": {
+      "count": 7,
+      "duplicateFree": true
+    },
+    "radioStopClearsRecommendations": true,
+    "offlineRadio": true,
+    "sleepEnd": true
+  },
+  "uiControlledStates": {
+    "bufferingPause": true,
+    "visualizerResumes": true,
+    "stableScrubbing": true,
+    "progressDoesNotRepaintControls": true,
+    "remainingTime": true,
+    "compactSpeedLabel": true,
+    "cancelledScrub": true,
+    "trackChangeDropsOldSeek": true,
+    "pausedTimerUpdates": true,
+    "radioModeUpdates": true,
+    "responsive": true
+  },
+  "externalAudioFocus": {
+    "appVersion": "2.9.0",
+    "startedAt": "2026-10-17T21:42:26.536Z",
+    "device": "Android API 37 emulator, separate audio probe app",
+    "failedStreamWaitSeconds": 65,
+    "externalPlaying": true,
+    "externalFocusLosses": 0,
+    "scenarios": {
+      "interfaceSounds": true,
+      "background": true,
+      "lockedScreen": true,
+      "notifications": true,
+      "networkLoss": true,
+      "networkReturn": true,
+      "rapidAppSwitching": true,
+      "idleAudioPreferences": true,
+      "downloadCompletion": true
+    },
+    "systemBatterySaverValidated": false
+  },
+  "nativePlayer": {
+    "staleSeekDoesNotStartService": true,
+    "validSeekPreservesPause": true,
+    "coldSeekUpdatesWithoutService": true,
+    "coldQueueAndSettingsNotifyUi": true,
+    "staleSeekCannotMoveNextTrack": true,
+    "changedSourceRejected": true,
+    "batteryModeDisablesMeter": true,
+    "meterResumes": true,
+    "nativeSpeedRaw": 1.100000023841858,
+    "nativeSpeedLabel": true,
+    "nativeScrubbingStable": true
+  }
+}
