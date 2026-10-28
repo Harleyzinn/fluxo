@@ -26,10 +26,17 @@ async function main() {
   const repo = await api(`/repos/${repository}`);
   if (!repo.permissions?.push) throw new Error('Repository push permission required.');
   if (mode === 'check') { console.log(JSON.stringify({ repository: repo.full_name, push: true, tag, defaultBranch: repo.default_branch })); return; }
-  const evidence = JSON.parse(readFileSync(path.join(root, 'dist', `RESULTADOS-${version}.json`), 'utf8'));
-  if (evidence.version !== version || `sha256:${evidence.apkSha256}` !== digest(path.join(root, 'dist', names[0]))) throw new Error('Validation evidence does not match this APK.');
-  if (evidence.nativeFocus?.externalFocusLosses !== 0 || !evidence.nativeBackground?.notificationNext || !evidence.nativeBackground?.offlineRadio || !evidence.nativeRenderer?.recoveryLoopGuard) throw new Error('Required native validation evidence is missing.');
   const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
+  const evidence = JSON.parse(readFileSync(path.join(root, 'dist', `RESULTADOS-${version}.json`), 'utf8'));
+  if (evidence.version !== version || evidence.sourceCommit !== head || `sha256:${evidence.apkSha256}` !== digest(path.join(root, 'dist', names[0]))) throw new Error('Validation evidence does not match this APK/source.');
+  const builtAt = Date.parse(evidence.apkBuiltAt);
+  if (!Number.isFinite(builtAt) || [evidence.nativeFocus, evidence.nativeBackground, evidence.nativeRenderer].some(result => !Number.isFinite(Date.parse(result?.startedAt)) || Date.parse(result.startedAt) < builtAt)) throw new Error('Stale or undated validation evidence.');
+  const focusCases = ['interfaceSounds', 'background', 'lockedScreen', 'notifications', 'networkLoss', 'networkReturn', 'rapidAppSwitching', 'idleAudioPreferences', 'downloadCompletion'];
+  const backgroundCases = ['notificationPause', 'notificationPlay', 'notificationNext', 'noAutomaticQueue', 'offlineRadio', 'sleepEnd', 'radioStopClearsRecommendations'];
+  const rendererCases = ['foregroundAudioSurvives', 'backgroundRecoveryDeferred', 'idleRecoveryDoesNotStartAudio', 'recoveryLoopGuard'];
+  if (evidence.nativeFocus?.appVersion !== version || evidence.nativeFocus.externalFocusLosses !== 0 || !focusCases.every(key => evidence.nativeFocus.scenarios?.[key] === true)
+    || !backgroundCases.every(key => evidence.nativeBackground?.[key] === true) || evidence.nativeBackground.onlineScreenOff?.seconds < 180 || !evidence.nativeBackground.onlineScreenOff?.foreground
+    || !rendererCases.every(key => evidence.nativeRenderer?.[key] === true) || !evidence.nativePlayer?.partialConfigurationPreserved) throw new Error('Required native validation evidence is missing.');
   if (execFileSync('git', ['status', '--porcelain', '--', '.'], { cwd: root, encoding: 'utf8' }).trim()) throw new Error('Commit the mobile sources before releasing.');
   let release = (await api(`/repos/${repository}/releases?per_page=100`)).find(item => item.tag_name === tag);
   if (!release && mode === 'draft') release = await api(`/repos/${repository}/releases`, 'POST', {
