@@ -12,6 +12,7 @@ import androidx.media3.common.MediaItem;
 import androidx.media3.common.MediaMetadata;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
+import androidx.media3.common.ForwardingPlayer;
 import androidx.media3.datasource.DefaultDataSource;
 import androidx.media3.datasource.DefaultHttpDataSource;
 import androidx.media3.datasource.ResolvingDataSource;
@@ -57,9 +58,19 @@ public class PlaybackService extends MediaSessionService {
     private android.media.audiofx.Equalizer equalizer;
     private int eqPreset;
     private final AudioMeter meter = new AudioMeter();
+    private AudioFocusController audioFocus;
+    private boolean ticking;
+    private float userVolume = 1;
+    private boolean ducking;
 
     @Override public void onCreate() {
         super.onCreate();
+        AudioDiagnostics.init(this); AudioDiagnostics.record("service", "created");
+        audioFocus = new AudioFocusController(this, handler, () -> {
+            playbackGeneration++; radioGeneration++; radioLoading = false; recovering = false; bufferingSince = 0;
+            player.pause(); player.stop(); error = "Audio pausado pelo sistema. Toque para continuar.";
+            handler.removeCallbacks(tick); ticking = false; persist(); publish();
+        }, active -> { ducking = active; if (player != null) player.setVolume(userVolume * (active ? .2f : 1)); });
         var http = new DefaultHttpDataSource.Factory().setUserAgent(StreamResolver.AGENT)
             .setConnectTimeoutMs(10000).setReadTimeoutMs(15000).setAllowCrossProtocolRedirects(false);
         var source = new ResolvingDataSource.Factory(new DefaultDataSource.Factory(this, http), spec -> {
@@ -68,7 +79,7 @@ public class PlaybackService extends MediaSessionService {
             try {
                 String local = LibraryStore.get(this).playbackUri(spec.uri.getQueryParameter("id"), page);
                 if (local != null) return spec.withUri(Uri.parse(local));
-            } catch (Exception failure) { android.util.Log.w("FluxoPlayback", "Offline file lookup failed", failure); }
+            } catch (Exception failure) { AudioDiagnostics.record("offline_store", "lookup_failed"); }
             if (page == null || page.isEmpty()) throw new java.io.IOException("Arquivo local indisponivel. Importe novamente.");
             return spec.withUri(Uri.parse(StreamResolver.resolve(page)));
         });
@@ -84,11 +95,18 @@ public class PlaybackService extends MediaSessionService {
             .setMediaSourceFactory(new DefaultMediaSourceFactory(source))
             .setLoadControl(new DefaultLoadControl.Builder().setBufferDurationsMs(15000, 50000, 600, 1800).build())
             .setAudioAttributes(new AudioAttributes.Builder().setUsage(C.USAGE_MEDIA)
-                .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(), true)
+                .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(), false)
             .setHandleAudioBecomingNoisy(true).setWakeMode(C.WAKE_MODE_NETWORK).build();
         var activity = android.app.PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class),
             android.app.PendingIntent.FLAG_IMMUTABLE | android.app.PendingIntent.FLAG_UPDATE_CURRENT);
-        session = new MediaSession.Builder(this, player).setSessionActivity(activity).build();
+        Player sessionPlayer = new ForwardingPlayer(player) {
+            @Override public void play() { requestPlayback("media_session"); }
+            @Override public void setPlayWhenReady(boolean play) { if (play) requestPlayback("media_session"); else command("pause", 0, 0); }
+            @Override public void pause() { command("pause", 0, 0); }
+            @Override public void setVolume(float volume) { command("volume", volume, 0); }
+            @Override public void stop() { command("pause", 0, 0); PlaybackService.this.player.stop(); }
+        };
+        session = new MediaSession.Builder(this, sessionPlayer).setSessionActivity(activity).build();
         var notification = new DefaultMediaNotificationProvider.Builder(this)
             .setChannelId("fluxo_playback").setChannelName(R.string.playback_channel).setNotificationId(1001).build();
         setMediaNotificationProvider(notification);
@@ -107,16 +125,20 @@ public class PlaybackService extends MediaSessionService {
         connectivity.registerDefaultNetworkCallback(networkCallback);
         player.addListener(new Player.Listener() {
             @Override public void onPlayWhenReadyChanged(boolean play, int reason) {
+                AudioDiagnostics.record("player", "play_intent", "playWhenReady", play, "reason", reason);
+                if (!play) { audioFocus.release("player_paused"); playbackGeneration++; radioGeneration++; radioLoading = false; recovering = false; handler.removeCallbacks(tick); ticking = false; persist(); }
+                else if (!ticking) { ticking = true; handler.post(tick); }
                 if (!play && reason == Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM) {
                     sleepEnd = false; player.setPauseAtEndOfMediaItems(false); publish();
                 }
             }
             @Override public void onAudioSessionIdChanged(int audioSessionId) { configureEqualizer(audioSessionId); }
             @Override public void onEvents(Player ignored, Player.Events events) {
+                if (player.getPlaybackState() == Player.STATE_ENDED && audioFocus.allowed()) { audioFocus.release("queue_ended"); player.pause(); }
                 if (player.getPlayWhenReady() && player.getPlaybackState() == Player.STATE_BUFFERING) {
                     if (bufferingSince == 0) bufferingSince = android.os.SystemClock.elapsedRealtime();
                 } else bufferingSince = 0;
-                if (player.getPlaybackState() == Player.STATE_READY) { error = ""; recovering = false; }
+                if (player.getPlaybackState() == Player.STATE_READY && audioFocus.allowed()) { error = ""; recovering = false; }
                 if (!player.getPlayWhenReady()) recovering = false;
                 refillRadio();
                 publish();
@@ -133,7 +155,8 @@ public class PlaybackService extends MediaSessionService {
                 persist();
                 // Resolve the next item ahead of time, without starting another audio player.
                 int next = player.getNextMediaItemIndex();
-                if (next != C.INDEX_UNSET) {
+                if (next != C.INDEX_UNSET && audioFocus.allowed() && getSharedPreferences("runtime", 0).getBoolean("prefetchNext", true)
+                    && !getSharedPreferences("runtime", 0).getString("performanceMode", "balanced").equals("battery")) {
                     String url = track(player.getMediaItemAt(next)).optString("url");
                     if (track(player.getMediaItemAt(next)).optString("localUri").isEmpty())
                         FluxoAudioPlugin.IO.execute(() -> { try { StreamResolver.resolve(url); } catch (Exception ignored) {} });
@@ -141,7 +164,7 @@ public class PlaybackService extends MediaSessionService {
             }
             @Override public void onPlayerError(PlaybackException failure) {
                 MediaItem item = player.getCurrentMediaItem();
-                android.util.Log.e("FluxoPlayback", "Playback failed", failure);
+                AudioDiagnostics.record("player", "error", "reason", failure.errorCode);
                 recoverPlayback();
             }
         });
@@ -153,7 +176,7 @@ public class PlaybackService extends MediaSessionService {
             player.setRepeatMode(prefs.getInt("repeat", 0));
             player.setShuffleModeEnabled(prefs.getBoolean("shuffle", false));
             player.setPlaybackSpeed(prefs.getFloat("speed", 1));
-            player.setVolume(Math.max(0, Math.min(1, prefs.getFloat("volume", 1))));
+            userVolume = Math.max(0, Math.min(1, prefs.getFloat("volume", 1))); player.setVolume(userVolume);
             JSONArray saved = new JSONArray(prefs.getString("queue", "[]"));
             long savedPosition = prefs.getLong("position", 0);
             if (saved.length() > 0) {
@@ -161,31 +184,33 @@ public class PlaybackService extends MediaSessionService {
                 player.seekTo(savedPosition);
             }
         } catch (Exception ignored) {}
-        handler.post(tick);
     }
 
     private final Runnable tick = new Runnable() {
         @Override public void run() {
-            if (sleepAt > 0 && System.currentTimeMillis() >= sleepAt) { player.pause(); sleepAt = 0; }
+            if (!audioFocus.allowed() || !player.getPlayWhenReady()) { ticking = false; return; }
+            if (sleepAt > 0 && System.currentTimeMillis() >= sleepAt) { AudioDiagnostics.record("timer", "expired"); player.pause(); sleepAt = 0; }
             if (sleepEnd && player.getPlaybackState() == Player.STATE_ENDED) { player.pause(); sleepEnd = false; }
             if (player.getPlayWhenReady() && bufferingSince > 0 && !recovering
                 && android.os.SystemClock.elapsedRealtime() - bufferingSince > 45000) recoverPlayback();
             if (radio && ticks % 20 == 0) refillRadio();
-            publish();
-            if (++ticks % 10 == 0) persist();
-            handler.postDelayed(this, 750);
+            publish(false);
+            if (++ticks % 10 == 0) persist(false);
+            handler.postDelayed(this, FluxoAudioPlugin.visible ? 750 : 4000);
         }
     };
+    private final Runnable sleepTask = () -> { if (sleepAt > 0 && System.currentTimeMillis() >= sleepAt) { sleepAt = 0; AudioDiagnostics.record("timer", "expired"); player.pause(); persist(); publish(); } };
 
     private void recoverPlayback() {
         MediaItem item = player.getCurrentMediaItem();
-        if (!player.getPlayWhenReady() || item == null) return;
+        if (!audioFocus.allowed() || !player.getPlayWhenReady() || item == null) return;
+        AudioDiagnostics.record("recovery", "started", "count", retries, "token", playbackGeneration);
         boolean local = !track(item).optString("localUri").isEmpty();
         if (local || retries >= 3) {
             recovering = false;
             error = local ? "O arquivo baixado esta indisponivel. Baixe ou importe novamente."
                 : "Nao foi possivel retomar o audio. Verifique a conexao e tente novamente.";
-            player.pause(); publish(); return;
+            audioFocus.release("recovery_failed"); player.pause(); publish(); return;
         }
         retries++;
         recovering = true;
@@ -199,7 +224,7 @@ public class PlaybackService extends MediaSessionService {
     }
 
     private void retryPlayback(int token) {
-        if (token != playbackGeneration || !recovering || !player.getPlayWhenReady()) return;
+        if (token != playbackGeneration || !audioFocus.allowed() || !recovering || !player.getPlayWhenReady()) { AudioDiagnostics.record("recovery", "cancelled", "token", token); return; }
         long position = player.getCurrentPosition();
         player.stop(); player.seekTo(position); player.prepare();
         recovering = false; bufferingSince = android.os.SystemClock.elapsedRealtime();
@@ -225,7 +250,7 @@ public class PlaybackService extends MediaSessionService {
         JSONObject now = player.getCurrentMediaItem() == null ? new JSONObject() : track(player.getCurrentMediaItem());
         boolean same = now.optString("id").equals(seed.optString("id"));
         if (same && (player.getPlaybackState() == Player.STATE_READY || player.getPlaybackState() == Player.STATE_BUFFERING)) {
-            stopRadio(); player.play();
+            stopRadio(); requestPlayback("radio_user");
         } else setQueue(new JSONArray().put(seed), 0, true);
         radio = true; radioOffline = local; radioSeed = new JSONObject(seed.toString());
         radioSeen.clear();
@@ -261,7 +286,7 @@ public class PlaybackService extends MediaSessionService {
     }
 
     private void refillRadio() {
-        if (!radio || radioLoading || player.getMediaItemCount() - player.getCurrentMediaItemIndex() > (radioOffline ? 1 : 3)
+        if (!audioFocus.allowed() || !player.getPlayWhenReady() || !radio || radioLoading || player.getMediaItemCount() - player.getCurrentMediaItemIndex() > (radioOffline ? 1 : 3)
             || System.currentTimeMillis() < radioRetryAt) return;
         MediaItem current = player.getCurrentMediaItem();
         if (current == null) { stopRadio(); return; }
@@ -276,7 +301,8 @@ public class PlaybackService extends MediaSessionService {
             } catch (Exception e) { failure = StreamResolver.readable(e); }
             JSONArray batch = candidates; String message = failure;
             handler.post(() -> {
-                if (token != radioGeneration || !radio || instance != this) return;
+                if (token != radioGeneration || instance != this) return;
+                if (!audioFocus.allowed() || !player.getPlayWhenReady() || !radio) { radioLoading = false; publish(); return; }
                 radioError = message;
                 ArrayList<JSONObject> eligible = new ArrayList<>();
                 for (int i = 0; i < batch.length(); i++) {
@@ -388,16 +414,16 @@ public class PlaybackService extends MediaSessionService {
         for (int i = 0; i < queue.length(); i++) items.add(item(queue.getJSONObject(i)));
         error = "";
         player.setMediaItems(items, Math.max(0, Math.min(index, items.size() - 1)), 0);
-        if (play && !items.isEmpty()) { player.prepare(); player.play(); }
+        if (play && !items.isEmpty()) requestPlayback("queue_user");
         persist();
     }
 
-    JSONObject state() {
+    JSONObject state() { return state(true); }
+    JSONObject state(boolean includeQueue) {
         JSONObject data = new JSONObject();
         try {
-            JSONArray queue = new JSONArray();
-            for (int i = 0; i < player.getMediaItemCount(); i++) queue.put(track(player.getMediaItemAt(i)));
-            data.put("queue", queue).put("index", player.getCurrentMediaItemIndex());
+            if (includeQueue) { JSONArray queue = new JSONArray(); for (int i = 0; i < player.getMediaItemCount(); i++) queue.put(track(player.getMediaItemAt(i))); data.put("queue", queue); }
+            data.put("index", player.getCurrentMediaItemIndex());
             data.put("playing", player.isPlaying()).put("playWhenReady", player.getPlayWhenReady());
             data.put("buffering", player.getPlaybackState() == Player.STATE_BUFFERING);
             data.put("position", player.getCurrentPosition() / 1000.0);
@@ -406,29 +432,40 @@ public class PlaybackService extends MediaSessionService {
             data.put("shuffle", player.getShuffleModeEnabled()).put("repeat", player.getRepeatMode());
             data.put("canNext", player.hasNextMediaItem() || radio);
             data.put("speed", player.getPlaybackParameters().speed).put("sleepAt", sleepAt).put("error", error);
-            data.put("volume", player.getVolume());
+            data.put("volume", userVolume).put("ducking", ducking);
+            data.put("focusState", audioFocus.allowed() ? "held" : "none");
             data.put("sleepEnd", sleepEnd).put("recovering", recovering).put("retries", retries);
             data.put("radio", radio).put("radioOffline", radioOffline).put("radioLoading", radioLoading)
                 .put("radioError", radioError).put("radioSeed", radioSeed);
             data.put("eqPreset", eqPreset).put("eqAvailable", equalizer != null);
             JSONArray levels = new JSONArray();
-            for (float value : meter.levels) levels.put(player.isPlaying() ? value : 0);
+            for (float value : meter.levels) levels.put(player.isPlaying() && FluxoAudioPlugin.meterEnabled ? value : 0);
             data.put("levels", levels);
         } catch (Exception ignored) {}
         return data;
     }
 
+    private void requestPlayback(String source) {
+        playbackGeneration++; recovering = false; error = "";
+        if (player.getMediaItemCount() == 0) return;
+        if (player.getPlaybackState() == Player.STATE_ENDED) player.seekTo(player.getCurrentMediaItemIndex(), 0);
+        if (!audioFocus.acquire(source)) { error = "Nao foi possivel obter foco de audio. Abra o app e tente novamente."; player.pause(); publish(); return; }
+        player.prepare(); player.play();
+    }
+
     void command(String action, double value, int index) {
+        AudioDiagnostics.record("command", Set.of("play", "pause", "next", "previous", "seek", "jump", "remove", "move", "clear", "shuffle", "repeat", "speed", "volume", "sleep", "radio-stop", "radio-retry", "equalizer", "remove-played", "clear-upcoming", "deduplicate-upcoming", "refresh").contains(action) ? action : "unknown", "count", player.getMediaItemCount());
         switch (action) {
-            case "play": error = ""; retries = 0; recovering = false; playbackGeneration++; player.prepare(); player.play(); break;
-            case "pause": playbackGeneration++; recovering = false; player.pause(); break;
+            case "refresh": publish(); return;
+            case "play": retries = 0; requestPlayback("play_user"); break;
+            case "pause": audioFocus.release("pause_user"); playbackGeneration++; radioGeneration++; radioLoading = false; recovering = false; player.pause(); break;
             case "next": player.seekToNextMediaItem(); if (radio) { radioRetryAt = 0; refillRadio(); } break;
             case "previous": player.seekToPrevious(); break;
             case "seek": if (Double.isFinite(value)) { long duration = player.getDuration(); long position = (long)(Math.max(0, value) * 1000); player.seekTo(duration > 0 ? Math.min(duration, position) : position); } break;
-            case "jump": if (index >= 0 && index < player.getMediaItemCount()) { player.seekTo(index, 0); player.prepare(); player.play(); } break;
+            case "jump": if (index >= 0 && index < player.getMediaItemCount()) { player.seekTo(index, 0); requestPlayback("jump_user"); } break;
             case "remove": if (index >= 0 && index < player.getMediaItemCount()) { player.removeMediaItem(index); if (player.getMediaItemCount() == 0) { command("clear", 0, 0); return; } } break;
             case "move": if (index >= 0 && index < player.getMediaItemCount() && value >= 0 && value < player.getMediaItemCount()) player.moveMediaItem(index, (int)value); break;
-            case "clear": stopRadio(); playbackGeneration++; recovering = false; retries = 0; error = ""; player.pause(); player.clearMediaItems(); sleepAt = 0; sleepEnd = false; player.setPauseAtEndOfMediaItems(false); break;
+            case "clear": audioFocus.release("clear_user"); stopRadio(); playbackGeneration++; recovering = false; retries = 0; error = ""; player.pause(); player.clearMediaItems(); sleepAt = 0; sleepEnd = false; player.setPauseAtEndOfMediaItems(false); break;
             case "remove-played": player.removeMediaItems(0, player.getCurrentMediaItemIndex()); break;
             case "clear-upcoming": stopRadio(); if (player.getMediaItemCount() > 0) player.removeMediaItems(player.getCurrentMediaItemIndex() + 1, player.getMediaItemCount()); break;
             case "deduplicate-upcoming": {
@@ -446,28 +483,33 @@ public class PlaybackService extends MediaSessionService {
             case "shuffle": player.setShuffleModeEnabled(value == 1); break;
             case "repeat": player.setRepeatMode(Math.max(0, Math.min(2, (int)value))); break;
             case "speed": player.setPlaybackSpeed((float)Math.max(0.5, Math.min(2, value))); break;
-            case "volume": if (Double.isFinite(value)) player.setVolume((float)Math.max(0, Math.min(1, value))); break;
-            case "sleep": sleepEnd = value == -1; player.setPauseAtEndOfMediaItems(sleepEnd); sleepAt = value <= 0 ? 0 : System.currentTimeMillis() + (long)(value * 60000); break;
+            case "volume": if (Double.isFinite(value)) { userVolume = (float)Math.max(0, Math.min(1, value)); player.setVolume(userVolume * (ducking ? .2f : 1)); } break;
+            case "sleep": sleepEnd = value == -1; player.setPauseAtEndOfMediaItems(sleepEnd); sleepAt = value <= 0 ? 0 : System.currentTimeMillis() + (long)(value * 60000); handler.removeCallbacks(sleepTask); if (sleepAt > 0) handler.postDelayed(sleepTask, Math.max(1, sleepAt - System.currentTimeMillis())); break;
             case "radio-stop": stopRadio(); break;
             case "radio-retry": radioRetryAt = 0; refillRadio(); break;
             case "equalizer": eqPreset = Math.max(0, Math.min(3, (int)value)); applyEqualizer(); break;
         }
         persist();
         publish();
+        if (action.equals("clear")) handler.post(() -> { if (player.getMediaItemCount() == 0 && !audioFocus.allowed()) stopSelf(); });
     }
 
-    void persist() {
+    void persist() { persist(true); }
+    void persist(boolean includeQueue) {
         if (player == null) return;
-        getSharedPreferences("player", MODE_PRIVATE).edit().putString("queue", state().optJSONArray("queue").toString())
-            .putInt("index", player.getCurrentMediaItemIndex()).putLong("position", player.getCurrentPosition())
+        var editor = getSharedPreferences("player", MODE_PRIVATE).edit();
+        if (includeQueue) editor.putString("queue", state().optJSONArray("queue").toString());
+        editor.putInt("index", player.getCurrentMediaItemIndex()).putLong("position", player.getCurrentPosition())
             .putInt("equalizer", eqPreset).putInt("repeat", player.getRepeatMode())
             .putBoolean("shuffle", player.getShuffleModeEnabled()).putFloat("speed", player.getPlaybackParameters().speed)
-            .putFloat("volume", player.getVolume()).apply();
+            .putFloat("volume", userVolume).apply();
     }
-    void publish() { if (FluxoAudioPlugin.visible) FluxoAudioPlugin.emit("state", state()); }
+    void publish() { publish(true); }
+    void publish(boolean includeQueue) { if (FluxoAudioPlugin.visible) FluxoAudioPlugin.emit("state", state(includeQueue)); }
     @Nullable @Override public MediaSession onGetSession(MediaSession.ControllerInfo controller) { return session; }
     @Override public void onTaskRemoved(Intent rootIntent) { if (player.getMediaItemCount() == 0 || (!isPlaybackOngoing() && !player.getPlayWhenReady())) stopSelf(); }
     @Override public void onDestroy() {
+        AudioDiagnostics.record("service", "destroyed"); audioFocus.release("service_destroyed");
         persist(); handler.removeCallbacksAndMessages(null); instance = null;
         if (connectivity != null && networkCallback != null) connectivity.unregisterNetworkCallback(networkCallback);
         if (equalizer != null) equalizer.release();

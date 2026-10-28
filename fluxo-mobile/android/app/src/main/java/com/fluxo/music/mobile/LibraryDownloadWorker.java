@@ -13,6 +13,9 @@ public class LibraryDownloadWorker extends Worker {
         try {
             var track = LibrarySync.target(context, id);
             if (track == null || isStopped()) return Result.success();
+            if (!context.getSharedPreferences("runtime", 0).getBoolean("backgroundDownloads", true) && !FluxoAudioPlugin.visible) {
+                LibrarySync.status(context, id, "queued", "Aguardando abrir o aplicativo"); return Result.success();
+            }
             var records = LibraryStore.get(context).list();
             for (int i = 0; i < records.length(); i++) {
                 var record = records.getJSONObject(i);

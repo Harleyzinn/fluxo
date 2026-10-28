@@ -17,7 +17,7 @@ final class AudioMeter implements TeeAudioProcessor.AudioBufferSink {
     }
 
     @Override public void handleBuffer(ByteBuffer input) {
-        if (!FluxoAudioPlugin.visible) return;
+        if (!FluxoAudioPlugin.visible || !FluxoAudioPlugin.meterEnabled) return;
         long now = android.os.SystemClock.elapsedRealtime();
         if (now - updated < 70) return;
         updated = now;

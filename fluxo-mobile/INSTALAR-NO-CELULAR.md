@@ -1,15 +1,33 @@
 # Instalar o Fluxo no Android
 
-Download: [Fluxo Mobile 2.7.0 no GitHub](https://github.com/Harleyzinn/fluxo/releases/tag/mobile-v2.7.0). Escolha o arquivo **Fluxo-Mobile-2.7.0.apk** em Assets.
+Esta entrega e o **Fluxo Mobile 2.10.0**. [Baixe o APK Android no GitHub](https://github.com/Harleyzinn/fluxo/releases/download/mobile-v2.10.0/Fluxo-Mobile-2.10.0.apk). E uma pre-release pessoal: nao e uma versao homologada de loja, e os testes fisicos no POCO continuam pendentes.
 
-1. Abra o link acima no celular e baixe o APK, ou envie **dist/Fluxo-Mobile-2.7.0.apk** por cabo USB.
+1. Baixe **Fluxo-Mobile-2.10.0.apk** diretamente no celular ou envie o arquivo da pasta `dist` por USB. Nao precisa hospedar um site ou manter o PC ligado. Instale como atualizacao, sem desinstalar.
 2. No celular, abra o arquivo APK em Downloads ou no gerenciador de arquivos.
 3. Se aparecer o aviso de instalacao bloqueada, toque em Configuracoes e permita instalar apps dessa origem. Volte e toque em Instalar.
 4. Abra **Fluxo Mobile**. A busca fica na aba Buscar; seus arquivos e playlists ficam em Biblioteca.
 5. Na primeira reproducao, permita notificacoes para facilitar os controles. Para importar musicas, toque no icone de pasta e escolha os arquivos.
 6. Salve na biblioteca, favorite ou adicione a uma playlist para baixar automaticamente. Aguarde o progresso terminar. Depois crie uma playlist com Somente musicas baixadas. Ative Ajustes > Baixar so no Wi-Fi para evitar downloads usando dados moveis.
 
+## Novos controles da 2.10
+
+Em Ajustes > Audio > Controles do player, escolha avancos de 5/10/15/30 segundos e ative Mostrar tempo restante. Tocar no tempo direito do player tambem altera essa preferencia, que permanece ao reabrir e no backup.
+
+O seletor de velocidade tem cinco valores rapidos e continua com ajuste fino. Com um timer ativo, abra Temporizador > Adicionar 5 minutos para estender o prazo, ate quatro horas. Um timer que ja expirou nao e reiniciado por esse atalho.
+
+## Player da 2.9, mantido na 2.10
+
+O player mantem os atalhos de dez segundos, volume, radio, download, timer, velocidade e fila. A pausa fica disponivel enquanto carrega. Arrastar a barra mostra o tempo escolhido; soltar aplica somente se aquela ainda for a mesma musica. Toque na duracao do lado direito para mostrar o tempo restante. O layout se reorganiza quando o celular fica deitado.
+
+O visualizador volta ao continuar a reproducao. Em economia ou com visualizador desativado, o Android tambem interrompe o calculo dos niveis; isso nao desliga a musica. Os botoes nao sao recriados a cada atualizacao do progresso.
+
 ## POCO X5 5G / HyperOS
+
+Para verificar a correcao, comece musica no Spotify ou no seu player habitual e abra o Fluxo sem iniciar uma faixa nele. Navegue, deixe o Fluxo em segundo plano e apague a tela. Depois confira notificacoes, mudancas de rede e fones/Bluetooth. Esses testes em aparelho real ainda estao pendentes nesta entrega.
+
+Se houver uma pausa, ative **Ajustes > Sistema > Registrar diagnostico**, repita o cenario e use **Exportar registros tecnicos**. Anote o horario e o que voce estava fazendo. O JSON e local, limitado e nao inclui nomes de musicas, links ou contas. Voce pode desligar o registro e limpar os logs depois.
+
+Ao perder foco para outro aplicativo, o Fluxo pausa somente sua propria musica e aguarda voce tocar em Reproduzir. Ele nao reinicia automaticamente nem tenta controlar a musica do outro app. Iniciar uma faixa do Fluxo intencionalmente pode pausar o outro player pela politica normal do Android.
 
 Na 2.7, edite nome e artista em Menu da musica > Biblioteca > Editar nome e artista. Isso nao regrava o audio e nao reinicia a faixa atual.
 
@@ -25,7 +43,7 @@ Na 2.6, Colecoes > Artistas organiza as faixas da biblioteca e do dispositivo. A
 
 O menu da musica tem secoes recolhiveis. Abra Reproducao para encontrar Tocar a seguir e Infinite Radio. O icone de informacoes mostra origem, tamanho e disponibilidade; Copiar link usa a area de transferencia do telefone. No player, o timer mostra quanto tempo falta.
 
-Os ajustes agora tem as abas Audio, Biblioteca, Visual e Sistema. Notificacoes e bateria ficam em Sistema > Tela apagada e notificacoes. Volume e temporizador ficam em Audio. Use Buscar > Na biblioteca para pesquisar seus arquivos offline; em Colecoes, o campo Buscar playlists encontra suas colecoes.
+Os ajustes agora tem as abas Audio, Biblioteca, Visual, Desempenho e Sistema. Notificacoes e bateria ficam em Sistema > Tela apagada e notificacoes. Volume, temporizador e sons internos ficam em Audio. Desempenho controla economia, cache e downloads em segundo plano. Claro/escuro/automatico fica em Visual. Use Buscar > Na biblioteca para pesquisar seus arquivos offline; em Colecoes, o campo Buscar playlists encontra suas colecoes.
 
 Na lista de musicas, o icone de selecao abre as acoes em lote. O filtro nao apaga a selecao; Todas seleciona a colecao filtrada inteira, nao apenas as linhas visiveis. No menu da playlist, Fixar playlist a coloca no topo. O historico completo abre pelo resumo Historico em Colecoes.
 

@@ -8,7 +8,7 @@ Windows: [release 3.9.35](https://github.com/Harleyzinn/fluxo/releases/tag/v3.9.
 
 ## Fluxo Mobile para Android
 
-**Versao mobile 2.7.0** | [Baixar o APK Android](https://github.com/Harleyzinn/fluxo/releases/download/mobile-v2.7.0/Fluxo-Mobile-2.7.0.apk) | [Release mobile](https://github.com/Harleyzinn/fluxo/releases/tag/mobile-v2.7.0) | [Guia de instalacao](fluxo-mobile/INSTALAR-NO-CELULAR.md)
+**Versao mobile 2.10.0** | [Baixar o APK Android](https://github.com/Harleyzinn/fluxo/releases/download/mobile-v2.10.0/Fluxo-Mobile-2.10.0.apk) | [Release mobile](https://github.com/Harleyzinn/fluxo/releases/tag/mobile-v2.10.0) | [Guia de instalacao](fluxo-mobile/INSTALAR-NO-CELULAR.md)
 
 App independente para **Android 7 ou superior**. Nao e um controle remoto: toca no proprio celular e nao precisa do computador ligado nem de um site hospedado.
 
@@ -30,6 +30,9 @@ App independente para **Android 7 ou superior**. Nao e um controle remoto: toca 
 - Importacao/exportacao individual de playlists, compartilhamento nativo de links e downloads automaticos por playlist mesmo com o ajuste geral desligado.
 - Downloads deduplicados por URL, cancelamento dos identificadores equivalentes, espaco livre e mensagens de espera/falha mais precisas.
 - 68 paletas adaptadas do desktop, favoritos, historico, fila editavel, temporizador, velocidade e equalizador.
+- Player com barra estavel, protecao contra comandos atrasados, controles durante carregamento e layout em paisagem. Atalhos de 5/10/15/30 segundos e tempo restante persistente.
+- Velocidades rapidas, extensao de cinco minutos do timer e preferencias de audio preservadas em atualizacoes parciais.
+- Correcao da retomada indevida de foco apos falha de stream; diagnostico opcional, interface silenciosa, modo economico e central de ajustes dividida em cinco categorias.
 - Permissao de notificacoes quando necessaria; importacao pelo seletor de arquivos, sem acesso geral ao armazenamento.
 
 **Novidades da 2.1.0:** area de Aparencia dividida em Visual, Player e Estilos salvos; cores principal, secundaria e fundo; fontes e tamanho do texto; espacamento, cantos e formato das capas; temas favoritos; ate 12 estilos pessoais; capas de playlists com icones e cores; visualizadores em barras/onda e player compacto. Playlists alternam entre grade/lista e a fila mostra a ordem das faixas. A personalizacao acompanha o backup.

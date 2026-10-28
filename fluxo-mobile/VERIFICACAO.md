@@ -1,4 +1,54 @@
-# Verificacao da Versao 2.7.0
+# Verificacao da Versao 2.10.0
+
+27 de outubro de 2026. Pre-release pessoal Android; validacao fisica pendente.
+
+- 54 testes de dados/preferencias, oito verificacoes Java e quatro testes JUnit passaram.
+- Player: atalhos de 5/10/15/30 segundos, preferencia de tempo persistente, presets de velocidade e extensao do timer passaram. A matriz de 16 layouts, 16 telas de navegacao, 24 combinacoes de aparencia, ajustes/backup/cache e colecoes/fila passou.
+- Android: configuracoes parciais nao reativaram medidor nem desligaram diagnostico; modos invalidos preservaram a preferencia anterior. Busca valida pausada, comandos antigos recusados, fila fria, PCM e arraste estavel passaram.
+- Tres falhas controladas do renderer: processo/audio preservados, recuperacao em segundo plano adiada ate o retorno, limite de tentativas e botao manual funcionando sem pedir foco extra ou iniciar audio ocioso.
+- A falha real de memoria foi observada em API 37 com 2 GB. A rodada final usa 4 GB. Atualizacao automatica do WebView interrompeu uma tentativa anterior; nao e contada como aprovada. Sem nova comparacao de PSS/bateria.
+- O [registro final de foco e tela apagada](https://github.com/Harleyzinn/fluxo/releases/download/mobile-v2.10.0/RESULTADOS-2.10.0.json) e distribuido na release, vinculado ao SHA-256 do APK. Os resultados historicos abaixo nao substituem essa verificacao.
+- APK SHA-256 `1b29936e2fb9486c5b26c73526169eee47f98d8174879bc4bbfff2a5493d9836`. Certificado anterior preservado; instale como atualizacao, sem desinstalar.
+
+[Relatorio, limites e arquivos da 2.10](docs/PLAYER-2.10.md). POCO/HyperOS, Spotify real, Bluetooth/fones e horas de uso fisicos ainda pendentes.
+
+## Evidencias da Versao 2.9.0
+
+17 de outubro de 2026. Compilacao local de teste, Android API 37 em emulador e Microsoft Edge. O POCO/HyperOS fisico continua pendente.
+
+- 51 testes de dados/estado e oito verificacoes Java de autorizacao passaram.
+- Novo player: pausa durante buffering, arraste sem substituicao do elemento, foco preservado e progresso retomado apos confirmar, cancelamento, troca de faixa durante o arraste, tempo restante, timer pausado e visualizador retomado passaram.
+- Atualizacoes apenas de progresso nao causaram mutacoes nos botoes principais. Velocidade com imprecisao de float foi exibida sem casas extras.
+- 16 combinacoes do novo player em 320/390/820 px e paisagem 844x390, claro/escuro, texto maior e compacto/capa, sem controles fora da tela. Passaram tambem 16 telas de navegacao, 24 combinacoes de aparencia, ajustes/backup e colecoes/fila/atalhos.
+- Android real do emulador: busca antiga nao iniciou servico nem pediu foco; comandos com faixa/URL antiga foram recusados, busca valida manteve a pausa e arraste sobreviveu aos ticks nativos. Economia desligou o medidor; modo equilibrado reativou niveis de PCM.
+- Fila fria: posicao, embaralhar e adicionar a fila atualizaram a interface sem iniciar servico. Posicao foi preservada enquanto pausada.
+- Android enviou velocidade `1.100000023841858`; a interface mostrou o rotulo compacto de 1,1 vezes.
+- Alternar apenas o estado online/offline do radio atualizou o indicador imediatamente. O teste reproduziu o rotulo antigo antes da correcao.
+- Na compilacao final, a falha de stream seguida de 65 segundos com outro player terminou com zero perdas de foco externo. Passaram tambem nove cenarios de coexistencia: sons internos, segundo plano, tela bloqueada, avisos, rede, alternancia de apps, preferencias/cache e download real. Economia do sistema nao foi contada como aprovada nesta rodada, pois sua ativacao no emulador foi inconsistente.
+- Stream proprio avancou 183,9 segundos durante tres minutos com tela apagada, com servico em primeiro plano. Pausar, Continuar e Proxima pela notificacao passaram. Radio online retornou sete faixas sem repetidas; encerrar radio, radio offline e temporizador ao fim passaram. Inicio do stream em 15,0 segundos nesta rede/fonte, sem alegacao de ganho de velocidade. Uma tentativa anterior de toque na notificacao foi inconclusiva; detalhes no relatorio.
+- APK `Fluxo-Mobile-2.9.0.apk`, SHA-256 `1ea2223fa5b3574092ff3ec91f46d8640d7fb01f663bdf055ef7d34e875efdb4`. Assinatura anterior preservada; instalado sobre a 2.8 sem apagar dados.
+
+[Detalhes das correcoes e limites](docs/PLAYER-2.9.md). Sem nova medicao de PSS/bateria nesta rodada; nao se afirma reducao de RAM. Spotify real, Bluetooth e teste no POCO continuam pendentes.
+
+## Evidencias da Versao 2.8.0
+
+Validacao em 11 de outubro de 2026, Android API 37 em emulador e Microsoft Edge. O POCO X5 5G fisico nao estava conectado. APK local de teste, nao publicado como release validada.
+
+- 47 testes de dados/preferencias/cache, oito verificacoes Java de autorizacao e quatro testes JUnit no Gradle passaram. O teste instrumentado de contexto foi corrigido, mas nao foi executado nem contado como teste de audio.
+- Uma causa de interferencia foi reproduzida na 2.7: recuperacao de stream apos perda transitoria retomou foco sem nova acao do usuario e pausou o player externo de teste. Na 2.8, o mesmo cenario manteve o player externo tocando por 65 segundos, zero perdas, sem recuperacao ou nova solicitacao de foco pelo Fluxo.
+- No APK final, coexistencia passou durante navegacao, segundo plano, tela bloqueada, efeitos opcionais, alternancia de apps, perda/retorno de rede e economia de bateria do Android confirmada ativa.
+- Download real de fixture oficial pequeno concluiu com notificacao silenciosa no canal proprio, sem interromper o player externo. Um download maior do Google excedeu quatro minutos com progresso parcial; esse teste nao foi contado como aprovado.
+- Interface: 16 telas, 24 combinacoes de personalizacao, biblioteca de 250 faixas, selecao de 183 e ferramentas de playlists. Nova central em cinco categorias, claro/escuro/automatico, backup aplicado imediatamente, limpeza segura e 18 capturas em 320/390/820 px passaram.
+- Android: migracao/reparacao com SHA-256, arquivos privados e playlists apos reinicio, aliases, volume, restauracao sem autoplay e organizacao de fila sem perder posicao. Edicao preservou audio/pausa; download por playlist, deduplicacao concorrente, cancelamento, compartilhar e seletor de exportacao passaram.
+- Stream proprio avancou 180,7 segundos em tres minutos com tela apagada no APK final; notificacao nativa pausou, continuou e passou de faixa. Radio online retornou sete faixas sem repetidas, radio offline e temporizador ao fim passaram. Inicio do stream: 4,2 segundos nesta ultima execucao (5,9 na anterior), dependente da fonte/rede.
+- Medicao sequencial de tres aberturas por versao: mediana 3970 -> 3044 ms; eventos ociosos 8/9/8 -> 0/0/0; servico passivo deixou de existir. PSS mediano 154619 -> 159962 KB, cerca de 3,5% maior, portanto reducao de RAM nao foi comprovada.
+- Segunda rodada alternando versoes: abertura 5153 -> 4259 ms, cerca de 17% menor; PSS 138514 -> 146246 KB, cerca de 5,6% maior. Memoria continua como pendencia de desempenho, sem alegacao de ausencia de regressao.
+- APK `dist/Fluxo-Mobile-2.8.0.apk`, SHA-256 `1aefa4948c56ed15af9927afca53eb0e773ba15a376a696c85ef42327e0e440c`. Certificado igual ao anterior: `42dc5c2adbe56aefb20922bd7ba4392c0413f7948122530132474876ea874bbb`. Atualizacao sem apagar dados passou no emulador.
+- Auditoria JavaScript de producao: zero vulnerabilidades reportadas, sem alegar auditoria completa das dependencias Android.
+
+Aceitacao final pendente: Spotify/YouTube Music/Apple Music reais, POCO/HyperOS, Bluetooth/fones, redes fisicas, horas de uso e perfilagem de memoria/bateria. [Relatorio detalhado, arquivos alterados, limites e matriz dos 14 cenarios](docs/RELATORIO-2.8.md).
+
+## Evidencias da Versao 2.7.0
 
 Validacao em 3 de outubro de 2026, Android API 37 em emulador e Microsoft Edge. O POCO X5 5G fisico nao estava conectado.
 

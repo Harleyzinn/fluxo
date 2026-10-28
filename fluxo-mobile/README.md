@@ -1,12 +1,12 @@
-# Fluxo Mobile 2.7
+# Fluxo Mobile 2.10
 
 App independente para **Android 7 ou superior**, reconstruido na pasta `fluxo-mobile`. Nao precisa do Fluxo de PC nem de um servidor seu para tocar. A interface usa HTML/CSS/JavaScript dentro do Capacitor; o audio, a sessao de midia, a extracao de streams e os arquivos sao tratados em Java no Android.
 
 ## Instalar e usar
 
-Download: [Fluxo Mobile 2.7.0 para Android](https://github.com/Harleyzinn/fluxo/releases/tag/mobile-v2.7.0). Baixe o arquivo `Fluxo-Mobile-2.7.0.apk`, nao os pacotes de codigo-fonte.
+Versao pessoal de teste 2.10.0: [baixar o APK Android](https://github.com/Harleyzinn/fluxo/releases/download/mobile-v2.10.0/Fluxo-Mobile-2.10.0.apk), [notas e codigo da release](https://github.com/Harleyzinn/fluxo/releases/tag/mobile-v2.10.0). Inclui as correcoes locais de 2.8/2.9, antes nao publicadas. E uma pre-release: POCO/HyperOS, Spotify real e Bluetooth fisicos continuam pendentes de validacao.
 
-1. Abra o link de download no celular ou envie `dist/Fluxo-Mobile-2.7.0.apk` por USB.
+1. Baixe `Fluxo-Mobile-2.10.0.apk` no celular ou envie `dist/Fluxo-Mobile-2.10.0.apk` por USB. Atualize a instalacao existente, sem desinstalar.
 2. Abra o APK no celular. Quando o Android pedir, permita instalar apps dessa origem. Depois da instalacao, voce pode desativar essa permissao novamente.
 3. Abra o Fluxo. Procure uma musica na aba **Buscar** ou use o botao de pasta para importar seus arquivos.
 4. Ao iniciar a primeira reproducao ou download, o app pede notificacoes no Android 13 ou superior. Negar nao impede tocar. O seletor de arquivos concede acesso somente aos arquivos escolhidos, sem pedir acesso geral ao armazenamento.
@@ -16,6 +16,48 @@ Download: [Fluxo Mobile 2.7.0 para Android](https://github.com/Harleyzinn/fluxo/
 **Nao precisa upar um site para usar o aplicativo.** O APK ja contem o app. O endereco de pre-visualizacao no computador e apenas uma ferramenta de desenvolvimento, nao e o app Android.
 
 Este APK e uma compilacao de desenvolvimento assinada para instalacao pessoal. Para publicar na Play Store ou distribuir atualizacoes permanentes, gere uma chave de assinatura de producao no Android Studio em **Build > Generate Signed App Bundle / APK**. Guarde essa chave: uma atualizacao precisa da mesma assinatura. Nao envie senhas nem a chave ao GitHub. Uma assinatura diferente exige desinstalar o app anterior, apagando seus arquivos privados; exporte os dados antes e preserve os audios originais.
+
+## Novidades da 2.10.0
+
+- Ajustes > Audio > Controles do player permite escolher atalhos de 5, 10, 15 ou 30 segundos. Os icones e rotulos acompanham o valor escolhido.
+- A opcao de mostrar o tempo restante e salva entre aberturas, inclusive quando alterada pelo player. As duas preferencias acompanham o backup, sem alterar estilos de aparencia.
+- Cinco velocidades rapidas no seletor, mantendo o ajuste fino por barra. Temporizador ativo pode ganhar cinco minutos, respeitando o limite de quatro horas.
+- Configuracoes nativas parciais preservam economia, visualizador, notificacoes, sons e diagnostico. O medidor tambem recupera o estado salvo ao carregar a ponte Android. Alterar preferencias nao inicia audio nem disputa foco.
+- A perda do renderer WebView e tratada sem encerrar intencionalmente o processo de audio. A interface e reconstruida ao voltar ao app, com limite de tentativas e acao manual em caso de repeticao. Isso nao impede o Android de encerrar o processo inteiro por falta de recursos.
+- Publicacao mobile separada do Windows, com verificacao dos arquivos enviados e downloads publicos. O workflow Android agora executa os testes Java antes de gerar o APK.
+
+[Relatorio da 2.10](docs/PLAYER-2.10.md). As melhorias de 2.8/2.9 abaixo estao incluidas nesta primeira publicacao posterior a 2.7.
+
+A release inclui `RESULTADOS-2.10.0.json` com os testes finais e o hash do APK, alem de `SHA256SUMS.txt`. A publicacao recusa um APK sem evidencias nativas correspondentes. Para manutencao, `scripts/publish-github.mjs` oferece os modos check/draft/upload/publish/verify e nao altera Windows Latest.
+
+## Player da 2.9.0
+
+- Capa, nome, origem, fila, transporte e ferramentas com hierarquia mais clara. Layout proprio em paisagem, texto ampliado, claro/escuro e layout compacto preservados.
+- Barra com progresso e buffer separados. O tempo acompanha o arraste; atualizacoes nao recriam o controle nem tiram seu foco. Depois da confirmacao, a barra volta a acompanhar o audio mesmo se continuar focada.
+- Uma busca de posicao atrasada nao pode mover outra faixa. O Android confere indice, identificador e URL na mesma thread do comando; requisicao antiga com servico encerrado e recusada sem inicializar outro player.
+- Fila restaurada: posicao, embaralhar e adicionar a fila atualizam a tela sem ligar o servico. A posicao pode ser salva enquanto pausado, sem pedir foco de audio.
+- Pausa continua visivel durante o carregamento; o indicador gira somente no estado, nao no botao principal. Erros mostram a acao Tentar novamente.
+- Visualizador volta depois de pausar/continuar e limpa o desenho ao parar. O medidor nativo nao calcula niveis no modo economico ou com visualizador desativado.
+- Temporizador visivel continua contando com a musica pausada. A atualizacao visual para quando a tela do player e fechada ou o app fica oculto; o temporizador Android continua independente.
+- Toque na duracao para alternar total/restante. Velocidades sao formatadas com no maximo duas casas, sem expor a imprecisao numerica do Android.
+- O indicador do radio acompanha a alternancia online/offline imediatamente, mesmo quando a musica e a fila continuam iguais.
+- Atualizacoes de progresso nao redesenham os botoes. A politica de foco da 2.8, a biblioteca, os downloads, as playlists e os temas continuam preservados.
+
+Veja [correcoes, testes e limites da 2.9](docs/PLAYER-2.9.md). A reducao de RAM ainda nao foi comprovada e a validacao fisica permanece necessaria.
+
+## Novidades da 2.8.0
+
+- Foco de audio centralizado e exclusivo para reproducao propria solicitada explicitamente. Perder foco cancela a recuperacao e nao dispara nova disputa automatica com outro player. Nenhum comando e enviado ao player externo.
+- Corrigida uma causa reproduzivel: a recuperacao de um stream que falhava voltava a solicitar foco depois de uma perda transitoria. Teste antes/depois com outro APK Android de audio; Spotify real e POCO fisico ainda pendentes.
+- Abrir o app, ler o estado, alterar volume ou adicionar a fila ociosa nao inicializa o player. Restaurar a fila nao toca automaticamente.
+- Diagnostico opcional, local e limitado a 250 eventos. Ajustes > Sistema permite ativar, consultar, exportar e limpar os registros, sem titulos, links ou contas no arquivo tecnico.
+- Configuracoes divididas em Audio, Biblioteca, Visual, Desempenho e Sistema. Interface silenciosa por padrao; sons e feedback tatil opcionais. Avisos de download configuraveis e conclusao silenciosa.
+- Modos claro, escuro e automatico com contraste ajustado, alem das 68 paletas existentes. Controles consistentes, foco acessivel e menos efeitos pesados.
+- Modo equilibrado/economia, pre-carregamento controlavel, downloads em segundo plano e cache temporario com limite. Limpar cache nao remove musicas, playlists ou favoritos.
+- Atualizacoes do player enviam progresso sem a fila inteira; consultas duplicadas de downloads compartilham uma operacao. A interface oculta e o visualizador pausado nao continuam atualizando.
+- Preferencias restauradas de backup sao aplicadas imediatamente ao Android. Playlists, arquivos e temas anteriores foram preservados.
+
+Veja [o relatorio tecnico e a matriz de validacao](docs/RELATORIO-2.8.md). O APK e uma compilacao pessoal de desenvolvimento, nao uma versao homologada em aparelhos fisicos. Tocar intencionalmente uma musica no Fluxo pode pausar outra musica pela politica normal do Android; abrir e navegar nao devem disputar esse foco.
 
 ## Novidades da 2.7.0
 
@@ -195,6 +237,10 @@ Abra `http://127.0.0.1:5174`. Os testes de interface usam Playwright e Microsoft
 `npm run test:professional` verifica artistas, informacoes das faixas, cache/filtros/cancelamento de busca, menus antigos e layouts. `npm run test:android:professional` confere a integracao nativa, os arquivos offline, o extrator real e os comandos da fila. Veja `VERIFICACAO.md` para as evidencias da versao publicada.
 
 `npm run test:library-tools` cobre descricao, preferencia da playlist, ordem/desfazer, edicao, exportacao/importacao e layout. `npm run test:android:library-tools` verifica edicao sem reiniciar o player, SHA-256 do audio preservado, downloads concorrentes equivalentes, cancelamento, compartilhamento e seletor de exportacao. Use somente um dispositivo de teste: as suites nativas alteram rede, fila e preferencias durante a verificacao.
+
+`npm run test:audio-policy` confere autorizacao/geracoes sem Android. `npm run test:studio` verifica cores, configuracoes, backup e layouts. `npm run test:android:focus` usa o APK separado em `tests/fixtures/audio-probe`, compilado por `scripts/build-audio-probe.ps1`, e testa coexistencia, avisos e recuperacao; configure `ANDROID_HOME` e `ANDROID_SERIAL` para um emulador de teste. A suite alterna rede e limpa seus fixtures. A economia do sistema e um cenario opcional com `FOCUS_TEST_BATTERY=1`, que exige confirmar que o Android realmente ativou o modo. Nao execute contra seu telefone de uso diario sem preparar um ambiente de teste.
+
+`npm run test:player` verifica pausa durante carregamento, arraste estavel, foco, troca de faixa, tempo restante, velocidade, retomada do visualizador e 16 combinacoes de layout. `npm run test:android:player` confere a ponte real, comandos antigos recusados, pausa preservada, medidor economico e arraste no WebView. As suites nativas devem rodar uma de cada vez e somente no dispositivo de teste configurado.
 
 ## GitHub e Novas Compilacoes
 

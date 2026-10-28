@@ -3,6 +3,7 @@
   "appName": "Fluxo Mobile",
   "webDir": "www",
   "bundledWebRuntime": false,
+  "loggingBehavior": "none",
   "server": {
     "androidScheme": "https"
   },
